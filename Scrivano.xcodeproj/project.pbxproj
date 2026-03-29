@@ -32,6 +32,8 @@
 		C735256980942ABC18C767A5 /* RecordingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05E9C746849DA8E5306E4EED /* RecordingView.swift */; };
 		D9EBFC7425DD2A88D689FBCC /* HelpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 610CED47007FEE1EF0D9D201 /* HelpView.swift */; };
 		E5E86AE4DC49FA27AE914E20 /* AutomationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D9B5E5904908D1A7C47A194 /* AutomationView.swift */; };
+		EDADD3885184A95FC95C4252 /* TranscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4652AD022253507EFDCBB835 /* TranscriptionManager.swift */; };
+		F4EF985C8EF327D82873A0EF /* VerifyCodeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE3F145DC89C9A2CFB627070 /* VerifyCodeView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -45,6 +47,7 @@
 		333DD858467181392B3624BE /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		352AFF83E7A6FA701F540953 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		42DB24EBC0D8FD24E722D0F2 /* NotesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesListView.swift; sourceTree = "<group>"; };
+		4652AD022253507EFDCBB835 /* TranscriptionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionManager.swift; sourceTree = "<group>"; };
 		610CED47007FEE1EF0D9D201 /* HelpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpView.swift; sourceTree = "<group>"; };
 		6DC7A5E1F0B8F2C72AAB26C4 /* PromptsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptsView.swift; sourceTree = "<group>"; };
 		7203BAC61936ECAD650B9880 /* RecorderSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecorderSettingsView.swift; sourceTree = "<group>"; };
@@ -61,6 +64,7 @@
 		D4741B2296ADDC623C44796A /* TextListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextListView.swift; sourceTree = "<group>"; };
 		DB4D06DCC2F419CCE4724A19 /* SignupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignupView.swift; sourceTree = "<group>"; };
 		DB942C17ECC38870DA121384 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
+		DE3F145DC89C9A2CFB627070 /* VerifyCodeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyCodeView.swift; sourceTree = "<group>"; };
 		F1E0E1EA57EB073389E1C64E /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		FB8204215F6E3D3B4877AFCC /* TextViewerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextViewerView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -184,6 +188,7 @@
 				C16ACC11E84E43688CE2D1A2 /* ForgotPasswordView.swift */,
 				06D498FDBFD2BF086DFBE841 /* LoginView.swift */,
 				DB4D06DCC2F419CCE4724A19 /* SignupView.swift */,
+				DE3F145DC89C9A2CFB627070 /* VerifyCodeView.swift */,
 			);
 			path = Auth;
 			sourceTree = "<group>";
@@ -220,6 +225,7 @@
 			isa = PBXGroup;
 			children = (
 				8215945EBEE41425AAFA0B45 /* APIClient.swift */,
+				4652AD022253507EFDCBB835 /* TranscriptionManager.swift */,
 			);
 			path = API;
 			sourceTree = "<group>";
@@ -339,6 +345,8 @@
 				B3CC2F84BDAA1803BB3E1EF8 /* SignupView.swift in Sources */,
 				9D84908CBC8F2D1856494134 /* TextListView.swift in Sources */,
 				5C738AACAA822D8A6488E3E1 /* TextViewerView.swift in Sources */,
+				EDADD3885184A95FC95C4252 /* TranscriptionManager.swift in Sources */,
+				F4EF985C8EF327D82873A0EF /* VerifyCodeView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

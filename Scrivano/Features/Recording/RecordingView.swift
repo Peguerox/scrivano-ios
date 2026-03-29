@@ -5,7 +5,10 @@ struct RecordingView: View {
     let item: Item
     @Environment(\.dismiss) var dismiss
     @StateObject private var recorder = AudioRecorderManager()
+    @StateObject private var transcriptionMgr = TranscriptionManager.shared
     @State private var showConfirmStop = false
+    @State private var isUploading = false
+    @State private var uploadError: String? = nil
 
     var body: some View {
         ZStack {
@@ -98,7 +101,18 @@ struct RecordingView: View {
 
                             // Stop
                             Button {
+                                let duration = Double(recorder.elapsedSeconds)
+                                let url = recorder.recordedFileURL
                                 recorder.stop()
+                                if let url = url, duration > 0 {
+                                    Task {
+                                        await transcriptionMgr.transcribe(
+                                            audioURL: url,
+                                            durationSeconds: duration,
+                                            itemId: item.id
+                                        ) { _ in }
+                                    }
+                                }
                                 dismiss()
                             } label: {
                                 Image(systemName: "stop.fill")

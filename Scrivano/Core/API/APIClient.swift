@@ -139,6 +139,40 @@ final class APIClient {
             responseType: TaskResult.self
         )
     }
+
+    // MARK: - Refresh token
+    func refreshToken() async throws {
+        guard let refresh = KeychainService.shared.getRefreshToken() else {
+            throw APIClientError.unauthorized
+        }
+        struct Body: Encodable { let refreshToken: String; enum CodingKeys: String, CodingKey { case refreshToken = "refresh_token" } }
+        struct Res: Decodable { let success: Bool; let token: String?; let refreshToken: String?; enum CodingKeys: String, CodingKey { case success, token; case refreshToken = "refresh_token" } }
+        let res = try await request(path: "/api/auth/refresh", method: "POST", body: Body(refreshToken: refresh), responseType: Res.self)
+        if let token = res.token {
+            KeychainService.shared.saveToken(token)
+            if let r = res.refreshToken { KeychainService.shared.saveRefreshToken(r) }
+        } else {
+            throw APIClientError.unauthorized
+        }
+    }
+
+    // MARK: - Cancel task
+    func cancelTask(taskId: String, endpoint: String) async throws {
+        struct Body: Encodable { let taskId: String; enum CodingKeys: String, CodingKey { case taskId = "task_id" } }
+        struct Res: Decodable { let success: Bool }
+        let _ = try await request(path: endpoint, method: "POST", body: Body(taskId: taskId), responseType: Res.self)
+    }
+
+    // MARK: - Save transcript
+    func saveTranscript(itemId: String, text: String, audioFileId: String) async throws {
+        struct Body: Encodable {
+            let itemId: String; let text: String; let audioFileId: String
+            enum CodingKeys: String, CodingKey { case itemId = "item_id"; case text; case audioFileId = "audio_file_id" }
+        }
+        struct Res: Decodable { let success: Bool; let message: String? }
+        let res = try await request(path: "/api/audio/save-transcript", method: "POST", body: Body(itemId: itemId, text: text, audioFileId: audioFileId), responseType: Res.self)
+        if !res.success { throw APIClientError.serverError(res.message ?? "Failed to save transcript.") }
+    }
 }
 
 // MARK: - Encodable helpers

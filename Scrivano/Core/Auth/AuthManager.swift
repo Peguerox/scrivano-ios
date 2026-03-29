@@ -55,7 +55,7 @@ final class AuthManager: ObservableObject {
     }
 
     // MARK: - Register
-    func register(email: String, password: String, firstName: String) async {
+    func register(email: String, password: String, firstName: String, lastName: String = "") async {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -64,9 +64,11 @@ final class AuthManager: ObservableObject {
             let email: String
             let password: String
             let firstName: String
+            let lastName: String
             enum CodingKeys: String, CodingKey {
                 case email, password
                 case firstName = "first_name"
+                case lastName  = "last_name"
             }
         }
 
@@ -78,7 +80,7 @@ final class AuthManager: ObservableObject {
             let res = try await api.request(
                 path: "/api/auth/register",
                 method: "POST",
-                body: RegisterBody(email: email, password: password, firstName: firstName),
+                body: RegisterBody(email: email, password: password, firstName: firstName, lastName: lastName),
                 responseType: RegisterResponse.self
             )
             if !res.success {
