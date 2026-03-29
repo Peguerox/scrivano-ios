@@ -1,0 +1,545 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0770A7DBD7A3A7D7BF5B0AE9 /* ForgotPasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C16ACC11E84E43688CE2D1A2 /* ForgotPasswordView.swift */; };
+		34263979EA5FD8821A9D124A /* ItemCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9813A14F177A7249DCF5C5A4 /* ItemCardView.swift */; };
+		3DDB9201EF1620E403A19133 /* MediaListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19E4226696BC227E8507A928 /* MediaListView.swift */; };
+		3ED482B75507F9380DFCFF5B /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB942C17ECC38870DA121384 /* KeychainService.swift */; };
+		43A0FC1414462AFCF730681C /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75D2368C9687DA615DA21827 /* Models.swift */; };
+		4D641050BC7A3B917E77B876 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEB1E7E916DFB38C85A373E8 /* DesignSystem.swift */; };
+		4DD89E2BAA52D3D37258F3FF /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8215945EBEE41425AAFA0B45 /* APIClient.swift */; };
+		5C738AACAA822D8A6488E3E1 /* TextViewerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB8204215F6E3D3B4877AFCC /* TextViewerView.swift */; };
+		607DA6A944FCE732A31DDA3C /* CreditsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286834DB0A6C04CAC314AF52 /* CreditsView.swift */; };
+		7111478265D2C8BEAE8F602B /* AudioPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E2D40F3D5F1D7E67B8A7F09 /* AudioPlayerView.swift */; };
+		79357EE76543D402E0E65BA8 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C793A2599B4AB77720F052D /* RootView.swift */; };
+		8890063D99A3BAA04D5E375F /* PromptsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DC7A5E1F0B8F2C72AAB26C4 /* PromptsView.swift */; };
+		98482BC84F71738776A0B712 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1E0E1EA57EB073389E1C64E /* DashboardView.swift */; };
+		9D84908CBC8F2D1856494134 /* TextListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4741B2296ADDC623C44796A /* TextListView.swift */; };
+		9F07F45CFB8EFB879684CC6E /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 352AFF83E7A6FA701F540953 /* SettingsView.swift */; };
+		A210A4CFC233027292A7C411 /* RecorderSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7203BAC61936ECAD650B9880 /* RecorderSettingsView.swift */; };
+		B11BC849722C139A2AEFD759 /* ScrivanoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B396376BA27985C0B2CFFC0 /* ScrivanoApp.swift */; };
+		B20BA0781FED73885500B188 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06D498FDBFD2BF086DFBE841 /* LoginView.swift */; };
+		B232BDD9179E5EF9F4471632 /* NotesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42DB24EBC0D8FD24E722D0F2 /* NotesListView.swift */; };
+		B2B009E3B161F7C8CE9D99BC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 333DD858467181392B3624BE /* Assets.xcassets */; };
+		B3CC2F84BDAA1803BB3E1EF8 /* SignupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB4D06DCC2F419CCE4724A19 /* SignupView.swift */; };
+		BBB1425C89B8CF158D76C4C7 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B214B81BF8848ECCE7BED5E0 /* AuthManager.swift */; };
+		C735256980942ABC18C767A5 /* RecordingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05E9C746849DA8E5306E4EED /* RecordingView.swift */; };
+		D9EBFC7425DD2A88D689FBCC /* HelpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 610CED47007FEE1EF0D9D201 /* HelpView.swift */; };
+		E5E86AE4DC49FA27AE914E20 /* AutomationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D9B5E5904908D1A7C47A194 /* AutomationView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		05E9C746849DA8E5306E4EED /* RecordingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingView.swift; sourceTree = "<group>"; };
+		06D498FDBFD2BF086DFBE841 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
+		19E4226696BC227E8507A928 /* MediaListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaListView.swift; sourceTree = "<group>"; };
+		1B396376BA27985C0B2CFFC0 /* ScrivanoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrivanoApp.swift; sourceTree = "<group>"; };
+		1C793A2599B4AB77720F052D /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		20CAE2611C0D530DDFD894DF /* Scrivano.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Scrivano.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		286834DB0A6C04CAC314AF52 /* CreditsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreditsView.swift; sourceTree = "<group>"; };
+		333DD858467181392B3624BE /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		352AFF83E7A6FA701F540953 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		42DB24EBC0D8FD24E722D0F2 /* NotesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesListView.swift; sourceTree = "<group>"; };
+		610CED47007FEE1EF0D9D201 /* HelpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpView.swift; sourceTree = "<group>"; };
+		6DC7A5E1F0B8F2C72AAB26C4 /* PromptsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptsView.swift; sourceTree = "<group>"; };
+		7203BAC61936ECAD650B9880 /* RecorderSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecorderSettingsView.swift; sourceTree = "<group>"; };
+		75D2368C9687DA615DA21827 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		8215945EBEE41425AAFA0B45 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		8D9B5E5904908D1A7C47A194 /* AutomationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationView.swift; sourceTree = "<group>"; };
+		9813A14F177A7249DCF5C5A4 /* ItemCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemCardView.swift; sourceTree = "<group>"; };
+		9E2D40F3D5F1D7E67B8A7F09 /* AudioPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayerView.swift; sourceTree = "<group>"; };
+		B214B81BF8848ECCE7BED5E0 /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
+		BE38C6949473AF349912B673 /* Scrivano.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Scrivano.entitlements; sourceTree = "<group>"; };
+		BEB1E7E916DFB38C85A373E8 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
+		C16ACC11E84E43688CE2D1A2 /* ForgotPasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForgotPasswordView.swift; sourceTree = "<group>"; };
+		C5880976E496DD746B0E2172 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		D4741B2296ADDC623C44796A /* TextListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextListView.swift; sourceTree = "<group>"; };
+		DB4D06DCC2F419CCE4724A19 /* SignupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignupView.swift; sourceTree = "<group>"; };
+		DB942C17ECC38870DA121384 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
+		F1E0E1EA57EB073389E1C64E /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		FB8204215F6E3D3B4877AFCC /* TextViewerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextViewerView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		2492FB5D9041665A99A9A95C /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				8D9B5E5904908D1A7C47A194 /* AutomationView.swift */,
+				286834DB0A6C04CAC314AF52 /* CreditsView.swift */,
+				610CED47007FEE1EF0D9D201 /* HelpView.swift */,
+				7203BAC61936ECAD650B9880 /* RecorderSettingsView.swift */,
+				352AFF83E7A6FA701F540953 /* SettingsView.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		29F5D4E53F9CCE62274E3C3E /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				20CAE2611C0D530DDFD894DF /* Scrivano.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		2EA59521902542BBEC18C101 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				75D2368C9687DA615DA21827 /* Models.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		3100E89F289C6007D1063EE8 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				707FDA0F50C016A16FDD3472 /* Auth */,
+				BA677EC99B8305009FF8D276 /* Dashboard */,
+				D14610D7AE3C50B31018AFDA /* Media */,
+				64F9BAC4B0144F3214FC080B /* Notes */,
+				5BD103BA1A278F406F5725B4 /* Prompts */,
+				5DC2847770DEBA7073B96460 /* Recording */,
+				2492FB5D9041665A99A9A95C /* Settings */,
+				52318F8F0E1C45E5E8F139D0 /* Shared */,
+				A80F8464EA37B12E9F6CAFA2 /* Text */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		32479CBA395A66A9F7A2FBA2 /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				B214B81BF8848ECCE7BED5E0 /* AuthManager.swift */,
+				DB942C17ECC38870DA121384 /* KeychainService.swift */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
+		52318F8F0E1C45E5E8F139D0 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				BEB1E7E916DFB38C85A373E8 /* DesignSystem.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		533E385304771ABC72D270CF /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				333DD858467181392B3624BE /* Assets.xcassets */,
+				C5880976E496DD746B0E2172 /* Info.plist */,
+				BE38C6949473AF349912B673 /* Scrivano.entitlements */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		5A865D38897A2B796DA527EF /* App */ = {
+			isa = PBXGroup;
+			children = (
+				1C793A2599B4AB77720F052D /* RootView.swift */,
+				1B396376BA27985C0B2CFFC0 /* ScrivanoApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		5BD103BA1A278F406F5725B4 /* Prompts */ = {
+			isa = PBXGroup;
+			children = (
+				6DC7A5E1F0B8F2C72AAB26C4 /* PromptsView.swift */,
+			);
+			path = Prompts;
+			sourceTree = "<group>";
+		};
+		5D13AF33F763DDED55F65D0B = {
+			isa = PBXGroup;
+			children = (
+				EDBBCF50E8F3162E183692E7 /* Scrivano */,
+				29F5D4E53F9CCE62274E3C3E /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		5DC2847770DEBA7073B96460 /* Recording */ = {
+			isa = PBXGroup;
+			children = (
+				05E9C746849DA8E5306E4EED /* RecordingView.swift */,
+			);
+			path = Recording;
+			sourceTree = "<group>";
+		};
+		64F9BAC4B0144F3214FC080B /* Notes */ = {
+			isa = PBXGroup;
+			children = (
+				42DB24EBC0D8FD24E722D0F2 /* NotesListView.swift */,
+			);
+			path = Notes;
+			sourceTree = "<group>";
+		};
+		707FDA0F50C016A16FDD3472 /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				C16ACC11E84E43688CE2D1A2 /* ForgotPasswordView.swift */,
+				06D498FDBFD2BF086DFBE841 /* LoginView.swift */,
+				DB4D06DCC2F419CCE4724A19 /* SignupView.swift */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
+		A75D0DA397B50F6EB1AFD603 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				CBFBBF3ADB72FE5808C5E9C5 /* API */,
+				32479CBA395A66A9F7A2FBA2 /* Auth */,
+				2EA59521902542BBEC18C101 /* Models */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		A80F8464EA37B12E9F6CAFA2 /* Text */ = {
+			isa = PBXGroup;
+			children = (
+				D4741B2296ADDC623C44796A /* TextListView.swift */,
+				FB8204215F6E3D3B4877AFCC /* TextViewerView.swift */,
+			);
+			path = Text;
+			sourceTree = "<group>";
+		};
+		BA677EC99B8305009FF8D276 /* Dashboard */ = {
+			isa = PBXGroup;
+			children = (
+				F1E0E1EA57EB073389E1C64E /* DashboardView.swift */,
+				9813A14F177A7249DCF5C5A4 /* ItemCardView.swift */,
+			);
+			path = Dashboard;
+			sourceTree = "<group>";
+		};
+		CBFBBF3ADB72FE5808C5E9C5 /* API */ = {
+			isa = PBXGroup;
+			children = (
+				8215945EBEE41425AAFA0B45 /* APIClient.swift */,
+			);
+			path = API;
+			sourceTree = "<group>";
+		};
+		D14610D7AE3C50B31018AFDA /* Media */ = {
+			isa = PBXGroup;
+			children = (
+				9E2D40F3D5F1D7E67B8A7F09 /* AudioPlayerView.swift */,
+				19E4226696BC227E8507A928 /* MediaListView.swift */,
+			);
+			path = Media;
+			sourceTree = "<group>";
+		};
+		EDBBCF50E8F3162E183692E7 /* Scrivano */ = {
+			isa = PBXGroup;
+			children = (
+				5A865D38897A2B796DA527EF /* App */,
+				A75D0DA397B50F6EB1AFD603 /* Core */,
+				3100E89F289C6007D1063EE8 /* Features */,
+				533E385304771ABC72D270CF /* Resources */,
+			);
+			path = Scrivano;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		92076D6B6205B829EFF6EF08 /* Scrivano */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1805AD3EFDB67DDBF60B2CBF /* Build configuration list for PBXNativeTarget "Scrivano" */;
+			buildPhases = (
+				AB22F2E0FC94ECA7EF035AFA /* Sources */,
+				E6588838468E87E4241A7DF0 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Scrivano;
+			packageProductDependencies = (
+			);
+			productName = Scrivano;
+			productReference = 20CAE2611C0D530DDFD894DF /* Scrivano.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		8ED82B25C14975E87335D6AE /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					92076D6B6205B829EFF6EF08 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = D7699AF466E1A9F50531AA6D /* Build configuration list for PBXProject "Scrivano" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 5D13AF33F763DDED55F65D0B;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 29F5D4E53F9CCE62274E3C3E /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				92076D6B6205B829EFF6EF08 /* Scrivano */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		E6588838468E87E4241A7DF0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B2B009E3B161F7C8CE9D99BC /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		AB22F2E0FC94ECA7EF035AFA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4DD89E2BAA52D3D37258F3FF /* APIClient.swift in Sources */,
+				7111478265D2C8BEAE8F602B /* AudioPlayerView.swift in Sources */,
+				BBB1425C89B8CF158D76C4C7 /* AuthManager.swift in Sources */,
+				E5E86AE4DC49FA27AE914E20 /* AutomationView.swift in Sources */,
+				607DA6A944FCE732A31DDA3C /* CreditsView.swift in Sources */,
+				98482BC84F71738776A0B712 /* DashboardView.swift in Sources */,
+				4D641050BC7A3B917E77B876 /* DesignSystem.swift in Sources */,
+				0770A7DBD7A3A7D7BF5B0AE9 /* ForgotPasswordView.swift in Sources */,
+				D9EBFC7425DD2A88D689FBCC /* HelpView.swift in Sources */,
+				34263979EA5FD8821A9D124A /* ItemCardView.swift in Sources */,
+				3ED482B75507F9380DFCFF5B /* KeychainService.swift in Sources */,
+				B20BA0781FED73885500B188 /* LoginView.swift in Sources */,
+				3DDB9201EF1620E403A19133 /* MediaListView.swift in Sources */,
+				43A0FC1414462AFCF730681C /* Models.swift in Sources */,
+				B232BDD9179E5EF9F4471632 /* NotesListView.swift in Sources */,
+				8890063D99A3BAA04D5E375F /* PromptsView.swift in Sources */,
+				A210A4CFC233027292A7C411 /* RecorderSettingsView.swift in Sources */,
+				C735256980942ABC18C767A5 /* RecordingView.swift in Sources */,
+				79357EE76543D402E0E65BA8 /* RootView.swift in Sources */,
+				B11BC849722C139A2AEFD759 /* ScrivanoApp.swift in Sources */,
+				9F07F45CFB8EFB879684CC6E /* SettingsView.swift in Sources */,
+				B3CC2F84BDAA1803BB3E1EF8 /* SignupView.swift in Sources */,
+				9D84908CBC8F2D1856494134 /* TextListView.swift in Sources */,
+				5C738AACAA822D8A6488E3E1 /* TextViewerView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		4477F6AC8E1A047368B79683 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+		5D7E483CC5B1B2F886687C83 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		876057EDB0F3D862913E7197 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Scrivano/Resources/Scrivano.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				INFOPLIST_FILE = Scrivano/Resources/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 2.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.scrivano.recorderapp;
+				PRODUCT_NAME = Scrivano;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				UILaunchScreen = "[:]";
+			};
+			name = Debug;
+		};
+		C65E311B8852BDA26FC23F22 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Scrivano/Resources/Scrivano.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				INFOPLIST_FILE = Scrivano/Resources/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 2.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.scrivano.recorderapp;
+				PRODUCT_NAME = Scrivano;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				UILaunchScreen = "[:]";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1805AD3EFDB67DDBF60B2CBF /* Build configuration list for PBXNativeTarget "Scrivano" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				876057EDB0F3D862913E7197 /* Debug */,
+				C65E311B8852BDA26FC23F22 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		D7699AF466E1A9F50531AA6D /* Build configuration list for PBXProject "Scrivano" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5D7E483CC5B1B2F886687C83 /* Debug */,
+				4477F6AC8E1A047368B79683 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 8ED82B25C14975E87335D6AE /* Project object */;
+}

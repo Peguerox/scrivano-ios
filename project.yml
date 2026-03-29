@@ -1,0 +1,37 @@
+name: Scrivano
+options:
+  bundleIdPrefix: com.scrivano
+  deploymentTarget:
+    iOS: "16.0"
+  xcodeVersion: "15"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    ENABLE_PREVIEWS: YES
+
+targets:
+  Scrivano:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: Scrivano
+    resources:
+      - path: Scrivano/Resources/Assets.xcassets
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.scrivano.recorderapp
+        PRODUCT_NAME: Scrivano
+        MARKETING_VERSION: "2.0"
+        CURRENT_PROJECT_VERSION: "1"
+        INFOPLIST_FILE: Scrivano/Resources/Info.plist
+        SWIFT_VERSION: "5.9"
+        DEVELOPMENT_TEAM: ""
+        CODE_SIGN_STYLE: Automatic
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        UILaunchScreen: {}
+    entitlements:
+      path: Scrivano/Resources/Scrivano.entitlements
