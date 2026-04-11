@@ -22,6 +22,16 @@ final class RevenueCatManager: ObservableObject {
 
     @Published var isLoading = false
     @Published var errorMessage: String? = nil
+    @Published var productPrices: [String: String] = [:]
+
+    func fetchPrices() async {
+        let ids = [RCProduct.credits50, RCProduct.credits125, RCProduct.credits300,
+                   RCProduct.unlimited, RCProduct.bringapi]
+        let products = (try? await Purchases.shared.products(ids)) ?? []
+        var prices: [String: String] = [:]
+        for p in products { prices[p.productIdentifier] = p.localizedPriceString }
+        productPrices = prices
+    }
 
     // MARK: - Configure (call once in ScrivanoApp.init)
     static func configure() {

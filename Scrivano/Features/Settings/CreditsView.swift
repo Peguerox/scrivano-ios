@@ -48,7 +48,7 @@ struct CreditsView: View {
             }
         }
         .navigationBarHidden(true)
-        .task { await auth.refreshUser() }
+        .task { await auth.refreshUser(); await rc.fetchPrices() }
         .alert("Purchase Error", isPresented: .init(
             get: { rc.errorMessage != nil },
             set: { if !$0 { rc.errorMessage = nil } }
@@ -159,11 +159,11 @@ struct CreditsView: View {
 
     private var paygoGroup: some View {
         VStack(spacing: 0) {
-            tierRow(productId: RCProduct.credits50,  credits: "50",  name: "Starter Pack",  price: "$4.99", isBest: false, glowLevel: 0)
+            tierRow(productId: RCProduct.credits50,  credits: "50",  name: "Starter Pack",  price: rc.productPrices[RCProduct.credits50]  ?? "$4.99",  isBest: false, glowLevel: 0)
             Divider().background(Color.white.opacity(0.05)).padding(.leading, 76)
-            tierRow(productId: RCProduct.credits125, credits: "125", name: "Standard Pack", price: "$9.99", isBest: false, glowLevel: 1)
+            tierRow(productId: RCProduct.credits125, credits: "125", name: "Standard Pack", price: rc.productPrices[RCProduct.credits125] ?? "$9.99",  isBest: false, glowLevel: 1)
             Divider().background(Color.white.opacity(0.05)).padding(.leading, 76)
-            tierRow(productId: RCProduct.credits300, credits: "300", name: "Plus Pack",     price: "$19.99", isBest: true,  glowLevel: 2)
+            tierRow(productId: RCProduct.credits300, credits: "300", name: "Plus Pack",     price: rc.productPrices[RCProduct.credits300] ?? "$19.99", isBest: true,  glowLevel: 2)
         }
         .background(Color.white.opacity(0.045))
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.09), lineWidth: 1))
@@ -280,7 +280,7 @@ struct CreditsView: View {
                         Text("∞ Unlimited Access")
                             .font(.inter(14, weight: .heavy))
                             .foregroundColor(.brandCyan)
-                        Text("$20.00")
+                        Text(rc.productPrices[RCProduct.unlimited] ?? "$20.00")
                             .font(.inter(22, weight: .heavy))
                             .foregroundColor(.textPrimary)
                         Text("per month · cancel anytime")
@@ -374,7 +374,7 @@ struct CreditsView: View {
 
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("$10.00")
+                        Text(rc.productPrices[RCProduct.bringapi] ?? "$10.00")
                             .font(.inter(20, weight: .heavy))
                             .foregroundColor(.textPrimary)
                         Text("per month")
