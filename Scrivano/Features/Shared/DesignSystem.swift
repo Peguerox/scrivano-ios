@@ -127,6 +127,10 @@ struct ScrivanoTextField: View {
     var placeholder: String = ""
     var isSecure: Bool = false
     var keyboardType: UIKeyboardType = .default
+    var autoFocus: Bool = false
+
+    @FocusState private var isFocused: Bool
+    @State private var showText: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -136,26 +140,51 @@ struct ScrivanoTextField: View {
                 .tracking(1)
                 .textCase(.uppercase)
 
-            Group {
+            ZStack(alignment: .trailing) {
+                Group {
+                    if isSecure && !showText {
+                        SecureField(placeholder, text: $text)
+                            .focused($isFocused)
+                    } else {
+                        TextField(placeholder, text: $text)
+                            .keyboardType(isSecure ? .default : keyboardType)
+                            .autocapitalization(.none)
+                            .autocorrectionDisabled()
+                            .focused($isFocused)
+                    }
+                }
+                .font(.inter(14))
+                .foregroundColor(.textPrimary)
+                .padding(.leading, 16)
+                .padding(.trailing, isSecure ? 44 : 16)
+                .padding(.vertical, 13)
+
                 if isSecure {
-                    SecureField(placeholder, text: $text)
-                } else {
-                    TextField(placeholder, text: $text)
-                        .keyboardType(keyboardType)
-                        .autocapitalization(.none)
-                        .autocorrectionDisabled()
+                    Button(action: { showText.toggle() }) {
+                        Image(systemName: showText ? "eye" : "eye.slash")
+                            .font(.system(size: 14))
+                            .foregroundColor(Color.white.opacity(0.35))
+                    }
+                    .padding(.trailing, 14)
                 }
             }
-            .font(.inter(14))
-            .foregroundColor(.textPrimary)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 13)
-            .background(Color.white.opacity(0.07))
+            .background(isFocused ? Color.brandBlue.opacity(0.10) : Color.white.opacity(0.07))
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color.white.opacity(0.12), lineWidth: 1.5)
+                    .stroke(
+                        isFocused ? Color.brandCyan.opacity(0.7) : Color.white.opacity(0.12),
+                        lineWidth: 1.5
+                    )
             )
             .clipShape(RoundedRectangle(cornerRadius: 14))
+            .shadow(color: isFocused ? Color.brandBlue.opacity(0.35) : .clear, radius: 10, x: 0, y: 0)
+            .shadow(color: isFocused ? Color.brandCyan.opacity(0.12) : .clear, radius: 4, x: 0, y: 0)
+            .animation(.easeInOut(duration: 0.15), value: isFocused)
+            .onAppear {
+                if autoFocus {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { isFocused = true }
+                }
+            }
         }
     }
 }
@@ -163,6 +192,7 @@ struct ScrivanoTextField: View {
 struct SubScreenBar: View {
     let title: String
     var accentColor: Color = .brandCyan
+    var backIcon: String = "chevron.left"
     var onBack: (() -> Void)?
     var trailingIcon: String? = nil
     var onTrailing: (() -> Void)? = nil
@@ -170,7 +200,7 @@ struct SubScreenBar: View {
     var body: some View {
         HStack(spacing: 12) {
             Button(action: { onBack?() }) {
-                Image(systemName: "chevron.left")
+                Image(systemName: backIcon)
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundColor(accentColor)
                     .frame(width: 36, height: 36)
@@ -214,6 +244,43 @@ struct TopGlowBar: View {
                 )
             )
             .frame(height: 1)
+    }
+}
+
+struct GoogleGIcon: View {
+    var size: CGFloat = 16
+    var body: some View {
+        Canvas { ctx, sz in
+            let c = CGPoint(x: sz.width / 2, y: sz.height / 2)
+            let radius = sz.width * 0.35
+            let lw = sz.width * 0.22
+
+            func seg(_ start: Double, _ end: Double, _ hex: String) {
+                var p = Path()
+                p.addArc(center: c, radius: radius,
+                         startAngle: .degrees(start), endAngle: .degrees(end),
+                         clockwise: false)
+                ctx.stroke(p, with: .color(Color(hex: hex)),
+                           style: StrokeStyle(lineWidth: lw, lineCap: .butt))
+            }
+
+            // Blue: top arc from ~11 o'clock to ~2 o'clock (passes through 12/top)
+            seg(240, 340, "#4285F4")
+            // Red: left side going up
+            seg(140, 240, "#EA4335")
+            // Yellow: bottom-left
+            seg(60, 140, "#FBBC05")
+            // Green: lower-right
+            seg(10, 60, "#34A853")
+
+            // Horizontal bar (blue): center → right outer edge
+            let barH = lw * 0.85
+            var bar = Path()
+            bar.addRect(CGRect(x: c.x, y: c.y - barH / 2,
+                               width: radius + lw * 0.5, height: barH))
+            ctx.fill(bar, with: .color(Color(hex: "#4285F4")))
+        }
+        .frame(width: size, height: size)
     }
 }
 
@@ -303,6 +370,7 @@ struct NavRow: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }

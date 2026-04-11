@@ -65,8 +65,8 @@ struct TextViewerView: View {
             }
         }
         .navigationBarHidden(true)
-        .sheet(isPresented: $showPrompts) {
-            PromptsView(context: .applyToText(selectedIds: [file.id], itemId: ""))
+        .fullScreenCover(isPresented: $showPrompts) {
+            PromptsView(context: .applyToText(transcriptTexts: [file.content ?? ""], itemId: "", transcriptIds: []))
         }
     }
 

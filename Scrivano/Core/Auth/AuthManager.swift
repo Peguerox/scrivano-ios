@@ -9,6 +9,7 @@ final class AuthManager: ObservableObject {
     @Published var isLoggedIn: Bool = false
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
+    @Published var hasOpenAIKey: Bool = false
 
     private let api = APIClient.shared
     private let keychain = KeychainService.shared
@@ -18,6 +19,7 @@ final class AuthManager: ObservableObject {
         if let user = keychain.getUser(), keychain.getToken() != nil {
             self.currentUser = user
             self.isLoggedIn = true
+            Task { await RevenueCatManager.shared.login(userId: user.email) }
         }
     }
 
@@ -44,8 +46,10 @@ final class AuthManager: ObservableObject {
                 keychain.saveToken(token)
                 if let refresh = res.refreshToken { keychain.saveRefreshToken(refresh) }
                 keychain.saveUser(user)
+                keychain.saveLoginProvider("email")
                 self.currentUser = user
                 self.isLoggedIn = true
+                Task { await RevenueCatManager.shared.login(userId: user.email) }
             } else {
                 errorMessage = res.message ?? "Login failed."
             }
@@ -110,11 +114,85 @@ final class AuthManager: ObservableObject {
         }
     }
 
+    // MARK: - Reset password (verify code + set new password)
+    // POST /api/auth/reset-password { email, confirmation_code, new_password }
+    func verifyResetCode(email: String, code: String, newPassword: String) async -> Bool {
+        struct Body: Encodable {
+            let email: String
+            let confirmation_code: String
+            let new_password: String
+        }
+        guard let url = URL(string: api.baseURL + "/api/auth/reset-password") else { return false }
+        do {
+            var req = URLRequest(url: url, timeoutInterval: 30)
+            req.httpMethod = "POST"
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = try JSONEncoder().encode(Body(email: email, confirmation_code: code, new_password: newPassword))
+            let (data, _) = try await URLSession.shared.data(for: req)
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                let success = json["success"] as? Bool ?? false
+                if !success {
+                    errorMessage = (json["message"] as? String) ?? "Invalid code or password"
+                }
+                return success
+            }
+            return false
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    // MARK: - Resend code
+    // POST /api/auth/resend-code { email, type: 'password_reset' }
+    func resendResetCode(email: String) async -> Bool {
+        struct Body: Encodable { let email: String; let type: String }
+        guard let url = URL(string: api.baseURL + "/api/auth/resend-code") else { return false }
+        do {
+            var req = URLRequest(url: url, timeoutInterval: 30)
+            req.httpMethod = "POST"
+            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            req.httpBody = try JSONEncoder().encode(Body(email: email, type: "password_reset"))
+            let (data, _) = try await URLSession.shared.data(for: req)
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                return json["success"] as? Bool ?? false
+            }
+            return false
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
     // MARK: - Logout
     func logout() {
+        guard !AudioRecorderManager.shared.isRecording else {
+            appLog("logout() suppressed — recording in progress", level: .warning)
+            return
+        }
         keychain.clearAll()
         currentUser = nil
         isLoggedIn = false
+        Task { await RevenueCatManager.shared.logout() }
+    }
+
+    /// Force-logout regardless of recording state — use only from explicit user action.
+    func forceLogout() {
+        keychain.clearAll()
+        currentUser = nil
+        isLoggedIn = false
+        Task { await RevenueCatManager.shared.logout() }
+    }
+
+    // MARK: - Refresh user from server (credits, plan, etc.)
+    func refreshUser() async {
+        struct Res: Decodable {
+            let success: Bool
+            let user: User?
+        }
+        guard let res = try? await api.request(path: "/api/auth/me", responseType: Res.self),
+              res.success, let user = res.user else { return }
+        updateUser(user)
     }
 
     // MARK: - Update user locally (after credit deduction etc.)

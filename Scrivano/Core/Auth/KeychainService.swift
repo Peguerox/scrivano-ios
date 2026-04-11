@@ -41,6 +41,17 @@ final class KeychainService {
         delete(key: userKey)
     }
 
+    // MARK: - Login provider ("google", "apple", "email")
+    private let providerKey = "scrivano.auth.provider"
+    func saveLoginProvider(_ provider: String) { save(key: providerKey, value: provider) }
+    func getLoginProvider() -> String? { load(key: providerKey) }
+
+    // MARK: - OpenAI API Key
+    private let openAIKeyKey = "scrivano.openai.key"
+    func saveOpenAIKey(_ key: String) { save(key: openAIKeyKey, value: key) }
+    func getOpenAIKey() -> String? { load(key: openAIKeyKey) }
+    func deleteOpenAIKey() { delete(key: openAIKeyKey) }
+
     // MARK: - Private helpers
     private func save(key: String, value: String) {
         guard let data = value.data(using: .utf8) else { return }

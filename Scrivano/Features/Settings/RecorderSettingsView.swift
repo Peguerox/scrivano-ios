@@ -2,26 +2,78 @@ import SwiftUI
 
 struct RecorderSettingsView: View {
     @Environment(\.dismiss) var dismiss
-    @AppStorage("pocket_mode")       private var pocketMode = false
-    @AppStorage("audio_quality")     private var quality = 1
-    @AppStorage("audio_format")      private var format = 1
-    @AppStorage("bit_depth")         private var bitDepth = 0
-    @AppStorage("auto_start")        private var autoStart = true
-    @AppStorage("auto_gain")         private var autoGain = false
+    @AppStorage("pocket_mode") private var pocketMode = false
+    @State private var showPocketExplanation = false
+    @AppStorage("recorderQuality")  private var quality: Int = 1    // 0=Low 1=Med 2=High 3=Max
+    @AppStorage("recorderFormat")   private var format: Int = 1     // 0=M4A 1=WAV
+    @AppStorage("recorderBitDepth") private var bitDepth: Int = 0   // 0=16 1=24 2=32
+    @AppStorage("splittingInterval")  private var splitInterval: Int = 1080
+    @AppStorage("auto_conversion")   private var autoConversion: Bool = true // seconds
 
-    let qualities = ["Low", "Medium", "High", "Max"]
-    let qualityHints = ["Smallest Size", "Best for voice", "CD Quality", "High Definition"]
-    let formats = ["aiff", "wav", "caf", "m4a"]
-    let formatHints = ["150 MB/hr", "150 MB/hr", "94 MB/hr", "16 MB/hr"]
-    let depths = ["16 bit", "24 bit", "32 bit"]
+    private let qualityLabels = ["Low", "Medium", "High", "Max"]
+    private let qualityDescriptions = [
+        "8 kHz · Smallest file size",
+        "22 kHz · Best for voice",
+        "44.1 kHz · CD Quality",
+        "96 kHz · High Definition"
+    ]
+
+    private let formatLabels = ["M4A", "WAV"]
+    private let depthLabels  = ["16 bit", "24 bit", "32 bit"]
+
+    // Estimated file size based on format / quality / bit depth
+    private var sizeHint: String {
+        if format == 0 {
+            return ["~8 MB/hr", "~16 MB/hr", "~22 MB/hr", "~30 MB/hr"][quality]
+        }
+        let sizes = [
+            ["~55 MB/hr", "~83 MB/hr",  "~110 MB/hr"],
+            ["~150 MB/hr","~230 MB/hr", "~305 MB/hr"],
+            ["~305 MB/hr","~455 MB/hr", "~610 MB/hr"],
+            ["~660 MB/hr","~990 MB/hr", "~1.3 GB/hr"]
+        ]
+        return sizes[quality][bitDepth]
+    }
+
+    private func formatLimit(mbPerHour: Double) -> String {
+        let minutes = (4.5 / mbPerHour) * 60
+        if minutes < 2 {
+            let secs = max(5, Int((minutes * 60).rounded()))
+            return "~\(secs) sec"
+        }
+        return "~\(Int(minutes.rounded())) min"
+    }
+
+    private var limitLabelM4A: String {
+        formatLimit(mbPerHour: [8.0, 15.0, 22.0, 30.0][quality])
+    }
+
+    private var limitLabelWAV: String {
+        let rates: [[Double]] = [
+            [55,  83,  110],
+            [150, 230, 305],
+            [305, 455, 610],
+            [660, 990, 1300]
+        ]
+        return formatLimit(mbPerHour: rates[quality][bitDepth])
+    }
+
+    private let splitOptions: [(label: String, sublabel: String, seconds: Int)] = [
+        ("None",    "off",      0),
+        ("5 min",   "300s",     300),
+        ("10 min",  "600s",     600),
+        ("15 min",  "900s",     900),
+        ("18 min",  "1080s",    1080),
+        ("30 min",  "1800s",    1800),
+        ("1 hour",  "3600s",    3600)
+    ]
 
     var body: some View {
         ZStack {
             Color.phoneBg.ignoresSafeArea()
-
             VStack(spacing: 0) {
-                SubScreenBar(title: "Recorder Settings", accentColor: .stageMedia, onBack: { dismiss() })
 
+                SubScreenBar(title: "Recorder Settings", onBack: { dismiss() })
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 4) {
                         settingsGroup {
@@ -29,23 +81,30 @@ struct RecorderSettingsView: View {
                         }
                         .padding(.top, 14)
 
+                        // ── Audio Quality ──────────────────────────────────
                         SectionLabel(text: "Audio Quality")
                         settingsGroup {
                             VStack(spacing: 10) {
-                                segmentedControl(options: qualities, selected: $quality)
-                                Text(qualityHints[quality] + " · " + qualities[quality])
-                                    .font(.inter(11))
-                                    .foregroundColor(.textQuaternary)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                segmentedControl(options: qualityLabels, selected: $quality)
+                                HStack {
+                                    Text(qualityDescriptions[quality])
+                                    Spacer()
+                                    Text(sizeHint)
+                                }
+                                .font(.inter(11))
+                                .foregroundColor(.textQuaternary)
                             }
                             .padding(.horizontal, 14).padding(.vertical, 12)
                         }
 
+                        // ── Audio Format ───────────────────────────────────
                         SectionLabel(text: "Audio Format")
                         settingsGroup {
                             VStack(spacing: 10) {
-                                segmentedControl(options: formats, selected: $format)
-                                Text(formatHints[format])
+                                segmentedControl(options: formatLabels, selected: $format)
+                                Text(format == 0
+                                     ? "Compressed AAC — smaller files, great for voice"
+                                     : "Lossless PCM — full quality, larger files")
                                     .font(.inter(11))
                                     .foregroundColor(.textQuaternary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -53,25 +112,180 @@ struct RecorderSettingsView: View {
                             .padding(.horizontal, 14).padding(.vertical, 12)
                         }
 
+                        // ── Bit Depth (WAV only) ───────────────────────────
                         SectionLabel(text: "Bit Depth")
                         settingsGroup {
-                            segmentedControl(options: depths, selected: $bitDepth)
-                                .padding(.horizontal, 14).padding(.vertical, 12)
+                            VStack(spacing: 10) {
+                                segmentedControl(options: depthLabels, selected: $bitDepth)
+                                    .opacity(format == 0 ? 0.3 : 1)
+                                    .allowsHitTesting(format != 0)
+                                Text(format == 0
+                                     ? "Bit depth only applies to WAV format"
+                                     : "\(depthLabels[bitDepth]) · \(sizeHint)")
+                                    .font(.inter(11))
+                                    .foregroundColor(.textQuaternary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .padding(.horizontal, 14).padding(.vertical, 12)
                         }
 
+                        // ── Splitting Interval ─────────────────────────────
+                        SectionLabel(text: "Splitting Interval")
                         settingsGroup {
-                            ToggleRow(icon: "▶️", iconColor: .brandBlue, title: "Auto Start Recording", isOn: $autoStart)
-                            Divider().background(Color.white.opacity(0.05)).padding(.leading, 68)
-                            ToggleRow(icon: "🎚️", iconColor: .brandCyan, title: "Auto Input Gain", subtitle: "Input gain set automatically", isOn: $autoGain)
+                            VStack(spacing: 12) {
+                                // Top row: None + first 3 time options
+                                HStack(spacing: 6) {
+                                    ForEach(splitOptions.prefix(4), id: \.seconds) { opt in
+                                        splitPill(opt)
+                                    }
+                                }
+                                // Bottom row: remaining 3 options
+                                HStack(spacing: 6) {
+                                    ForEach(splitOptions.suffix(3), id: \.seconds) { opt in
+                                        splitPill(opt)
+                                    }
+                                    // invisible spacer pill to keep alignment
+                                    Color.clear.frame(maxWidth: .infinity).frame(height: 52)
+                                }
+                                HStack(spacing: 6) {
+                                    Image(systemName: splitInterval > 0 ? "scissors" : "infinity")
+                                        .font(.system(size: 10, weight: .semibold))
+                                    Text(splitInterval > 0
+                                         ? "Each segment auto-saves and a new one starts immediately"
+                                         : "No splitting — single continuous recording")
+                                        .font(.inter(11))
+                                }
+                                .foregroundColor(.textQuaternary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+
+                                // Warning: always show the size-based split info
+                                HStack(alignment: .top, spacing: 10) {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .font(.system(size: 13))
+                                        .foregroundColor(Color(hex: "#f59e0b"))
+                                    Text("Files over 4.5 MB are automatically split before transcription. At your current settings, that's around \(format == 0 || autoConversion ? limitLabelM4A : limitLabelWAV).")
+                                        .font(.inter(11, weight: .medium))
+                                        .foregroundColor(Color(hex: "#fbbf24"))
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                .padding(12)
+                                .background(Color(hex: "#f59e0b").opacity(0.08))
+                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(hex: "#f59e0b").opacity(0.25), lineWidth: 1))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                            }
+                            .padding(.horizontal, 14).padding(.vertical, 14)
                         }
-                        .padding(.top, 8)
 
                         Spacer().frame(height: 40)
                     }
                 }
             }
+
+            // Pocket Mode warning overlay
+            if showPocketExplanation {
+                Color.black.opacity(0.65).ignoresSafeArea().zIndex(10)
+                VStack {
+                    Spacer()
+                    pocketModeCard
+                        .padding(.horizontal, 24)
+                    Spacer()
+                }
+                .transition(.scale(scale: 0.92).combined(with: .opacity))
+                .zIndex(11)
+            }
         }
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: showPocketExplanation)
         .navigationBarHidden(true)
+        .onChange(of: pocketMode) { newValue in
+            if newValue { showPocketExplanation = true }
+        }
+    }
+
+    private var pocketModeCard: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "hand.tap.fill")
+                .font(.system(size: 30, weight: .light))
+                .foregroundColor(Color.white.opacity(0.30))
+
+            Text("Pocket Mode Active")
+                .font(.inter(16, weight: .heavy))
+                .foregroundColor(Color.white.opacity(0.70))
+
+            VStack(alignment: .leading, spacing: 14) {
+                pocketRow(icon: "hand.tap",      title: "First tap arms the action",
+                          detail: "A strong vibration confirms the button is armed. Nothing happens yet.")
+                pocketRow(icon: "hand.tap.fill",  title: "Second tap confirms",
+                          detail: "Tap again within 6 seconds to pause or stop the recording.")
+                pocketRow(icon: "timer",          title: "Inaction cancels",
+                          detail: "If you don't tap again, the action is cancelled with a soft vibration and recording continues.")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button {
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showPocketExplanation = false }
+            } label: {
+                Text("Got it")
+                    .font(.inter(14, weight: .heavy))
+                    .foregroundColor(Color.white.opacity(0.60))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 13)
+                    .background(Color.white.opacity(0.06))
+                    .overlay(RoundedRectangle(cornerRadius: 13).stroke(Color.white.opacity(0.12), lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 13))
+            }
+        }
+        .padding(24)
+        .background(Color.black)
+        .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.white.opacity(0.15), lineWidth: 1.5))
+        .clipShape(RoundedRectangle(cornerRadius: 22))
+        .shadow(color: .black.opacity(0.6), radius: 24)
+    }
+
+    private func pocketRow(icon: String, title: String, detail: String) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(Color.white.opacity(0.30))
+                .frame(width: 20)
+                .padding(.top, 1)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.inter(13, weight: .bold))
+                    .foregroundColor(Color.white.opacity(0.55))
+                Text(detail)
+                    .font(.inter(12))
+                    .foregroundColor(Color.white.opacity(0.28))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func splitPill(_ opt: (label: String, sublabel: String, seconds: Int)) -> some View {
+        let isSelected = splitInterval == opt.seconds
+        return Button { withAnimation(.easeInOut(duration: 0.15)) { splitInterval = opt.seconds } } label: {
+            VStack(spacing: 2) {
+                Text(opt.label)
+                    .font(.inter(13, weight: .bold))
+                    .foregroundColor(isSelected ? .white : .textTertiary)
+                Text(opt.sublabel)
+                    .font(.inter(9, weight: .medium))
+                    .foregroundColor(isSelected ? Color.white.opacity(0.6) : Color.white.opacity(0.2))
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 52)
+            .background(
+                isSelected
+                ? LinearGradient(colors: [Color.brandBlue, Color.brandNavy], startPoint: .topLeading, endPoint: .bottomTrailing)
+                : LinearGradient(colors: [Color.white.opacity(0.05), Color.white.opacity(0.05)], startPoint: .leading, endPoint: .trailing)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 11)
+                    .stroke(isSelected ? Color.brandCyan.opacity(0.5) : Color.white.opacity(0.06), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 11))
+            .shadow(color: isSelected ? Color.brandBlue.opacity(0.4) : .clear, radius: 8, y: 3)
+        }
+        .buttonStyle(.plain)
     }
 
     private func segmentedControl(options: [String], selected: Binding<Int>) -> some View {

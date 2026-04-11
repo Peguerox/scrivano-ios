@@ -11,6 +11,11 @@ settings:
     SWIFT_VERSION: "5.9"
     ENABLE_PREVIEWS: YES
 
+packages:
+  GoogleSignIn:
+    url: https://github.com/google/GoogleSignIn-iOS
+    from: "7.0.0"
+
 targets:
   Scrivano:
     type: application
@@ -35,3 +40,11 @@ targets:
         UILaunchScreen: {}
     entitlements:
       path: Scrivano/Resources/Scrivano.entitlements
+      properties:
+        com.apple.developer.applesignin:
+          - Default
+    dependencies:
+      - package: GoogleSignIn
+        product: GoogleSignIn
+      - package: GoogleSignIn
+        product: GoogleSignInSwift

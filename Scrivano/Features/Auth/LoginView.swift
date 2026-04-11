@@ -1,4 +1,6 @@
 import SwiftUI
+import GoogleSignInSwift
+import AuthenticationServices
 
 struct LoginView: View {
     @EnvironmentObject var auth: AuthManager
@@ -6,22 +8,29 @@ struct LoginView: View {
     @State private var password = ""
     @State private var showSignup = false
     @State private var showForgot = false
+    @State private var socialError: String?
+    @State private var agreedToTerms = true
+
+    private let socialAuth = SocialAuthManager.shared
 
     var body: some View {
         ZStack {
-            // Background gradient
-            Color.phoneBg.ignoresSafeArea()
+            // Background — darker gradient matching HTML
             LinearGradient(
-                colors: [Color.brandBlue.opacity(0.35), .clear, Color.brandNavy.opacity(0.25), .clear],
-                startPoint: .topLeading, endPoint: .bottomTrailing
+                colors: [Color(hex: "#060e1e"), Color(hex: "#040a16")],
+                startPoint: .top, endPoint: .bottom
             ).ignoresSafeArea()
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
                     // Hero
                     ZStack {
+                        // Radial glow blobs — subtle, matching HTML
+                        RadialGradient(colors: [Color.brandBlue.opacity(0.22), .clear], center: .init(x: 0.5, y: 0.8), startRadius: 0, endRadius: 200).ignoresSafeArea()
+                        RadialGradient(colors: [Color.brandCyan.opacity(0.05), .clear], center: .init(x: 0.85, y: 0.2), startRadius: 0, endRadius: 90).ignoresSafeArea()
+
                         // Grid overlay
-                        GeometryReader { geo in
+                        GeometryReader { _ in
                             Canvas { ctx, size in
                                 let spacing: CGFloat = 28
                                 let cols = Int(size.width / spacing) + 1
@@ -37,14 +46,14 @@ struct LoginView: View {
                                     path.move(to: CGPoint(x: 0, y: y))
                                     path.addLine(to: CGPoint(x: size.width, y: y))
                                 }
-                                ctx.stroke(path, with: .color(Color.brandBlue.opacity(0.1)), lineWidth: 1)
+                                ctx.stroke(path, with: .color(Color.brandBlue.opacity(0.22)), lineWidth: 1)
                             }
                             .mask(
                                 RadialGradient(
                                     colors: [.black, .clear],
                                     center: .center,
-                                    startRadius: 40,
-                                    endRadius: 160
+                                    startRadius: 0,
+                                    endRadius: 220
                                 )
                             )
                         }
@@ -53,48 +62,58 @@ struct LoginView: View {
                         // Fade bottom
                         VStack {
                             Spacer()
-                            LinearGradient(colors: [.clear, Color.phoneBg], startPoint: .top, endPoint: .bottom)
-                                .frame(height: 100)
+                            LinearGradient(colors: [.clear, Color(hex: "#040a16")], startPoint: .top, endPoint: .bottom)
+                                .frame(height: 120)
                         }
 
                         // Logo
                         VStack(spacing: 0) {
-                            // App icon ring
+                            // Neon logo image with outer glow
                             ZStack {
                                 Circle()
-                                    .fill(LinearGradient(colors: [Color(hex: "#081526"), Color.appBg], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                    .fill(Color.brandBlue.opacity(0.18))
+                                    .frame(width: 112, height: 112)
+                                    .blur(radius: 14)
+                                Circle()
+                                    .fill(Color.brandCyan.opacity(0.08))
+                                    .frame(width: 90, height: 90)
+                                    .blur(radius: 8)
+                                Image("ScrivanoLogo")
+                                    .resizable()
+                                    .scaledToFit()
                                     .frame(width: 84, height: 84)
-                                    .shadow(color: Color.brandBlue.opacity(0.3), radius: 30, y: 10)
-                                    .overlay(Circle().stroke(Color.brandBlue.opacity(0.5), lineWidth: 1))
-
-                                Image(systemName: "mic.fill")
-                                    .font(.system(size: 32, weight: .medium))
-                                    .foregroundStyle(
-                                        LinearGradient(colors: [Color.brandCyan, Color.brandBlue], startPoint: .top, endPoint: .bottom)
-                                    )
+                                    .shadow(color: Color.brandBlue.opacity(0.6), radius: 16, y: 0)
+                                    .shadow(color: Color.brandCyan.opacity(0.25), radius: 32, y: 0)
                             }
 
                             Text("SCRIVANO")
-                                .font(.system(size: 24, weight: .heavy, design: .default))
+                                .font(.system(size: 24, weight: .heavy))
                                 .tracking(6)
                                 .foregroundStyle(
                                     LinearGradient(colors: [.white, Color(hex: "#7dd3fc"), Color.brandCyan], startPoint: .leading, endPoint: .trailing)
                                 )
-                                .padding(.top, 16)
+                                .padding(.top, 8)
 
-                            Text("AI TRANSCRIPTION")
+                            Text("RECORD · TRANSCRIBE · GENERATE")
                                 .font(.inter(10, weight: .bold))
                                 .tracking(2.5)
                                 .foregroundColor(Color.brandCyan.opacity(0.45))
                                 .padding(.top, 5)
                         }
-                        .padding(.top, 40)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        .padding(.top, 28)
                     }
                     .frame(height: 268)
 
                     // Card
                     VStack(alignment: .leading, spacing: 0) {
-                        TopGlowBar()
+                        // Full-width top border + gradient glow line
+                        ZStack(alignment: .top) {
+                            Rectangle()
+                                .fill(Color.brandBlue.opacity(0.2))
+                                .frame(height: 1)
+                            TopGlowBar()
+                        }
 
                         VStack(alignment: .leading, spacing: 13) {
                             Text("Welcome back")
@@ -131,35 +150,113 @@ struct LoginView: View {
                                     if auth.isLoading {
                                         ProgressView().tint(.white).scaleEffect(0.8)
                                     }
-                                    Text(auth.isLoading ? "Signing in…" : "Sign In")
+                                    Text(auth.isLoading ? "Signing in…" : "Sign In →")
                                 }
                             }
                             .primaryButtonStyle()
-                            .disabled(auth.isLoading || email.isEmpty || password.isEmpty)
+                            .disabled(auth.isLoading || email.isEmpty || password.isEmpty || !agreedToTerms)
                             .padding(.top, 4)
+
+                            // Terms of service
+                            HStack(alignment: .top, spacing: 10) {
+                                Button { agreedToTerms.toggle() } label: {
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: 5)
+                                            .fill(agreedToTerms
+                                                ? LinearGradient(colors: [Color.brandBlue, Color.brandNavy], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                                : LinearGradient(colors: [Color.brandBlue.opacity(0.06), Color.brandBlue.opacity(0.06)], startPoint: .top, endPoint: .bottom))
+                                            .frame(width: 18, height: 18)
+                                            .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color.brandBlue.opacity(0.55), lineWidth: 1.5))
+                                        if agreedToTerms {
+                                            Text("✓").font(.system(size: 11, weight: .heavy)).foregroundColor(.white)
+                                        }
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                                .padding(.top, 1)
+
+                                HStack(spacing: 0) {
+                                    Text("I agree to the ")
+                                        .font(.inter(12))
+                                        .foregroundColor(Color.white.opacity(0.38))
+                                    Button("Legal Agreements") {
+                                        if let url = URL(string: "https://app.scrivano.net/#legal") {
+                                            UIApplication.shared.open(url)
+                                        }
+                                    }
+                                    .font(.inter(12, weight: .semibold))
+                                    .foregroundColor(.brandCyan)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                            .padding(.top, 2)
 
                             // Divider
                             HStack(spacing: 10) {
                                 Rectangle().fill(Color.white.opacity(0.08)).frame(height: 1)
-                                Text("or").font(.inter(10, weight: .bold)).foregroundColor(Color.white.opacity(0.25)).tracking(0.5)
+                                Text("or continue with").font(.inter(10, weight: .bold)).foregroundColor(Color.white.opacity(0.25)).tracking(0.5).fixedSize()
                                 Rectangle().fill(Color.white.opacity(0.08)).frame(height: 1)
                             }
                             .padding(.vertical, 4)
 
-                            // Google sign in
-                            Button(action: {}) {
-                                HStack(spacing: 7) {
-                                    Image(systemName: "globe")
-                                        .font(.system(size: 16))
-                                    Text("Continue with Google")
-                                        .font(.inter(13, weight: .semibold))
+                            // Social errors
+                            if let err = socialError {
+                                Text(err).font(.inter(12)).foregroundColor(.danger)
+                            }
+
+                            // Google + Apple side by side
+                            HStack(spacing: 8) {
+                                // Google
+                                Button {
+                                    guard let vc = UIApplication.shared.connectedScenes
+                                        .compactMap({ $0 as? UIWindowScene })
+                                        .flatMap({ $0.windows })
+                                        .first(where: { $0.isKeyWindow })?.rootViewController else { return }
+                                    Task {
+                                        do {
+                                            let user = try await socialAuth.signInWithGoogle(presenting: vc)
+                                            auth.currentUser = user
+                                            auth.isLoggedIn = true
+                                        } catch {
+                                            socialError = error.localizedDescription
+                                        }
+                                    }
+                                } label: {
+                                    HStack(spacing: 7) {
+                                        GoogleGIcon(size: 17)
+                                        Text("Google").font(.inter(13, weight: .semibold))
+                                    }
+                                    .foregroundColor(Color.white.opacity(0.7))
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                                    .background(Color.white.opacity(0.06))
+                                    .overlay(RoundedRectangle(cornerRadius: 13).stroke(Color.white.opacity(0.1), lineWidth: 1.5))
+                                    .clipShape(RoundedRectangle(cornerRadius: 13))
                                 }
-                                .foregroundColor(Color.white.opacity(0.7))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(Color.white.opacity(0.06))
-                                .overlay(RoundedRectangle(cornerRadius: 13).stroke(Color.white.opacity(0.1), lineWidth: 1.5))
-                                .clipShape(RoundedRectangle(cornerRadius: 13))
+
+                                // Apple
+                                Button {
+                                    Task {
+                                        do {
+                                            let user = try await socialAuth.signInWithApple()
+                                            auth.currentUser = user
+                                            auth.isLoggedIn = true
+                                        } catch {
+                                            socialError = error.localizedDescription
+                                        }
+                                    }
+                                } label: {
+                                    HStack(spacing: 7) {
+                                        Image(systemName: "apple.logo").font(.system(size: 15))
+                                        Text("Apple").font(.inter(13, weight: .semibold))
+                                    }
+                                    .foregroundColor(Color.white.opacity(0.7))
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                                    .background(Color.white.opacity(0.06))
+                                    .overlay(RoundedRectangle(cornerRadius: 13).stroke(Color.white.opacity(0.1), lineWidth: 1.5))
+                                    .clipShape(RoundedRectangle(cornerRadius: 13))
+                                }
                             }
 
                             HStack {
@@ -167,7 +264,7 @@ struct LoginView: View {
                                 Text("Don't have an account? ")
                                     .font(.inter(12))
                                     .foregroundColor(.textQuaternary)
-                                Button("Sign up") { showSignup = true }
+                                Button("Sign up free") { showSignup = true }
                                     .font(.inter(12, weight: .semibold))
                                     .foregroundColor(.brandCyan)
                             }
@@ -175,14 +272,24 @@ struct LoginView: View {
                             .padding(.bottom, 36)
                         }
                         .padding(.horizontal, 26)
-                        .background(Color.phoneBg.opacity(0.85))
                     }
+                    .background(Color(hex: "#050c19").opacity(0.88))
                     .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 32, style: .continuous)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [Color.brandBlue.opacity(0.45), Color.brandBlue.opacity(0.15), Color.brandBlue.opacity(0.08)],
+                                    startPoint: .top, endPoint: .bottom
+                                ),
+                                lineWidth: 1
+                            )
+                    )
                     .offset(y: -28)
                 }
             }
         }
-        .sheet(isPresented: $showSignup) { SignupView() }
-        .sheet(isPresented: $showForgot) { ForgotPasswordView() }
+        .fullScreenCover(isPresented: $showSignup) { SignupView() }
+        .fullScreenCover(isPresented: $showForgot) { ForgotPasswordView() }
     }
 }

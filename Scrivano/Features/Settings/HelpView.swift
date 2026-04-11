@@ -2,82 +2,99 @@ import SwiftUI
 
 struct HelpView: View {
     @Environment(\.dismiss) var dismiss
+    @Environment(\.openURL) var openURL
 
     var body: some View {
         ZStack {
             Color.phoneBg.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                SubScreenBar(title: "Help", accentColor: .brandCyan, onBack: { dismiss() })
+                SubScreenBar(title: "Help & Support", accentColor: .brandCyan, onBack: { dismiss() })
 
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 12) {
+                    VStack(spacing: 14) {
 
                         // Hero
-                        VStack(alignment: .leading, spacing: 10) {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 14)
-                                    .fill(Color.brandCyan.opacity(0.12))
-                                    .frame(width: 44, height: 44)
-                                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.brandCyan.opacity(0.3), lineWidth: 1))
-                                    .shadow(color: Color.brandCyan.opacity(0.15), radius: 8)
-                                Text("?")
-                                    .font(.inter(22, weight: .heavy))
-                                    .foregroundColor(.brandCyan)
+                        ZStack(alignment: .bottomTrailing) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("How can we help?")
+                                    .font(.inter(20, weight: .heavy))
+                                    .foregroundColor(.textPrimary)
+                                Text("Find answers, watch tutorials,\nand connect with the community.")
+                                    .font(.inter(12))
+                                    .foregroundColor(.textTertiary)
+                                    .lineSpacing(4)
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(20)
 
-                            Text("How can we help?")
-                                .font(.inter(16, weight: .heavy))
-                                .foregroundColor(.textPrimary)
-                            Text("Find answers, watch tutorials, and connect with the Scrivano community.")
-                                .font(.inter(12))
-                                .foregroundColor(.textTertiary)
-                                .lineSpacing(3)
+                            Text("?")
+                                .font(.system(size: 80, weight: .heavy))
+                                .foregroundColor(Color.brandCyan.opacity(0.07))
+                                .padding(.trailing, 20).padding(.bottom, 8)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(18)
                         .background(
-                            LinearGradient(colors: [Color.brandBlue.opacity(0.15), Color.brandNavy.opacity(0.08)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                            LinearGradient(colors: [Color.brandBlue.opacity(0.22), Color.brandNavy.opacity(0.10)],
+                                           startPoint: .topLeading, endPoint: .bottomTrailing)
                         )
                         .overlay(
                             ZStack(alignment: .top) {
-                                RoundedRectangle(cornerRadius: 22).stroke(Color.brandBlue.opacity(0.25), lineWidth: 1)
-                                LinearGradient(colors: [Color.brandCyan.opacity(0.65), Color.brandBlue.opacity(0.5), .clear], startPoint: .leading, endPoint: .trailing)
-                                    .frame(height: 1)
-                                    .padding(.horizontal, 20)
+                                RoundedRectangle(cornerRadius: 22).stroke(Color.brandCyan.opacity(0.22), lineWidth: 1)
+                                LinearGradient(colors: [.clear, Color.brandCyan.opacity(0.70), Color.brandBlue.opacity(0.50), .clear],
+                                               startPoint: .leading, endPoint: .trailing)
+                                    .frame(height: 1).padding(.horizontal, 30)
                             }
                         )
                         .clipShape(RoundedRectangle(cornerRadius: 22))
                         .padding(.horizontal, 14).padding(.top, 14)
 
+                        // Section label
+                        sectionLabel("Resources")
+
                         // Help cards
-                        helpCard(icon: "book.fill", iconColor: .brandCyan, title: "Knowledge Base", subtitle: "Guides, tutorials and full documentation")
-                        helpCard(icon: "play.circle.fill", iconColor: .stageText, title: "Quick Start Video", subtitle: "Get up and running in minutes")
-                        helpCard(icon: "bubble.left.and.bubble.right.fill", iconColor: Color(hex: "#a78bfa"), title: "Support Group", subtitle: "Community forum and discussions")
-                        helpCard(icon: "doc.text.fill", iconColor: .textTertiary, title: "Legal Agreements", subtitle: "Terms of service · Privacy policy")
-
-                        // Social
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Connect with us")
-                                .font(.inter(10, weight: .heavy))
-                                .tracking(1)
-                                .foregroundColor(.textQuaternary)
-                                .textCase(.uppercase)
-
-                            HStack(spacing: 10) {
-                                socialBtn(icon: "globe", color: .brandCyan)
-                                socialBtn(icon: "camera.fill", color: Color(hex: "#ec4899"))
-                                socialBtn(icon: "play.rectangle.fill", color: Color.red)
-                                socialBtn(icon: "hand.thumbsup.fill", color: Color(hex: "#1877F2"))
-                            }
-                        }
-                        .padding(16)
-                        .background(
-                            LinearGradient(colors: [Color.brandCyan.opacity(0.07), Color.brandBlue.opacity(0.04)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                        helpCard(
+                            icon: "book.fill", iconColor: .brandCyan,
+                            title: "Knowledge Base",
+                            subtitle: "Guides, tutorials and full documentation",
+                            url: "https://app.scrivano.net/knowledge-base"
                         )
-                        .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.brandCyan.opacity(0.16), lineWidth: 1))
-                        .clipShape(RoundedRectangle(cornerRadius: 22))
-                        .padding(.horizontal, 14)
+                        helpCard(
+                            icon: "play.circle.fill", iconColor: Color(hex: "#f59e0b"),
+                            title: "Quick Start Video",
+                            subtitle: "Get up and running in minutes",
+                            url: "https://www.youtube.com/watch?v=vvUcnRT3Qz0&t=3s"
+                        )
+                        helpCard(
+                            icon: "doc.text.fill", iconColor: .textTertiary,
+                            title: "Legal Agreements",
+                            subtitle: "Terms of service · Privacy policy",
+                            url: "https://app.scrivano.net/#legal"
+                        )
+
+                        // Section label
+                        sectionLabel("Connect")
+
+                        helpCard(
+                            icon: "globe",
+                            iconColor: .brandCyan,
+                            title: "Website",
+                            subtitle: "Visit us at app.scrivano.net",
+                            url: "https://app.scrivano.net/"
+                        )
+                        helpCard(
+                            icon: "play.rectangle.fill",
+                            iconColor: Color.red,
+                            title: "YouTube",
+                            subtitle: "Tutorials and feature walkthroughs",
+                            url: "https://www.youtube.com/@ScrivanoSocial"
+                        )
+                        helpCard(
+                            icon: "camera.fill",
+                            iconColor: Color(hex: "#ec4899"),
+                            title: "Instagram",
+                            subtitle: "@scrivanosocial",
+                            url: "https://www.instagram.com/scrivanosocial/"
+                        )
 
                         Spacer().frame(height: 40)
                     }
@@ -87,39 +104,64 @@ struct HelpView: View {
         .navigationBarHidden(true)
     }
 
-    private func helpCard(icon: String, iconColor: Color, title: String, subtitle: String) -> some View {
-        HStack(spacing: 14) {
-            Image(systemName: icon)
-                .font(.system(size: 18))
-                .foregroundColor(iconColor)
-                .frame(width: 44, height: 44)
-                .background(iconColor.opacity(0.12))
-                .overlay(RoundedRectangle(cornerRadius: 13).stroke(iconColor.opacity(0.2), lineWidth: 1))
-                .clipShape(RoundedRectangle(cornerRadius: 13))
+    // MARK: - Section Label
+    private func sectionLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.inter(10, weight: .heavy))
+            .tracking(1)
+            .foregroundColor(.textQuaternary)
+            .textCase(.uppercase)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 18)
+            .padding(.top, 4)
+    }
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.inter(13.5, weight: .bold)).foregroundColor(.textPrimary)
-                Text(subtitle).font(.inter(11)).foregroundColor(.textTertiary)
+    // MARK: - Help Card
+    private func helpCard(icon: String, iconColor: Color, title: String, subtitle: String, url: String) -> some View {
+        Button {
+            if let u = URL(string: url) { openURL(u) }
+        } label: {
+            HStack(spacing: 14) {
+                // Colored left accent bar
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(iconColor)
+                    .frame(width: 3, height: 36)
+
+                Image(systemName: icon)
+                    .font(.system(size: 17))
+                    .foregroundColor(iconColor)
+                    .frame(width: 40, height: 40)
+                    .background(iconColor.opacity(0.13))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(iconColor.opacity(0.25), lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .shadow(color: iconColor.opacity(0.18), radius: 6)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.inter(13.5, weight: .bold))
+                        .foregroundColor(.textPrimary)
+                    Text(subtitle)
+                        .font(.inter(11))
+                        .foregroundColor(.textTertiary)
+                }
+                Spacer()
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(.textQuaternary)
+                    .padding(7)
+                    .background(Color.white.opacity(0.05))
+                    .clipShape(Circle())
             }
-            Spacer()
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(.textQuaternary)
+            .padding(.horizontal, 14).padding(.vertical, 13)
+            .background(
+                LinearGradient(colors: [iconColor.opacity(0.06), Color.clear],
+                               startPoint: .leading, endPoint: .trailing)
+            )
+            .overlay(RoundedRectangle(cornerRadius: 18).stroke(iconColor.opacity(0.14), lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 18))
         }
-        .padding(.horizontal, 16).padding(.vertical, 14)
-        .background(Color.white.opacity(0.04))
-        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.08), lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .buttonStyle(.plain)
         .padding(.horizontal, 14)
     }
 
-    private func socialBtn(icon: String, color: Color) -> some View {
-        Image(systemName: icon)
-            .font(.system(size: 20))
-            .foregroundColor(color)
-            .frame(width: 54, height: 54)
-            .background(Color.brandCyan.opacity(0.07))
-            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.brandCyan.opacity(0.18), lineWidth: 1))
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-    }
 }

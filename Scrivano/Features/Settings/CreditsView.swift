@@ -3,200 +3,438 @@ import SwiftUI
 struct CreditsView: View {
     @EnvironmentObject var auth: AuthManager
     @Environment(\.dismiss) var dismiss
+    @StateObject private var rc = RevenueCatManager.shared
+
+    private var currentPlan: String { auth.currentUser?.plan.lowercased() ?? "free" }
+    private var isFreePlan:      Bool { currentPlan == "free" }
+    private var isPaygo:         Bool { currentPlan == "paygo" }
+    private var isUnlimited:     Bool { currentPlan == "unlimited" }
+    private var isBringAPI:      Bool { currentPlan == "bringapi" || currentPlan.contains("api") }
 
     var body: some View {
         ZStack {
             Color.phoneBg.ignoresSafeArea()
-
             VStack(spacing: 0) {
                 SubScreenBar(title: "Plans", accentColor: .brandCyan, onBack: { dismiss() })
-
                 ScrollView(showsIndicators: false) {
-                    VStack(spacing: 16) {
-
-                        // Current balance
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text("Current Balance")
-                                .font(.inter(12, weight: .heavy))
-                                .foregroundColor(.textQuaternary)
-                                .tracking(0.5)
-                                .textCase(.uppercase)
-                            HStack(spacing: 8) {
-                                balanceItem(label: "Paid Credits", value: String(format: "%.2f", auth.currentUser?.credit ?? 0), highlight: true)
-                                balanceItem(label: "Free Credits", value: String(format: "%.0f", auth.currentUser?.freeCredit ?? 0), highlight: false)
-                            }
-                        }
-                        .padding(16)
-                        .blueBorderCard()
-                        .padding(.horizontal, 14)
-                        .padding(.top, 14)
-
-                        // Free plan
-                        VStack(spacing: 0) {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text("Free Plan").font(.inter(14, weight: .bold)).foregroundColor(.textPrimary)
-                                    Text("Monthly credits refreshed daily")
-                                        .font(.inter(11)).foregroundColor(.textTertiary)
-                                }
-                                Spacer()
-                                VStack(alignment: .trailing, spacing: 2) {
-                                    Toggle("", isOn: .constant(true)).labelsHidden().tint(.brandBlue).disabled(true)
-                                    Text("Always On").font(.inter(9, weight: .bold)).foregroundColor(.textQuaternary)
-                                }
-                            }
-                        }
-                        .padding(16)
-                        .cardStyle()
-                        .padding(.horizontal, 14)
-
-                        // Pay as you go
-                        SectionLabel(text: "Pay As You Go")
-                        HStack(spacing: 8) {
-                            paygoCard(credits: "50", name: "Starter", price: "$4.99", isBest: false)
-                            paygoCard(credits: "80", name: "Standard", price: "$6.99", isBest: false)
-                            paygoCard(credits: "125", name: "Plus", price: "$9.99", isBest: true)
-                        }
-                        .padding(.horizontal, 14)
-
-                        // Unlimited
-                        SectionLabel(text: "Unlimited Access")
-                        VStack(spacing: 12) {
-                            HStack {
-                                Text("Most Popular")
-                                    .font(.inter(9, weight: .heavy))
-                                    .tracking(1)
-                                    .foregroundColor(.brandCyan)
-                                    .padding(.horizontal, 8).padding(.vertical, 3)
-                                    .background(Color.brandBlue.opacity(0.2))
-                                    .clipShape(Capsule())
-                                Spacer()
-                            }
-
-                            HStack {
-                                Text("∞")
-                                    .font(.system(size: 40, weight: .heavy))
-                                    .foregroundColor(.brandCyan)
-                                Spacer()
-                                VStack(alignment: .trailing, spacing: 2) {
-                                    Text("$34.99")
-                                        .font(.inter(22, weight: .heavy))
-                                        .foregroundColor(.textPrimary)
-                                    Text("per month · cancel anytime")
-                                        .font(.inter(11)).foregroundColor(.textTertiary)
-                                }
-                            }
-
-                            Button {
-                            } label: {
-                                Text("Subscribe Now →")
-                                    .font(.inter(14, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 13)
-                                    .background(LinearGradient(colors: [Color.brandBlue, Color.brandNavy], startPoint: .leading, endPoint: .trailing))
-                                    .clipShape(RoundedRectangle(cornerRadius: 13))
-                                    .shadow(color: Color.brandBlue.opacity(0.4), radius: 8, y: 4)
-                            }
-                        }
-                        .padding(16)
-                        .background(
-                            LinearGradient(colors: [Color.brandBlue.opacity(0.15), Color.brandNavy.opacity(0.08)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                        )
-                        .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.brandBlue.opacity(0.3), lineWidth: 1))
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
-                        .padding(.horizontal, 14)
-
-                        // Bring your own API
-                        SectionLabel(text: "Bring Your Own API")
-                        HStack(spacing: 14) {
-                            Image(systemName: "key.fill")
-                                .font(.system(size: 18))
-                                .foregroundColor(Color(hex: "#a78bfa"))
-                                .frame(width: 44, height: 44)
-                                .background(Color(hex: "#a78bfa").opacity(0.12))
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("Bring your own API")
-                                    .font(.inter(14, weight: .bold)).foregroundColor(.textPrimary)
-                                Text("Use your OpenAI key · unlimited integrations")
-                                    .font(.inter(11)).foregroundColor(.textTertiary)
-                            }
-                            Spacer()
-                            VStack(alignment: .trailing, spacing: 2) {
-                                Text("$19.99")
-                                    .font(.inter(14, weight: .heavy)).foregroundColor(.textPrimary)
-                                Text("/month")
-                                    .font(.inter(10)).foregroundColor(.textQuaternary)
-                            }
-                        }
-                        .padding(14)
-                        .cardStyle(padding: 0)
-                        .padding(.horizontal, 14)
-
+                    VStack(spacing: 0) {
+                        balanceCard.padding(.top, 14)
+                        freePlanRow
+                        sectionLabel("Pay as you go")
+                        paygoGroup
+                        sectionLabel("Unlimited Access")
+                        unlimitedCard
+                        sectionLabel("Bring Your Own API")
+                        apiCard
+                        restoreButton
                         Spacer().frame(height: 40)
                     }
                 }
             }
+
+            // Loading overlay
+            if rc.isLoading {
+                Color.black.opacity(0.55).ignoresSafeArea()
+                VStack(spacing: 14) {
+                    ProgressView().progressViewStyle(.circular).tint(.brandCyan).scaleEffect(1.3)
+                    Text("Processing…")
+                        .font(.inter(13, weight: .semibold))
+                        .foregroundColor(.textSecondary)
+                }
+                .padding(28)
+                .background(Color(hex: "#081221"))
+                .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.brandCyan.opacity(0.25), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+            }
         }
         .navigationBarHidden(true)
+        .task { await auth.refreshUser() }
+        .alert("Purchase Error", isPresented: .init(
+            get: { rc.errorMessage != nil },
+            set: { if !$0 { rc.errorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { rc.errorMessage = nil }
+        } message: {
+            Text(rc.errorMessage ?? "")
+        }
     }
 
-    private func balanceItem(label: String, value: String, highlight: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(label).font(.inter(9, weight: .bold)).foregroundColor(.textQuaternary).tracking(0.3).textCase(.uppercase)
-            Text(value).font(.inter(18, weight: .heavy)).foregroundColor(highlight ? .brandCyan : .textPrimary)
+    // MARK: - Balance Card
+
+    private var balanceCard: some View {
+        ZStack(alignment: .top) {
+            Rectangle()
+                .fill(LinearGradient(colors: [.clear, Color.brandCyan.opacity(0.65), Color.brandBlue.opacity(0.5), .clear],
+                                     startPoint: .leading, endPoint: .trailing))
+                .frame(height: 1)
+                .zIndex(1)
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Current Balance")
+                    .font(.inter(10, weight: .heavy))
+                    .foregroundColor(.textQuaternary)
+                    .tracking(1)
+                    .textCase(.uppercase)
+
+                HStack(spacing: 7) {
+                    balItem(value: String(format: "%.2f", auth.currentUser?.credit ?? 0),
+                            label: "Paid credits", isPaid: true)
+                    balItem(value: String(format: "%.0f", auth.currentUser?.freeCredit ?? 0),
+                            label: "Free credits", isPaid: false)
+                }
+            }
+            .padding(16)
         }
-        .padding(.horizontal, 12).padding(.vertical, 10)
+        .background(
+            LinearGradient(colors: [Color.brandBlue.opacity(0.18), Color.brandNavy.opacity(0.10)],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
+        )
+        .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.brandBlue.opacity(0.28), lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 22))
+        .padding(.horizontal, 18)
+    }
+
+    private func balItem(value: String, label: String, isPaid: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(value)
+                .font(.inter(18, weight: .heavy))
+                .foregroundColor(isPaid ? Color(hex: "#f59e0b") : .textPrimary)
+            Text(label)
+                .font(.inter(9, weight: .bold))
+                .foregroundColor(.textQuaternary)
+                .tracking(0.7)
+                .textCase(.uppercase)
+        }
+        .padding(.horizontal, 12).padding(.vertical, 11)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.05))
-        .overlay(RoundedRectangle(cornerRadius: 12).stroke(highlight ? Color.brandBlue.opacity(0.3) : Color.white.opacity(0.07), lineWidth: 1))
+        .background(isPaid ? Color(hex: "#f59e0b").opacity(0.09) : Color.white.opacity(0.07))
+        .overlay(RoundedRectangle(cornerRadius: 12)
+            .stroke(isPaid ? Color(hex: "#f59e0b").opacity(0.24) : Color.white.opacity(0.10), lineWidth: 1))
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
-    private func paygoCard(credits: String, name: String, price: String, isBest: Bool) -> some View {
-        VStack(spacing: 8) {
-            if isBest {
-                Text("BEST VALUE")
-                    .font(.inter(7, weight: .heavy))
-                    .tracking(0.8)
-                    .foregroundColor(.brandCyan)
-                    .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(Color.brandBlue.opacity(0.2))
-                    .clipShape(Capsule())
-            } else {
-                Spacer().frame(height: 14)
+    // MARK: - Free Plan Row
+
+    private var freePlanRow: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text("Free Plan")
+                        .font(.inter(13, weight: .bold))
+                        .foregroundColor(isFreePlan ? .textPrimary : Color.white.opacity(0.6))
+                    if isFreePlan { activeBadge }
+                }
+                Text("Monthly credits refreshed daily")
+                    .font(.inter(11))
+                    .foregroundColor(.textQuaternary)
             }
-            Text(credits)
-                .font(.inter(22, weight: .heavy))
-                .foregroundColor(.textPrimary)
-            Text("credits")
-                .font(.inter(9, weight: .bold))
-                .foregroundColor(.textQuaternary)
-            Text(name)
-                .font(.inter(11, weight: .semibold))
-                .foregroundColor(.textTertiary)
-            Text(price)
-                .font(.inter(13, weight: .heavy))
-                .foregroundColor(.textPrimary)
-            Button {
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.white)
-                    .frame(width: 30, height: 30)
-                    .background(LinearGradient(colors: [Color.brandBlue, Color.brandNavy], startPoint: .top, endPoint: .bottom))
-                    .clipShape(Circle())
+            Spacer()
+            VStack(alignment: .trailing, spacing: 5) {
+                ZStack(alignment: .trailing) {
+                    Capsule()
+                        .fill(LinearGradient(colors: [Color.brandBlue, Color.brandCyan],
+                                             startPoint: .leading, endPoint: .trailing))
+                        .frame(width: 46, height: 27)
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 21, height: 21)
+                        .shadow(color: .black.opacity(0.3), radius: 2)
+                        .padding(.trailing, 3)
+                }
+                Text("Always On")
+                    .font(.inter(10, weight: .bold))
+                    .foregroundColor(.textQuaternary)
             }
         }
-        .padding(.vertical, 14)
-        .frame(maxWidth: .infinity)
-        .background(isBest
-            ? LinearGradient(colors: [Color.brandBlue.opacity(0.2), Color.brandNavy.opacity(0.1)], startPoint: .top, endPoint: .bottom)
-            : LinearGradient(colors: [Color.white.opacity(0.04), Color.white.opacity(0.04)], startPoint: .top, endPoint: .bottom)
-        )
-        .overlay(RoundedRectangle(cornerRadius: 16).stroke(isBest ? Color.brandBlue.opacity(0.4) : Color.white.opacity(0.07), lineWidth: 1))
+        .padding(.horizontal, 16).padding(.vertical, 13)
+        .background(isFreePlan ? Color.brandCyan.opacity(0.06) : Color.white.opacity(0.04))
+        .overlay(RoundedRectangle(cornerRadius: 16)
+            .stroke(isFreePlan ? Color.brandCyan.opacity(0.30) : Color.white.opacity(0.08), lineWidth: isFreePlan ? 1.5 : 1))
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .padding(.horizontal, 18)
+        .padding(.top, 14)
+    }
+
+    // MARK: - Pay As You Go Group
+
+    private var paygoGroup: some View {
+        VStack(spacing: 0) {
+            tierRow(productId: RCProduct.credits50,  credits: "50",  name: "Starter Pack",  price: "$4.99", isBest: false, glowLevel: 0)
+            Divider().background(Color.white.opacity(0.05)).padding(.leading, 76)
+            tierRow(productId: RCProduct.credits125, credits: "125", name: "Standard Pack", price: "$9.99", isBest: false, glowLevel: 1)
+            Divider().background(Color.white.opacity(0.05)).padding(.leading, 76)
+            tierRow(productId: RCProduct.credits300, credits: "300", name: "Plus Pack",     price: "$19.99", isBest: true,  glowLevel: 2)
+        }
+        .background(Color.white.opacity(0.045))
+        .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.09), lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 18))
+        .padding(.horizontal, 18)
+    }
+
+    // MARK: - Active Plan Badge
+    private var activeBadge: some View {
+        Text("CURRENT PLAN")
+            .font(.inter(8, weight: .heavy))
+            .foregroundColor(.brandCyan)
+            .padding(.horizontal, 6).padding(.vertical, 2)
+            .background(Color.brandCyan.opacity(0.15))
+            .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color.brandCyan.opacity(0.40), lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 5))
+    }
+
+    private func tierRow(productId: String, credits: String, name: String, price: String, isBest: Bool, glowLevel: Int) -> some View {
+        let bgOpacity:     [Double] = [0.20, 0.28, 0.38]
+        let blueOpacity:   [Double] = [0.12, 0.18, 0.26]
+        let borderOpacity: [Double] = [0.30, 0.40, 0.55]
+        let glowOpacity:   [Double] = [0.12, 0.18, 0.25]
+
+        return HStack(spacing: 14) {
+            VStack(spacing: 2) {
+                Text(credits)
+                    .font(.inter(15, weight: .heavy))
+                    .foregroundColor(isBest ? .white : .brandCyan)
+                Text("credits")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundColor(isBest ? Color.white.opacity(0.8) : Color.brandCyan.opacity(0.7))
+                    .textCase(.uppercase)
+                    .tracking(0.3)
+            }
+            .frame(width: 46, height: 46)
+            .background(
+                LinearGradient(colors: [Color.brandCyan.opacity(bgOpacity[glowLevel]),
+                                        Color.brandBlue.opacity(blueOpacity[glowLevel])],
+                               startPoint: .topLeading, endPoint: .bottomTrailing)
+            )
+            .overlay(RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.brandCyan.opacity(borderOpacity[glowLevel]), lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .shadow(color: Color.brandCyan.opacity(glowOpacity[glowLevel]), radius: 10)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(name)
+                        .font(.inter(13, weight: .bold))
+                        .foregroundColor(.textPrimary)
+                    if isBest {
+                        Text("BEST VALUE")
+                            .font(.inter(8, weight: .heavy))
+                            .foregroundColor(.brandCyan)
+                            .padding(.horizontal, 6).padding(.vertical, 2)
+                            .background(Color.brandCyan.opacity(0.2))
+                            .clipShape(RoundedRectangle(cornerRadius: 5))
+                    }
+                }
+                Text("One-time purchase")
+                    .font(.inter(11))
+                    .foregroundColor(.textQuaternary)
+            }
+
+            Spacer()
+
+            Text(price)
+                .font(.inter(15, weight: .heavy))
+                .foregroundColor(.textPrimary)
+                .padding(.trailing, 10)
+
+            Button {
+                Task { await rc.purchase(productId: productId) }
+            } label: {
+                Text("+")
+                    .font(.system(size: 20, weight: .light))
+                    .foregroundColor(.brandCyan)
+                    .frame(width: 32, height: 32)
+                    .background(Color.brandCyan.opacity(0.10))
+                    .overlay(Circle().stroke(Color.brandCyan.opacity(0.50), lineWidth: 1.5))
+                    .clipShape(Circle())
+            }
+            .disabled(rc.isLoading)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 14)
+    }
+
+    // MARK: - Unlimited Card
+
+    private var unlimitedCard: some View {
+        ZStack(alignment: .top) {
+            Rectangle()
+                .fill(LinearGradient(colors: [.clear, Color.brandCyan.opacity(0.80), Color.brandBlue.opacity(0.60), .clear],
+                                     startPoint: .leading, endPoint: .trailing))
+                .frame(height: 1)
+                .zIndex(1)
+
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 8) {
+                    Text("Most Popular")
+                        .font(.inter(9, weight: .heavy))
+                        .tracking(0.8)
+                        .foregroundColor(Color(hex: "#060e1e"))
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(Color.brandCyan)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                    if isUnlimited { activeBadge }
+                }
+                .padding(.bottom, 12)
+
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("∞ Unlimited Access")
+                            .font(.inter(14, weight: .heavy))
+                            .foregroundColor(.brandCyan)
+                        Text("$20.00")
+                            .font(.inter(22, weight: .heavy))
+                            .foregroundColor(.textPrimary)
+                        Text("per month · cancel anytime")
+                            .font(.inter(11))
+                            .foregroundColor(.textTertiary)
+                    }
+                    Spacer()
+                    Text("∞")
+                        .font(.system(size: 38, weight: .heavy))
+                        .foregroundColor(Color.brandCyan.opacity(0.18))
+                        .padding(.top, -4)
+                }
+                .padding(.bottom, 16)
+
+                Button {
+                    Task { await rc.purchase(productId: RCProduct.unlimited) }
+                } label: {
+                    Text(isUnlimited ? "Active Plan ✓" : "Subscribe Now →")
+                        .font(.inter(13, weight: .heavy))
+                        .foregroundColor(isUnlimited ? .brandCyan : Color(hex: "#060e1e"))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(isUnlimited
+                            ? LinearGradient(colors: [Color.brandCyan.opacity(0.12), Color.brandCyan.opacity(0.12)],
+                                             startPoint: .leading, endPoint: .trailing)
+                            : LinearGradient(colors: [Color.brandBlue, Color.brandCyan],
+                                             startPoint: .leading, endPoint: .trailing))
+                        .overlay(RoundedRectangle(cornerRadius: 14)
+                            .stroke(isUnlimited ? Color.brandCyan.opacity(0.50) : Color.clear, lineWidth: 1.5))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        .shadow(color: Color.brandCyan.opacity(isUnlimited ? 0 : 0.30), radius: 8, y: 4)
+                }
+                .disabled(rc.isLoading || isUnlimited)
+            }
+            .padding(18)
+        }
+        .background(
+            LinearGradient(colors: [Color.brandCyan.opacity(0.13), Color.brandBlue.opacity(0.18), Color.brandNavy.opacity(0.22)],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
+        )
+        .overlay(RoundedRectangle(cornerRadius: 22)
+            .stroke(Color.brandCyan.opacity(isUnlimited ? 0.70 : 0.38), lineWidth: isUnlimited ? 1.5 : 1))
+        .clipShape(RoundedRectangle(cornerRadius: 22))
+        .shadow(color: Color.brandCyan.opacity(isUnlimited ? 0.22 : 0.12), radius: 28)
+        .padding(.horizontal, 18)
+    }
+
+    // MARK: - Bring Your Own API Card
+
+    private var apiCard: some View {
+        ZStack(alignment: .top) {
+            Rectangle()
+                .fill(LinearGradient(colors: [.clear, Color(hex: "#a78bfa").opacity(0.60), .clear],
+                                     startPoint: .leading, endPoint: .trailing))
+                .frame(height: 1)
+                .zIndex(1)
+
+            VStack(spacing: 10) {
+                HStack(spacing: 12) {
+                    Image(systemName: "key.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(Color(hex: "#a78bfa"))
+                        .frame(width: 40, height: 40)
+                        .background(Color(hex: "#a78bfa").opacity(0.15))
+                        .overlay(RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color(hex: "#a78bfa").opacity(0.30), lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Text("Bring your own API")
+                                .font(.inter(13, weight: .heavy))
+                                .foregroundColor(Color(hex: "#a78bfa"))
+                            if isBringAPI {
+                                Text("CURRENT PLAN")
+                                    .font(.inter(8, weight: .heavy))
+                                    .foregroundColor(Color(hex: "#a78bfa"))
+                                    .padding(.horizontal, 6).padding(.vertical, 2)
+                                    .background(Color(hex: "#a78bfa").opacity(0.15))
+                                    .overlay(RoundedRectangle(cornerRadius: 5)
+                                        .stroke(Color(hex: "#a78bfa").opacity(0.40), lineWidth: 1))
+                                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                            }
+                        }
+                        Text("Use your OpenAI key · unlimited integrations")
+                            .font(.inter(11))
+                            .foregroundColor(.textQuaternary)
+                    }
+                    Spacer()
+                }
+
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("$10.00")
+                            .font(.inter(20, weight: .heavy))
+                            .foregroundColor(.textPrimary)
+                        Text("per month")
+                            .font(.inter(11))
+                            .foregroundColor(.textQuaternary)
+                    }
+                    Spacer()
+                    Button {
+                        Task { await rc.purchase(productId: RCProduct.bringapi) }
+                    } label: {
+                        Text(isBringAPI ? "Active Plan ✓" : "Connect API →")
+                            .font(.inter(12, weight: .heavy))
+                            .foregroundColor(Color(hex: "#a78bfa"))
+                            .padding(.horizontal, 18).padding(.vertical, 9)
+                            .background(Color(hex: "#a78bfa").opacity(isBringAPI ? 0.18 : 0.10))
+                            .overlay(RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color(hex: "#a78bfa").opacity(isBringAPI ? 0.70 : 0.50), lineWidth: 1.5))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .disabled(rc.isLoading || isBringAPI)
+                }
+            }
+            .padding(18)
+        }
+        .background(
+            LinearGradient(colors: [Color(hex: "#a78bfa").opacity(isBringAPI ? 0.18 : 0.10),
+                                    Color(hex: "#6d28d9").opacity(isBringAPI ? 0.14 : 0.08)],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
+        )
+        .overlay(RoundedRectangle(cornerRadius: 22)
+            .stroke(Color(hex: "#a78bfa").opacity(isBringAPI ? 0.55 : 0.30), lineWidth: isBringAPI ? 1.5 : 1))
+        .clipShape(RoundedRectangle(cornerRadius: 22))
+        .padding(.horizontal, 18)
+    }
+
+    // MARK: - Restore Button
+
+    private var restoreButton: some View {
+        Button {
+            Task { await rc.restorePurchases() }
+        } label: {
+            Text("Restore Purchases")
+                .font(.inter(12, weight: .semibold))
+                .foregroundColor(.textQuaternary)
+        }
+        .disabled(rc.isLoading)
+        .padding(.top, 20)
+    }
+
+    // MARK: - Section Label
+
+    private func sectionLabel(_ text: String) -> some View {
+        Text(text)
+            .font(.inter(10, weight: .heavy))
+            .foregroundColor(.textQuaternary)
+            .tracking(1)
+            .textCase(.uppercase)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 18)
+            .padding(.top, 18)
+            .padding(.bottom, 8)
     }
 }

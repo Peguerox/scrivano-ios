@@ -111,7 +111,7 @@ struct AudioPlayerView: View {
 
                         // Speed
                         HStack(spacing: 6) {
-                            ForEach([0.75, 1.0, 1.25, 1.5], id: \.self) { speed in
+                            ForEach([0.5, 1.0, 1.5, 2.0], id: \.self) { speed in
                                 Button {
                                     player.setRate(Float(speed))
                                 } label: {
@@ -167,11 +167,22 @@ final class AudioPlayerManager: ObservableObject {
     private var player: AVAudioPlayer?
     private var timer: Timer?
 
-    func load(url: URL?) {
+    func load(url: URL?, autoPlay: Bool = false) {
         guard let url = url else { return }
-        player = try? AVAudioPlayer(contentsOf: url)
-        player?.prepareToPlay()
-        duration = player?.duration ?? 0
+        // Init + prepareToPlay off main thread — eliminates first-play lag
+        Task {
+            let p = await AudioPlayerManager.preparePlayer(url: url)
+            self.player = p
+            self.duration = p?.duration ?? 0
+            if autoPlay { self.play() }
+        }
+    }
+
+    nonisolated static func preparePlayer(url: URL) async -> AVAudioPlayer? {
+        let p = try? AVAudioPlayer(contentsOf: url)
+        p?.enableRate = true   // required for any rate != 1.0 to take effect
+        p?.prepareToPlay()
+        return p
     }
 
     func togglePlay() {
@@ -179,6 +190,9 @@ final class AudioPlayerManager: ObservableObject {
     }
 
     func play() {
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playback, mode: .default, options: [])
+        try? session.setActive(true)
         player?.rate = rate
         player?.play()
         isPlaying = true
@@ -214,6 +228,58 @@ final class AudioPlayerManager: ObservableObject {
 
     func setRate(_ r: Float) {
         rate = r
-        player?.rate = r
+        if isPlaying { player?.rate = r }
+        else { player?.rate = r }  // stored for when play() is called
+    }
+}
+
+// MARK: - Audio File Processor (split / trim)
+
+import CoreMedia
+
+struct AudioFileProcessor {
+
+    /// Splits `sourceURL` at `splitTime` seconds into two new m4a files.
+    /// Returns URLs of (firstHalf, secondHalf).
+    static func split(sourceURL: URL, at splitTime: TimeInterval, itemId: String) async throws -> (URL, URL) {
+        let asset = AVURLAsset(url: sourceURL)
+        let duration = try await asset.load(.duration).seconds
+        let url1 = LocalRecordingStore.newFileURL(itemId: itemId)
+        let url2 = LocalRecordingStore.newFileURL(itemId: itemId)
+        try await export(asset: asset, from: 0,         to: splitTime, outputURL: url1)
+        try await export(asset: asset, from: splitTime, to: duration,  outputURL: url2)
+        return (url1, url2)
+    }
+
+    /// Trims `sourceURL` keeping only the region from `startTime` to `endTime`.
+    static func trim(sourceURL: URL, from startTime: TimeInterval, to endTime: TimeInterval, itemId: String) async throws -> URL {
+        let asset = AVURLAsset(url: sourceURL)
+        let url = LocalRecordingStore.newFileURL(itemId: itemId)
+        try await export(asset: asset, from: startTime, to: endTime, outputURL: url)
+        return url
+    }
+
+    private static func export(asset: AVAsset, from start: TimeInterval, to end: TimeInterval, outputURL: URL) async throws {
+        guard let session = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetAppleM4A) else {
+            throw NSError(domain: "AudioFileProcessor", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "Cannot create export session"])
+        }
+        session.outputURL = outputURL
+        session.outputFileType = .m4a
+        session.timeRange = CMTimeRange(
+            start:    CMTime(seconds: start,       preferredTimescale: 44100),
+            duration: CMTime(seconds: end - start, preferredTimescale: 44100)
+        )
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+            session.exportAsynchronously {
+                if session.status == .completed {
+                    cont.resume()
+                } else {
+                    cont.resume(throwing: session.error ??
+                        NSError(domain: "AudioFileProcessor", code: 2,
+                                userInfo: [NSLocalizedDescriptionKey: "Export failed"]))
+                }
+            }
+        }
     }
 }

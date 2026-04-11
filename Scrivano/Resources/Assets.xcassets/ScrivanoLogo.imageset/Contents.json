@@ -1,0 +1,18 @@
+{
+  "images" : [
+    {
+      "filename" : "logo_signin_84px.png",
+      "idiom" : "universal",
+      "scale" : "1x"
+    },
+    {
+      "filename" : "logo_signin_168px_2x.png",
+      "idiom" : "universal",
+      "scale" : "2x"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

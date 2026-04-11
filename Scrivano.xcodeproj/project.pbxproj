@@ -7,48 +7,66 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		03E9017693BAC8BC944AC5A3 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = 222246E36DF7BDF2845F8585 /* GoogleSignIn */; };
 		0770A7DBD7A3A7D7BF5B0AE9 /* ForgotPasswordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C16ACC11E84E43688CE2D1A2 /* ForgotPasswordView.swift */; };
+		2B4D5E0BF94464B81D92CAFB /* GoogleSignInSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 0CBE658973C4C0C7A78CDD6E /* GoogleSignInSwift */; };
 		34263979EA5FD8821A9D124A /* ItemCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9813A14F177A7249DCF5C5A4 /* ItemCardView.swift */; };
 		3DDB9201EF1620E403A19133 /* MediaListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19E4226696BC227E8507A928 /* MediaListView.swift */; };
 		3ED482B75507F9380DFCFF5B /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB942C17ECC38870DA121384 /* KeychainService.swift */; };
+		439835D52F89163800B23817 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 439835D42F89163800B23817 /* RevenueCat */; };
+		439835D82F89167500B23817 /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 439835D72F89167500B23817 /* StoreKit.framework */; };
+		439835DA2F89185000B23817 /* RevenueCatManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 439835D92F89185000B23817 /* RevenueCatManager.swift */; };
 		43A0FC1414462AFCF730681C /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75D2368C9687DA615DA21827 /* Models.swift */; };
 		4D641050BC7A3B917E77B876 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEB1E7E916DFB38C85A373E8 /* DesignSystem.swift */; };
 		4DD89E2BAA52D3D37258F3FF /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8215945EBEE41425AAFA0B45 /* APIClient.swift */; };
 		5C738AACAA822D8A6488E3E1 /* TextViewerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB8204215F6E3D3B4877AFCC /* TextViewerView.swift */; };
 		607DA6A944FCE732A31DDA3C /* CreditsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 286834DB0A6C04CAC314AF52 /* CreditsView.swift */; };
 		7111478265D2C8BEAE8F602B /* AudioPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E2D40F3D5F1D7E67B8A7F09 /* AudioPlayerView.swift */; };
+		7413A21CB845616B683F5E90 /* TaskQueueManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69DF8B5B82FF25100FFF5A23 /* TaskQueueManager.swift */; };
 		79357EE76543D402E0E65BA8 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C793A2599B4AB77720F052D /* RootView.swift */; };
 		8890063D99A3BAA04D5E375F /* PromptsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DC7A5E1F0B8F2C72AAB26C4 /* PromptsView.swift */; };
 		98482BC84F71738776A0B712 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1E0E1EA57EB073389E1C64E /* DashboardView.swift */; };
 		9D84908CBC8F2D1856494134 /* TextListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4741B2296ADDC623C44796A /* TextListView.swift */; };
 		9F07F45CFB8EFB879684CC6E /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 352AFF83E7A6FA701F540953 /* SettingsView.swift */; };
 		A210A4CFC233027292A7C411 /* RecorderSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7203BAC61936ECAD650B9880 /* RecorderSettingsView.swift */; };
+		AA11BB22CC33DD44EE55FF66 /* BackupManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB11CC22DD33EE44FF55AA66 /* BackupManager.swift */; };
 		B11BC849722C139A2AEFD759 /* ScrivanoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B396376BA27985C0B2CFFC0 /* ScrivanoApp.swift */; };
 		B20BA0781FED73885500B188 /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06D498FDBFD2BF086DFBE841 /* LoginView.swift */; };
 		B232BDD9179E5EF9F4471632 /* NotesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42DB24EBC0D8FD24E722D0F2 /* NotesListView.swift */; };
 		B2B009E3B161F7C8CE9D99BC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 333DD858467181392B3624BE /* Assets.xcassets */; };
 		B3CC2F84BDAA1803BB3E1EF8 /* SignupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB4D06DCC2F419CCE4724A19 /* SignupView.swift */; };
 		BBB1425C89B8CF158D76C4C7 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B214B81BF8848ECCE7BED5E0 /* AuthManager.swift */; };
+		C1D2E3F4A5B6C7D8E9F0A1B2 /* SecurityLockManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C3D4E5F6A7B8C9D0E1F2A3 /* SecurityLockManager.swift */; };
 		C735256980942ABC18C767A5 /* RecordingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05E9C746849DA8E5306E4EED /* RecordingView.swift */; };
+		CC44DD55EE66FF77AA88BB99 /* PocketModeExplanationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB22CC33DD44EE55FF66AA11 /* PocketModeExplanationView.swift */; };
+		D1388A1797655DE855B399F1 /* SocialAuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 048E1CF29233B9E1A7EDAD2E /* SocialAuthManager.swift */; };
+		D2E3F4A5B6C7D8E9F0A1B2C3 /* LockScreenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3D4E5F6A7B8C9D0E1F2A3B4 /* LockScreenView.swift */; };
 		D9EBFC7425DD2A88D689FBCC /* HelpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 610CED47007FEE1EF0D9D201 /* HelpView.swift */; };
 		E5E86AE4DC49FA27AE914E20 /* AutomationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D9B5E5904908D1A7C47A194 /* AutomationView.swift */; };
 		EDADD3885184A95FC95C4252 /* TranscriptionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4652AD022253507EFDCBB835 /* TranscriptionManager.swift */; };
+		EE11FF22AA33BB44CC55DD66 /* BackupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF11AA22BB33CC44DD55EE66 /* BackupView.swift */; };
+		F1A2B3C4D5E6F7A8B9C0D1E2 /* TrashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* TrashView.swift */; };
 		F4EF985C8EF327D82873A0EF /* VerifyCodeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE3F145DC89C9A2CFB627070 /* VerifyCodeView.swift */; };
+		FF33AA44BB55CC66DD77EE88 /* APIKeyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE33FF44AA55BB66CC77DD88 /* APIKeyView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		048E1CF29233B9E1A7EDAD2E /* SocialAuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SocialAuthManager.swift; sourceTree = "<group>"; };
 		05E9C746849DA8E5306E4EED /* RecordingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecordingView.swift; sourceTree = "<group>"; };
 		06D498FDBFD2BF086DFBE841 /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		19E4226696BC227E8507A928 /* MediaListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaListView.swift; sourceTree = "<group>"; };
 		1B396376BA27985C0B2CFFC0 /* ScrivanoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScrivanoApp.swift; sourceTree = "<group>"; };
 		1C793A2599B4AB77720F052D /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
-		20CAE2611C0D530DDFD894DF /* Scrivano.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Scrivano.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		20CAE2611C0D530DDFD894DF /* Scrivano.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Scrivano.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		286834DB0A6C04CAC314AF52 /* CreditsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreditsView.swift; sourceTree = "<group>"; };
 		333DD858467181392B3624BE /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		352AFF83E7A6FA701F540953 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		42DB24EBC0D8FD24E722D0F2 /* NotesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesListView.swift; sourceTree = "<group>"; };
+		439835D72F89167500B23817 /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
+		439835D92F89185000B23817 /* RevenueCatManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevenueCatManager.swift; sourceTree = "<group>"; };
 		4652AD022253507EFDCBB835 /* TranscriptionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionManager.swift; sourceTree = "<group>"; };
 		610CED47007FEE1EF0D9D201 /* HelpView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HelpView.swift; sourceTree = "<group>"; };
+		69DF8B5B82FF25100FFF5A23 /* TaskQueueManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskQueueManager.swift; sourceTree = "<group>"; };
 		6DC7A5E1F0B8F2C72AAB26C4 /* PromptsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PromptsView.swift; sourceTree = "<group>"; };
 		7203BAC61936ECAD650B9880 /* RecorderSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecorderSettingsView.swift; sourceTree = "<group>"; };
 		75D2368C9687DA615DA21827 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
@@ -56,28 +74,54 @@
 		8D9B5E5904908D1A7C47A194 /* AutomationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutomationView.swift; sourceTree = "<group>"; };
 		9813A14F177A7249DCF5C5A4 /* ItemCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemCardView.swift; sourceTree = "<group>"; };
 		9E2D40F3D5F1D7E67B8A7F09 /* AudioPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayerView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E1F2 /* TrashView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrashView.swift; sourceTree = "<group>"; };
 		B214B81BF8848ECCE7BED5E0 /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
+		B2C3D4E5F6A7B8C9D0E1F2A3 /* SecurityLockManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityLockManager.swift; sourceTree = "<group>"; };
+		BB11CC22DD33EE44FF55AA66 /* BackupManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupManager.swift; sourceTree = "<group>"; };
+		BB22CC33DD44EE55FF66AA11 /* PocketModeExplanationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PocketModeExplanationView.swift; sourceTree = "<group>"; };
 		BE38C6949473AF349912B673 /* Scrivano.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Scrivano.entitlements; sourceTree = "<group>"; };
 		BEB1E7E916DFB38C85A373E8 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		C16ACC11E84E43688CE2D1A2 /* ForgotPasswordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ForgotPasswordView.swift; sourceTree = "<group>"; };
+		C3D4E5F6A7B8C9D0E1F2A3B4 /* LockScreenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LockScreenView.swift; sourceTree = "<group>"; };
 		C5880976E496DD746B0E2172 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		D4741B2296ADDC623C44796A /* TextListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextListView.swift; sourceTree = "<group>"; };
 		DB4D06DCC2F419CCE4724A19 /* SignupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignupView.swift; sourceTree = "<group>"; };
 		DB942C17ECC38870DA121384 /* KeychainService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
 		DE3F145DC89C9A2CFB627070 /* VerifyCodeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyCodeView.swift; sourceTree = "<group>"; };
+		EE33FF44AA55BB66CC77DD88 /* APIKeyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIKeyView.swift; sourceTree = "<group>"; };
 		F1E0E1EA57EB073389E1C64E /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		FB8204215F6E3D3B4877AFCC /* TextViewerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextViewerView.swift; sourceTree = "<group>"; };
+		FF11AA22BB33CC44DD55EE66 /* BackupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		95C82601A942FC02A44DDADB /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				03E9017693BAC8BC944AC5A3 /* GoogleSignIn in Frameworks */,
+				2B4D5E0BF94464B81D92CAFB /* GoogleSignInSwift in Frameworks */,
+				439835D52F89163800B23817 /* RevenueCat in Frameworks */,
+				439835D82F89167500B23817 /* StoreKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		2492FB5D9041665A99A9A95C /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				EE33FF44AA55BB66CC77DD88 /* APIKeyView.swift */,
+				BB22CC33DD44EE55FF66AA11 /* PocketModeExplanationView.swift */,
 				8D9B5E5904908D1A7C47A194 /* AutomationView.swift */,
+				FF11AA22BB33CC44DD55EE66 /* BackupView.swift */,
 				286834DB0A6C04CAC314AF52 /* CreditsView.swift */,
 				610CED47007FEE1EF0D9D201 /* HelpView.swift */,
+				C3D4E5F6A7B8C9D0E1F2A3B4 /* LockScreenView.swift */,
 				7203BAC61936ECAD650B9880 /* RecorderSettingsView.swift */,
 				352AFF83E7A6FA701F540953 /* SettingsView.swift */,
+				A1B2C3D4E5F6A7B8C9D0E1F2 /* TrashView.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -119,8 +163,18 @@
 			children = (
 				B214B81BF8848ECCE7BED5E0 /* AuthManager.swift */,
 				DB942C17ECC38870DA121384 /* KeychainService.swift */,
+				048E1CF29233B9E1A7EDAD2E /* SocialAuthManager.swift */,
+				B2C3D4E5F6A7B8C9D0E1F2A3 /* SecurityLockManager.swift */,
 			);
 			path = Auth;
+			sourceTree = "<group>";
+		};
+		439835D62F89167500B23817 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				439835D72F89167500B23817 /* StoreKit.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 		52318F8F0E1C45E5E8F139D0 /* Shared */ = {
@@ -162,6 +216,7 @@
 			isa = PBXGroup;
 			children = (
 				EDBBCF50E8F3162E183692E7 /* Scrivano */,
+				439835D62F89167500B23817 /* Frameworks */,
 				29F5D4E53F9CCE62274E3C3E /* Products */,
 			);
 			sourceTree = "<group>";
@@ -198,6 +253,7 @@
 			children = (
 				CBFBBF3ADB72FE5808C5E9C5 /* API */,
 				32479CBA395A66A9F7A2FBA2 /* Auth */,
+				BB11CC22DD33EE44FF55AA66 /* BackupManager.swift */,
 				2EA59521902542BBEC18C101 /* Models */,
 			);
 			path = Core;
@@ -224,7 +280,9 @@
 		CBFBBF3ADB72FE5808C5E9C5 /* API */ = {
 			isa = PBXGroup;
 			children = (
+				439835D92F89185000B23817 /* RevenueCatManager.swift */,
 				8215945EBEE41425AAFA0B45 /* APIClient.swift */,
+				69DF8B5B82FF25100FFF5A23 /* TaskQueueManager.swift */,
 				4652AD022253507EFDCBB835 /* TranscriptionManager.swift */,
 			);
 			path = API;
@@ -259,6 +317,7 @@
 			buildPhases = (
 				AB22F2E0FC94ECA7EF035AFA /* Sources */,
 				E6588838468E87E4241A7DF0 /* Resources */,
+				95C82601A942FC02A44DDADB /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -266,6 +325,9 @@
 			);
 			name = Scrivano;
 			packageProductDependencies = (
+				222246E36DF7BDF2845F8585 /* GoogleSignIn */,
+				0CBE658973C4C0C7A78CDD6E /* GoogleSignInSwift */,
+				439835D42F89163800B23817 /* RevenueCat */,
 			);
 			productName = Scrivano;
 			productReference = 20CAE2611C0D530DDFD894DF /* Scrivano.app */;
@@ -281,7 +343,6 @@
 				LastUpgradeCheck = 1500;
 				TargetAttributes = {
 					92076D6B6205B829EFF6EF08 = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -295,6 +356,10 @@
 			);
 			mainGroup = 5D13AF33F763DDED55F65D0B;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				60EBE711D86A6C324C1551FF /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+				439835D32F89163800B23817 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 29F5D4E53F9CCE62274E3C3E /* Products */;
 			projectDirPath = "";
@@ -322,9 +387,16 @@
 			buildActionMask = 2147483647;
 			files = (
 				4DD89E2BAA52D3D37258F3FF /* APIClient.swift in Sources */,
+				AA11BB22CC33DD44EE55FF66 /* BackupManager.swift in Sources */,
+				EE11FF22AA33BB44CC55DD66 /* BackupView.swift in Sources */,
+				FF33AA44BB55CC66DD77EE88 /* APIKeyView.swift in Sources */,
+				CC44DD55EE66FF77AA88BB99 /* PocketModeExplanationView.swift in Sources */,
 				7111478265D2C8BEAE8F602B /* AudioPlayerView.swift in Sources */,
 				BBB1425C89B8CF158D76C4C7 /* AuthManager.swift in Sources */,
+				C1D2E3F4A5B6C7D8E9F0A1B2 /* SecurityLockManager.swift in Sources */,
+				D2E3F4A5B6C7D8E9F0A1B2C3 /* LockScreenView.swift in Sources */,
 				E5E86AE4DC49FA27AE914E20 /* AutomationView.swift in Sources */,
+				F1A2B3C4D5E6F7A8B9C0D1E2 /* TrashView.swift in Sources */,
 				607DA6A944FCE732A31DDA3C /* CreditsView.swift in Sources */,
 				98482BC84F71738776A0B712 /* DashboardView.swift in Sources */,
 				4D641050BC7A3B917E77B876 /* DesignSystem.swift in Sources */,
@@ -337,12 +409,15 @@
 				43A0FC1414462AFCF730681C /* Models.swift in Sources */,
 				B232BDD9179E5EF9F4471632 /* NotesListView.swift in Sources */,
 				8890063D99A3BAA04D5E375F /* PromptsView.swift in Sources */,
+				439835DA2F89185000B23817 /* RevenueCatManager.swift in Sources */,
 				A210A4CFC233027292A7C411 /* RecorderSettingsView.swift in Sources */,
 				C735256980942ABC18C767A5 /* RecordingView.swift in Sources */,
 				79357EE76543D402E0E65BA8 /* RootView.swift in Sources */,
 				B11BC849722C139A2AEFD759 /* ScrivanoApp.swift in Sources */,
 				9F07F45CFB8EFB879684CC6E /* SettingsView.swift in Sources */,
 				B3CC2F84BDAA1803BB3E1EF8 /* SignupView.swift in Sources */,
+				D1388A1797655DE855B399F1 /* SocialAuthManager.swift in Sources */,
+				7413A21CB845616B683F5E90 /* TaskQueueManager.swift in Sources */,
 				9D84908CBC8F2D1856494134 /* TextListView.swift in Sources */,
 				5C738AACAA822D8A6488E3E1 /* TextViewerView.swift in Sources */,
 				EDADD3885184A95FC95C4252 /* TranscriptionManager.swift in Sources */,
@@ -482,15 +557,15 @@
 				CODE_SIGN_ENTITLEMENTS = Scrivano/Resources/Scrivano.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				CURRENT_PROJECT_VERSION = 21;
+				DEVELOPMENT_TEAM = 6MM4NQJ88Q;
 				INFOPLIST_FILE = Scrivano/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.0;
+				MARKETING_VERSION = 4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.scrivano.recorderapp;
 				PRODUCT_NAME = Scrivano;
 				SDKROOT = iphoneos;
@@ -508,15 +583,15 @@
 				CODE_SIGN_ENTITLEMENTS = Scrivano/Resources/Scrivano.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				CURRENT_PROJECT_VERSION = 21;
+				DEVELOPMENT_TEAM = 6MM4NQJ88Q;
 				INFOPLIST_FILE = Scrivano/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.0;
+				MARKETING_VERSION = 4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.scrivano.recorderapp;
 				PRODUCT_NAME = Scrivano;
 				SDKROOT = iphoneos;
@@ -548,6 +623,43 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		439835D32F89163800B23817 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/RevenueCat/purchases-ios-spm.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.67.2;
+			};
+		};
+		60EBE711D86A6C324C1551FF /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 7.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		0CBE658973C4C0C7A78CDD6E /* GoogleSignInSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 60EBE711D86A6C324C1551FF /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignInSwift;
+		};
+		222246E36DF7BDF2845F8585 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 60EBE711D86A6C324C1551FF /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+		439835D42F89163800B23817 /* RevenueCat */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 439835D32F89163800B23817 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;
+			productName = RevenueCat;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 8ED82B25C14975E87335D6AE /* Project object */;
 }
