@@ -566,6 +566,7 @@ struct MediaListView: View {
                                 guard !audioQueue.isEmpty else { return }
                                 queuedIds = Set(audioQueue.map(\.id))
                                 mediaQueue = audioQueue
+                                TranscriptionManager.shared.queuedRecordingIds.formUnion(queuedIds)
                                 processQueueNext()
                             } label: {
                                 Text("Continue")
@@ -785,8 +786,8 @@ struct MediaListView: View {
         }
         .sheet(isPresented: $showRecorder) { RecordingView(item: item) }
         // Advance audio queue when transcription completes or fails
-        .onChange(of: transcriptionMgr.transcribedRecordingIds) { ids in
-            if let rec = activeQueueItem, ids.contains(rec.id) {
+        .onChange(of: transcriptionMgr.transcriptSaveCounter) { _ in
+            if let rec = activeQueueItem, transcriptionMgr.transcribedRecordingIds.contains(rec.id) {
                 activeQueueItem = nil
                 processQueueNext()
             }
