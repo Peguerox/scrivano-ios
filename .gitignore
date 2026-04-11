@@ -18,6 +18,11 @@ Pods/
 # macOS
 .DS_Store
 
+# Private keys — never commit
+*.p8
+*.p12
+*.mobileprovision
+
 # Xcode generated
 *.moved-aside
 *.pbxuser
