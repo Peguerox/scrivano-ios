@@ -130,7 +130,10 @@ struct DashboardView: View {
                         processItemsSelected.removeAll()
                     }
                 }) {
-                    let mergeEntries: [(text: String, id: String, itemId: String)] = processItemsSelected.compactMap { iid in
+                    let mergeEntries: [(text: String, id: String, itemId: String)] = displayedItems
+                        .filter { processItemsSelected.contains($0.id) }
+                        .compactMap { item in
+                        let iid = item.id
                         // Try merge entry first; fall back to combining all non-merge transcripts
                         if let merge = LocalTranscriptStore.shared.entries.first(where: { $0.itemId == iid && $0.isMerge && !$0.text.isEmpty }) {
                             return (text: merge.text, id: merge.id, itemId: iid)
