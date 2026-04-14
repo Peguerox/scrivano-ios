@@ -200,6 +200,7 @@ struct ImagePickerView: UIViewControllerRepresentable {
 // MARK: - MediaListView
 struct MediaListView: View {
     let item: Item
+    var triggerAudioImport: Bool = false
     @Environment(\.dismiss) var dismiss
     @State private var selected = Set<String>()
     @State private var isLoading = false
@@ -708,6 +709,11 @@ struct MediaListView: View {
             }
         }
         .navigationBarHidden(true)
+        .onAppear {
+            if triggerAudioImport {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { showAudioImporter = true }
+            }
+        }
         // Player sheets
         .fullScreenCover(item: $playerRecording) { rec in
             LocalAudioPlayerView(

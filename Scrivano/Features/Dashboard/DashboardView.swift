@@ -23,7 +23,6 @@ struct DashboardView: View {
     @State private var sessionWarmTask: Task<Void, Never>? = nil
 
     // File importers (lifted from cards so they work reliably at top level)
-    @State private var showAudioImporter = false
     @State private var showImageImporter = false
     @State private var showDocImporter = false
     @State private var importTargetItem: Item? = nil
@@ -99,15 +98,6 @@ struct DashboardView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: .scrivanoBackupRestored)) { _ in
                 vm.refreshFromLocalStores()
-            }
-            // File importers at top level so they work reliably outside AnyView
-            .fileImporter(isPresented: $showAudioImporter, allowedContentTypes: [.audio, .mpeg4Movie, .movie], allowsMultipleSelection: false) { result in
-                guard let item = importTargetItem, case .success(let urls) = result, let url = urls.first else { return }
-                Task { await handleAudioImport(url: url, item: item) }
-            }
-            .fileImporter(isPresented: $showImageImporter, allowedContentTypes: [.image, .jpeg, .png, .heic, .webP, UTType(filenameExtension: "jpg") ?? .image], allowsMultipleSelection: false) { result in
-                guard let item = importTargetItem, case .success(let urls) = result, let url = urls.first else { return }
-                Task { await handleImageImport(url: url, item: item) }
             }
     }
 
@@ -505,7 +495,10 @@ struct DashboardView: View {
         animatedContent
             .navigationBarHidden(true)
             .navigationDestination(isPresented: $vm.navigateToMedia) {
-                if let item = vm.navigationItem { MediaListView(item: item) }
+                if let item = vm.navigationItem {
+                    MediaListView(item: item, triggerAudioImport: vm.triggerMediaAudioImport)
+                        .onDisappear { vm.triggerMediaAudioImport = false }
+                }
             }
             .navigationDestination(isPresented: $vm.navigateToText) {
                 if let item = vm.navigationItem { TextListView(item: item) }
@@ -982,35 +975,6 @@ struct DashboardView: View {
         vm.refreshFromLocalStores()
     }
 
-    // MARK: - Import audio
-    @MainActor
-    private func handleAudioImport(url: URL, item: Item) async {
-        let accessed = url.startAccessingSecurityScopedResource()
-        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
-
-        let ext = url.pathExtension.lowercased().isEmpty ? "m4a" : url.pathExtension.lowercased()
-        let destURL = LocalRecordingStore.newFileURL(itemId: item.id, ext: ext)
-        do { try FileManager.default.copyItem(at: url, to: destURL) } catch { return }
-
-        let asset = AVURLAsset(url: destURL)
-        let duration: Double
-        if let cmDur = try? await asset.load(.duration) {
-            duration = CMTimeGetSeconds(cmDur)
-        } else { duration = 0 }
-
-        let originalName = url.deletingPathExtension().lastPathComponent
-        let entry = LocalRecordingEntry(
-            id: UUID().uuidString,
-            itemId: item.id,
-            relativePath: LocalRecordingStore.relativePath(of: destURL),
-            createdAt: Date(),
-            durationSeconds: duration,
-            label: "\(originalName).\(ext)"
-        )
-        LocalRecordingStore.shared.add(entry)
-        vm.refreshLocalCounts()
-    }
-
     // MARK: - Import image
     @MainActor
     private func handleImageImport(url: URL, item: Item) async {
@@ -1092,8 +1056,8 @@ struct DashboardView: View {
                 selectedItem = item; vm.navigateTo(stage: stage, item: item)
             },
             onImportAudioTapped: {
-                importTargetItem = item
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { showAudioImporter = true }
+                vm.triggerMediaAudioImport = true
+                vm.navigateTo(stage: .media, item: item)
             },
             onImportImageTapped: {
                 importTargetItem = item
@@ -1897,6 +1861,7 @@ final class DashboardViewModel: ObservableObject {
     @Published var navigateToText = false
     @Published var navigateToNotes = false
     @Published var navigationItem: Item?
+    @Published var triggerMediaAudioImport = false
 
     enum Stage { case media, text, notes }
 
