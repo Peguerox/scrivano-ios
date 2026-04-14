@@ -226,6 +226,21 @@ struct DashboardView: View {
                         .font(.inter(16, weight: .heavy)).foregroundColor(.textPrimary)
                     Text(submitMessage ?? "")
                         .font(.inter(13)).foregroundColor(.textSecondary).multilineTextAlignment(.center)
+                    if submitSuccess {
+                        HStack(spacing: 6) {
+                            Image(systemName: "globe")
+                                .font(.system(size: 11, weight: .semibold))
+                            Text("Published to ")
+                                .font(.inter(12)) +
+                            Text("app.scrivano.net")
+                                .font(.inter(12, weight: .bold))
+                        }
+                        .foregroundColor(Color.stageNotes)
+                        .padding(.horizontal, 12).padding(.vertical, 7)
+                        .background(Color.stageNotes.opacity(0.10))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.stageNotes.opacity(0.3), lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
                     Button {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showSubmitCard = false }
                     } label: {
