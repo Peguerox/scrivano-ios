@@ -19,10 +19,10 @@ struct ItemCardView: View {
     var isInProcessMode: Bool = false
     var isProcessSelected: Bool = false
     var onRenameRequested: () -> Void = {}
+    var onClearAllRequested: () -> Void = {}
 
     @ObservedObject private var transcriptionMgr: TranscriptionManager = TranscriptionManager.shared
     @ObservedObject private var notesMgr: NoteGenerationManager = NoteGenerationManager.shared
-    @State private var showClearConfirm = false
 
     private var mediaCount: Int { localAudioCount }
     private var textCount: Int { localTextCount ?? item.textCount }
@@ -42,57 +42,6 @@ struct ItemCardView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { onTap() }
-        .sheet(isPresented: $showClearConfirm) { clearConfirmSheet }
-    }
-
-    private var clearConfirmSheet: some View {
-        ZStack {
-            Color(hex: "#081221").ignoresSafeArea()
-            VStack(spacing: 0) {
-                Capsule().fill(Color.white.opacity(0.15)).frame(width: 36, height: 4).padding(.top, 12)
-                Spacer()
-                VStack(spacing: 16) {
-                    Image(systemName: "trash.fill")
-                        .font(.system(size: 30)).foregroundColor(.danger)
-                        .shadow(color: Color.danger.opacity(0.7), radius: 10)
-                    Text("Clear All Content")
-                        .font(.inter(16, weight: .heavy)).foregroundColor(.textPrimary)
-                    Text("All media, text and notes in \"\(item.name)\" will be deleted. The item itself will remain.")
-                        .font(.inter(13)).foregroundColor(.textSecondary).multilineTextAlignment(.center)
-                    HStack(spacing: 10) {
-                        Button { showClearConfirm = false } label: {
-                            Text("Cancel").font(.inter(14, weight: .semibold)).foregroundColor(.textSecondary)
-                                .frame(maxWidth: .infinity).padding(.vertical, 13)
-                                .background(Color.white.opacity(0.07)).clipShape(RoundedRectangle(cornerRadius: 14))
-                        }
-                        Button {
-                            showClearConfirm = false
-                            clearAllContent()
-                        } label: {
-                            Text("Clear All").font(.inter(14, weight: .bold)).foregroundColor(.white)
-                                .frame(maxWidth: .infinity).padding(.vertical, 13)
-                                .background(Color.danger.opacity(0.85)).clipShape(RoundedRectangle(cornerRadius: 14))
-                        }
-                    }
-                }
-                .padding(24)
-                .background(Color.white.opacity(0.03))
-                .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.danger.opacity(0.35), lineWidth: 1.5))
-                .clipShape(RoundedRectangle(cornerRadius: 22))
-                .padding(.horizontal, 24)
-                Spacer()
-            }
-        }
-        .presentationDetents([.height(280)])
-        .presentationDragIndicator(.visible)
-    }
-
-    // MARK: - Clear all content
-    private func clearAllContent() {
-        LocalRecordingStore.shared.deleteAll(for: item.id)
-        LocalTranscriptStore.shared.deleteAll(for: item.id)
-        LocalNoteStore.shared.deleteAll(for: item.id)
-        vm.refreshLocalCounts()
     }
 
     // MARK: - Shared style helpers
@@ -141,7 +90,7 @@ struct ItemCardView: View {
                         }
                         Button { onRenameRequested() } label: { Label("Rename Item", systemImage: "pencil") }
                         Divider()
-                        Button(role: .destructive) { showClearConfirm = true } label: {
+                        Button(role: .destructive) { onClearAllRequested() } label: {
                             Label("Clear All Content", systemImage: "trash.fill")
                         }
                         Button(role: .destructive) {
@@ -827,66 +776,6 @@ struct RoundedBottomShape: Shape {
 extension Set {
     mutating func toggle(_ element: Element) {
         if contains(element) { remove(element) } else { insert(element) }
-    }
-}
-
-// MARK: - New Item Sheet
-struct NewItemView: View {
-    @ObservedObject var vm: DashboardViewModel
-    @Environment(\.dismiss) var dismiss
-    @State private var name = ""
-    var onCreated: ((Item) -> Void)? = nil
-
-    var body: some View {
-        ZStack {
-            Color.sheetBg.ignoresSafeArea()
-            VStack(spacing: 20) {
-                HStack {
-                    Text("New Item")
-                        .font(.inter(16, weight: .heavy))
-                        .foregroundColor(.textPrimary)
-                    Spacer()
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(.textTertiary)
-                            .frame(width: 30, height: 30)
-                            .background(Color.white.opacity(0.08))
-                            .clipShape(Circle())
-                    }
-                }
-                .padding(.horizontal, 24)
-                .padding(.top, 24)
-
-                ScrivanoTextField(label: "Name", text: $name, placeholder: "Item name", autoFocus: true)
-                    .padding(.horizontal, 24)
-
-                Button {
-                    let item = vm.createItem(name: name)
-                    onCreated?(item)
-                    dismiss()
-                } label: {
-                    Text("Create Item →")
-                        .font(.inter(15, weight: .heavy))
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 15)
-                        .background(
-                            LinearGradient(
-                                colors: [Color(hex: "#1e8ae0"), Color(hex: "#1060b0"), Color(hex: "#0a4d8e")],
-                                startPoint: .topLeading, endPoint: .bottomTrailing
-                            )
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
-                        .shadow(color: Color.brandBlue.opacity(0.5), radius: 12, y: 6)
-                }
-                .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
-                .padding(.horizontal, 24)
-                Spacer()
-            }
-        }
-        .presentationDetents([.height(260)])
-        .presentationDragIndicator(.visible)
     }
 }
 

@@ -69,6 +69,13 @@ struct DashboardView: View {
     @State private var renameItem: Item? = nil
     @State private var renameItemText = ""
 
+    // New item overlay
+    @State private var newItemName = ""
+    @FocusState private var newItemFocused: Bool
+
+    // Clear confirm overlay
+    @State private var clearConfirmItem: Item? = nil
+
     // Prompt database
     @State private var showPromptDatabase          = false
 
@@ -99,9 +106,6 @@ struct DashboardView: View {
         AnyView(
             navStack
                 .fullScreenCover(isPresented: $showSettings, onDismiss: { vm.refreshFromLocalStores() }) { SettingsView() }
-                .sheet(isPresented: $showNewItem, onDismiss: {
-                    if recordAfterNewItem, selectedItem != nil { recordAfterNewItem = false; showRecorder = true }
-                }) { NewItemView(vm: vm, onCreated: { item in selectedItem = item }) }
                 .fullScreenCover(isPresented: $showRecorder) {
                     if let item = selectedItem {
                         RecordingView(item: item,
@@ -197,6 +201,14 @@ struct DashboardView: View {
             renameCollectionCard
             deleteCollectionCard
             renameItemCard
+            newItemCard
+            clearConfirmCard
+        }
+        .onChange(of: showNewItem) { showing in
+            if showing {
+                newItemName = ""
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { newItemFocused = true }
+            }
         }
     }
 
@@ -765,6 +777,131 @@ struct DashboardView: View {
         }
     }
 
+    // MARK: - New item card
+
+    @ViewBuilder
+    private var newItemCard: some View {
+        if showNewItem {
+            Color.black.opacity(0.65).ignoresSafeArea()
+                .onTapGesture { showNewItem = false; newItemName = "" }
+                .zIndex(20)
+            VStack {
+                Spacer()
+                VStack(spacing: 20) {
+                    HStack {
+                        Text("New Item")
+                            .font(.inter(16, weight: .heavy))
+                            .foregroundColor(.textPrimary)
+                        Spacer()
+                        Button { showNewItem = false; newItemName = "" } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 14, weight: .bold))
+                                .foregroundColor(.textTertiary)
+                                .frame(width: 30, height: 30)
+                                .background(Color.white.opacity(0.08))
+                                .clipShape(Circle())
+                        }
+                    }
+                    TextField("Item name", text: $newItemName)
+                        .font(.inter(14))
+                        .foregroundColor(.textPrimary)
+                        .padding(.horizontal, 14).padding(.vertical, 12)
+                        .background(Color.white.opacity(0.06))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.brandCyan.opacity(0.35), lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .autocorrectionDisabled()
+                        .focused($newItemFocused)
+                        .onSubmit {
+                            let t = newItemName.trimmingCharacters(in: .whitespaces)
+                            guard !t.isEmpty else { return }
+                            let item = vm.createItem(name: t)
+                            selectedItem = item
+                            showNewItem = false; newItemName = ""
+                            if recordAfterNewItem { recordAfterNewItem = false; showRecorder = true }
+                        }
+                    Button {
+                        let t = newItemName.trimmingCharacters(in: .whitespaces)
+                        guard !t.isEmpty else { return }
+                        let item = vm.createItem(name: t)
+                        selectedItem = item
+                        showNewItem = false; newItemName = ""
+                        if recordAfterNewItem { recordAfterNewItem = false; showRecorder = true }
+                    } label: {
+                        Text("Create Item →")
+                            .font(.inter(15, weight: .heavy))
+                            .foregroundColor(newItemName.trimmingCharacters(in: .whitespaces).isEmpty ? .textQuaternary : .white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 15)
+                            .background(
+                                newItemName.trimmingCharacters(in: .whitespaces).isEmpty
+                                    ? LinearGradient(colors: [Color.white.opacity(0.06), Color.white.opacity(0.06)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                    : LinearGradient(colors: [Color(hex: "#1e8ae0"), Color(hex: "#1060b0"), Color(hex: "#0a4d8e")], startPoint: .topLeading, endPoint: .bottomTrailing)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 20))
+                            .shadow(color: newItemName.trimmingCharacters(in: .whitespaces).isEmpty ? .clear : Color.brandBlue.opacity(0.5), radius: 12, y: 6)
+                    }
+                    .disabled(newItemName.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+                .padding(24)
+                .background(Color(hex: "#081221"))
+                .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.brandCyan.opacity(0.25), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 22))
+                .shadow(color: Color.brandCyan.opacity(0.15), radius: 20)
+                .padding(.horizontal, 24)
+                Spacer()
+            }
+            .zIndex(21)
+        }
+    }
+
+    // MARK: - Clear confirm card
+
+    @ViewBuilder
+    private var clearConfirmCard: some View {
+        if let item = clearConfirmItem {
+            Color.black.opacity(0.65).ignoresSafeArea()
+                .onTapGesture { clearConfirmItem = nil }
+                .zIndex(20)
+            VStack {
+                Spacer()
+                VStack(spacing: 16) {
+                    Image(systemName: "trash.fill")
+                        .font(.system(size: 30)).foregroundColor(.danger)
+                        .shadow(color: Color.danger.opacity(0.7), radius: 10)
+                    Text("Clear All Content")
+                        .font(.inter(16, weight: .heavy)).foregroundColor(.textPrimary)
+                    Text("All media, text and notes in \"\(item.name)\" will be deleted. The item itself will remain.")
+                        .font(.inter(13)).foregroundColor(.textSecondary).multilineTextAlignment(.center)
+                    HStack(spacing: 10) {
+                        Button { clearConfirmItem = nil } label: {
+                            Text("Cancel").font(.inter(14, weight: .semibold)).foregroundColor(.textSecondary)
+                                .frame(maxWidth: .infinity).padding(.vertical, 13)
+                                .background(Color.white.opacity(0.07)).clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                        Button {
+                            clearConfirmItem = nil
+                            LocalRecordingStore.shared.deleteAll(for: item.id)
+                            LocalTranscriptStore.shared.deleteAll(for: item.id)
+                            LocalNoteStore.shared.deleteAll(for: item.id)
+                            vm.refreshLocalCounts()
+                        } label: {
+                            Text("Clear All").font(.inter(14, weight: .bold)).foregroundColor(.white)
+                                .frame(maxWidth: .infinity).padding(.vertical, 13)
+                                .background(Color.danger.opacity(0.85)).clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                    }
+                }
+                .padding(24)
+                .background(Color(hex: "#081221"))
+                .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.danger.opacity(0.35), lineWidth: 1.5))
+                .clipShape(RoundedRectangle(cornerRadius: 22))
+                .padding(.horizontal, 24)
+                Spacer()
+            }
+            .zIndex(21)
+        }
+    }
+
     // MARK: - Delete collection card
 
     @ViewBuilder
@@ -967,7 +1104,8 @@ struct DashboardView: View {
             },
             isInProcessMode: showProcessItemsMode,
             isProcessSelected: processItemsSelected.contains(item.id),
-            onRenameRequested: { renameItem = item; renameItemText = item.name }
+            onRenameRequested: { renameItem = item; renameItemText = item.name },
+            onClearAllRequested: { clearConfirmItem = item }
         )
         .opacity(showProcessItemsMode && !eligible ? 0.35 : 1.0)
     }

@@ -23,6 +23,8 @@ struct RecordingView: View {
 
     @State private var displayName: String
     @State private var showRenameSheet  = false
+    @State private var renameText       = ""
+    @FocusState private var renameFocused: Bool
     @State private var showDeleteCard   = false
     @State private var showRedoCard     = false
 
@@ -463,6 +465,66 @@ struct RecordingView: View {
                 }
                 .zIndex(20)
             }
+
+            // ── Rename overlay ────────────────────────────────────
+            if showRenameSheet {
+                Color.black.opacity(0.65).ignoresSafeArea()
+                    .onTapGesture { showRenameSheet = false }
+                    .zIndex(30)
+                VStack {
+                    Spacer()
+                    VStack(spacing: 16) {
+                        Text("Rename Item")
+                            .font(.inter(16, weight: .heavy))
+                            .foregroundColor(.textPrimary)
+                        TextField(displayName, text: $renameText)
+                            .font(.inter(14))
+                            .foregroundColor(.textPrimary)
+                            .padding(.horizontal, 14).padding(.vertical, 12)
+                            .background(Color.white.opacity(0.06))
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.brandCyan.opacity(0.35), lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .autocorrectionDisabled()
+                            .autocapitalization(.none)
+                            .focused($renameFocused)
+                            .onSubmit {
+                                let t = renameText.trimmingCharacters(in: .whitespaces)
+                                guard !t.isEmpty else { return }
+                                displayName = t; onRename?(t); showRenameSheet = false
+                            }
+                        HStack(spacing: 10) {
+                            Button { showRenameSheet = false } label: {
+                                Text("Cancel")
+                                    .font(.inter(14, weight: .bold)).foregroundColor(.textTertiary)
+                                    .frame(maxWidth: .infinity).padding(.vertical, 13)
+                                    .background(Color.white.opacity(0.05))
+                                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.12), lineWidth: 1))
+                                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                            }
+                            Button {
+                                let t = renameText.trimmingCharacters(in: .whitespaces)
+                                guard !t.isEmpty else { return }
+                                displayName = t; onRename?(t); showRenameSheet = false
+                            } label: {
+                                Text("Rename")
+                                    .font(.inter(14, weight: .bold)).foregroundColor(.white)
+                                    .frame(maxWidth: .infinity).padding(.vertical, 13)
+                                    .background(LinearGradient(colors: [Color.brandBlue, Color.brandCyan], startPoint: .leading, endPoint: .trailing))
+                                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                            }
+                            .disabled(renameText.trimmingCharacters(in: .whitespaces).isEmpty)
+                        }
+                    }
+                    .padding(24)
+                    .background(Color(hex: "#081221"))
+                    .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.brandCyan.opacity(0.25), lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 22))
+                    .shadow(color: Color.brandCyan.opacity(0.15), radius: 20)
+                    .padding(.horizontal, 24)
+                    Spacer()
+                }
+                .zIndex(31)
+            }
         }
         .animation(.easeInOut(duration: 0.25), value: pocketMode)
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showDeleteCard)
@@ -481,10 +543,10 @@ struct RecordingView: View {
                 UIApplication.shared.isIdleTimerDisabled = TaskQueueManager.shared.isProcessing
             }
         }
-        .sheet(isPresented: $showRenameSheet) {
-            RenameRecordingSheet(currentName: displayName) { newName in
-                displayName = newName
-                onRename?(newName)
+        .onChange(of: showRenameSheet) { showing in
+            if showing {
+                renameText = displayName
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { renameFocused = true }
             }
         }
     }

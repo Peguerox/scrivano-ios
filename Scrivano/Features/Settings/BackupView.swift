@@ -21,6 +21,7 @@ struct BackupView: View {
     @State private var restoreError: String?
     @State private var restoreSuccess: String?
     @State private var showRestoreSheet = false
+    @FocusState private var restorePwdFocused: Bool
 
     private var passwordsMatch: Bool {
         !createPassword.isEmpty && createPassword == createConfirm
@@ -61,6 +62,87 @@ struct BackupView: View {
                 .background(Color(hex: "#0d1a2a"))
                 .clipShape(RoundedRectangle(cornerRadius: 18))
                 .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.1), lineWidth: 1))
+            }
+
+            // Restore password overlay
+            if showRestoreSheet {
+                Color.black.opacity(0.65).ignoresSafeArea()
+                    .onTapGesture { showRestoreSheet = false; restorePassword = ""; restoreError = nil }
+                    .zIndex(10)
+                VStack {
+                    Spacer()
+                    VStack(spacing: 18) {
+                        Image(systemName: "lock.open.fill")
+                            .font(.system(size: 32))
+                            .foregroundColor(.brandCyan)
+
+                        VStack(spacing: 5) {
+                            Text("Enter Backup Password")
+                                .font(.inter(17, weight: .bold))
+                                .foregroundColor(.textPrimary)
+                            if let url = pendingRestoreURL {
+                                Text(url.lastPathComponent)
+                                    .font(.inter(11))
+                                    .foregroundColor(.textQuaternary)
+                                    .lineLimit(1)
+                            }
+                        }
+
+                        SecureField("Password", text: $restorePassword)
+                            .font(Font.custom("Inter", size: 14))
+                            .foregroundColor(Color(hex: "#e2e8f0"))
+                            .padding(.horizontal, 14).padding(.vertical, 12)
+                            .background(Color.white.opacity(0.05))
+                            .overlay(RoundedRectangle(cornerRadius: 11).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 11))
+                            .focused($restorePwdFocused)
+
+                        if let err = restoreError {
+                            Label(err, systemImage: "exclamationmark.triangle.fill")
+                                .font(.inter(12))
+                                .foregroundColor(.danger)
+                                .multilineTextAlignment(.center)
+                        }
+
+                        HStack(spacing: 12) {
+                            Button {
+                                showRestoreSheet = false
+                                restorePassword = ""
+                                restoreError = nil
+                            } label: {
+                                Text("Cancel")
+                                    .font(.inter(14, weight: .semibold))
+                                    .foregroundColor(.textSecondary)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 13)
+                                    .background(Color.white.opacity(0.07))
+                                    .clipShape(RoundedRectangle(cornerRadius: 13))
+                            }
+                            Button { Task { await doRestore() } } label: {
+                                Text("Restore")
+                                    .font(.inter(14, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 13)
+                                    .background(
+                                        restorePassword.isEmpty
+                                            ? LinearGradient(colors: [Color.white.opacity(0.06), Color.white.opacity(0.06)], startPoint: .leading, endPoint: .trailing)
+                                            : LinearGradient(colors: [.brandBlue, .brandNavy], startPoint: .leading, endPoint: .trailing)
+                                    )
+                                    .clipShape(RoundedRectangle(cornerRadius: 13))
+                            }
+                            .disabled(restorePassword.isEmpty || manager.isWorking)
+                        }
+                    }
+                    .padding(24)
+                    .background(Color(hex: "#081221"))
+                    .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.brandCyan.opacity(0.25), lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 22))
+                    .shadow(color: Color.brandCyan.opacity(0.15), radius: 20)
+                    .padding(.horizontal, 24)
+                    Spacer()
+                }
+                .zIndex(11)
             }
 
             // Logout overlay — shown after export when coming from logout flow
@@ -107,10 +189,8 @@ struct BackupView: View {
             restorePassword = ""
             showRestoreSheet = true
         }
-        // Password entry for restore
-        .sheet(isPresented: $showRestoreSheet) {
-            restorePasswordSheet
-                .presentationDetents([.medium])
+        .onChange(of: showRestoreSheet) { showing in
+            if showing { DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { restorePwdFocused = true } }
         }
         .onReceive(NotificationCenter.default.publisher(for: .scrivanoOpenBackupFile)) { note in
             guard let url = note.object as? URL else { return }
@@ -263,100 +343,6 @@ struct BackupView: View {
         }
         .padding(18)
         .cardStyle(borderColor: .brandBlue.opacity(0.2))
-    }
-
-    // MARK: - Restore password sheet
-
-    private var restorePasswordSheet: some View {
-        ZStack {
-            Color.phoneBg.ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                Capsule()
-                    .fill(Color.white.opacity(0.15))
-                    .frame(width: 40, height: 4)
-                    .padding(.top, 14)
-
-                VStack(spacing: 18) {
-                    Image(systemName: "lock.open.fill")
-                        .font(.system(size: 32))
-                        .foregroundColor(.brandCyan)
-                        .padding(.top, 20)
-
-                    VStack(spacing: 5) {
-                        Text("Enter Backup Password")
-                            .font(.inter(17, weight: .bold))
-                            .foregroundColor(.textPrimary)
-                        if let url = pendingRestoreURL {
-                            Text(url.lastPathComponent)
-                                .font(.inter(11))
-                                .foregroundColor(.textQuaternary)
-                                .lineLimit(1)
-                        }
-                    }
-
-                    SecureField("Password", text: $restorePassword)
-                        .styledField()
-                        .padding(.horizontal, 4)
-
-                    if let err = restoreError {
-                        Label(err, systemImage: "exclamationmark.triangle.fill")
-                            .font(.inter(12))
-                            .foregroundColor(.danger)
-                            .multilineTextAlignment(.center)
-                    }
-
-                    HStack(spacing: 12) {
-                        Button {
-                            showRestoreSheet = false
-                            restorePassword = ""
-                            restoreError = nil
-                        } label: {
-                            Text("Cancel")
-                                .font(.inter(14, weight: .semibold))
-                                .foregroundColor(.textSecondary)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 13)
-                                .background(Color.white.opacity(0.07))
-                                .clipShape(RoundedRectangle(cornerRadius: 13))
-                        }
-
-                        Button { Task { await doRestore() } } label: {
-                            Text("Restore")
-                                .font(.inter(14, weight: .bold))
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 13)
-                                .background(
-                                    restorePassword.isEmpty
-                                        ? LinearGradient(colors: [Color.white.opacity(0.06), Color.white.opacity(0.06)],
-                                                         startPoint: .leading, endPoint: .trailing)
-                                        : LinearGradient(colors: [.brandBlue, .brandNavy],
-                                                         startPoint: .leading, endPoint: .trailing)
-                                )
-                                .clipShape(RoundedRectangle(cornerRadius: 13))
-                        }
-                        .disabled(restorePassword.isEmpty || manager.isWorking)
-                    }
-                }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 40)
-            }
-
-            if manager.isWorking {
-                Color.black.opacity(0.55).ignoresSafeArea()
-                VStack(spacing: 14) {
-                    ProgressView().progressViewStyle(.circular).tint(.brandCyan).scaleEffect(1.3)
-                    Text(manager.progress)
-                        .font(.inter(13, weight: .semibold))
-                        .foregroundColor(.textSecondary)
-                }
-                .padding(28)
-                .background(Color(hex: "#0d1a2a"))
-                .clipShape(RoundedRectangle(cornerRadius: 18))
-                .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.1), lineWidth: 1))
-            }
-        }
     }
 
     // MARK: - Helpers
