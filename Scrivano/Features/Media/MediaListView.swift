@@ -201,6 +201,7 @@ struct ImagePickerView: UIViewControllerRepresentable {
 struct MediaListView: View {
     let item: Item
     var triggerAudioImport: Bool = false
+    var triggerImageImport: Bool = false
     @Environment(\.dismiss) var dismiss
     @State private var selected = Set<String>()
     @State private var isLoading = false
@@ -712,6 +713,8 @@ struct MediaListView: View {
         .onAppear {
             if triggerAudioImport {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { showAudioImporter = true }
+            } else if triggerImageImport {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { showPhotoLibrary = true }
             }
         }
         // Player sheets

@@ -20,6 +20,7 @@ struct TextFile: Identifiable, Codable {
 
 struct TextListView: View {
     let item: Item
+    var triggerDocImport: Bool = false
     @Environment(\.dismiss) var dismiss
     @ObservedObject private var notesMgr = NoteGenerationManager.shared
     @State private var transcripts: [TranscriptSummary] = []
@@ -533,6 +534,11 @@ struct TextListView: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: showDeleteConfirm)
         .animation(.easeInOut(duration: 0.3), value: showMergeToast)
         .navigationBarHidden(true)
+        .onAppear {
+            if triggerDocImport {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { showDocImporter = true }
+            }
+        }
         .fileImporter(
             isPresented: $showDocImporter,
             allowedContentTypes: [

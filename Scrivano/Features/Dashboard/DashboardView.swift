@@ -22,10 +22,6 @@ struct DashboardView: View {
     @State private var fabPulse = false
     @State private var sessionWarmTask: Task<Void, Never>? = nil
 
-    // File importers (lifted from cards so they work reliably at top level)
-    @State private var showImageImporter = false
-    @State private var showDocImporter = false
-    @State private var importTargetItem: Item? = nil
 
     @AppStorage("showMyCollection") private var showMyCollection: Bool = true
 
@@ -496,34 +492,26 @@ struct DashboardView: View {
             .navigationBarHidden(true)
             .navigationDestination(isPresented: $vm.navigateToMedia) {
                 if let item = vm.navigationItem {
-                    MediaListView(item: item, triggerAudioImport: vm.triggerMediaAudioImport)
-                        .onDisappear { vm.triggerMediaAudioImport = false }
+                    MediaListView(item: item,
+                                  triggerAudioImport: vm.triggerMediaAudioImport,
+                                  triggerImageImport: vm.triggerMediaImageImport)
+                        .onDisappear { vm.triggerMediaAudioImport = false; vm.triggerMediaImageImport = false }
                 }
             }
             .navigationDestination(isPresented: $vm.navigateToText) {
-                if let item = vm.navigationItem { TextListView(item: item) }
+                if let item = vm.navigationItem {
+                    TextListView(item: item, triggerDocImport: vm.triggerTextDocImport)
+                        .onDisappear { vm.triggerTextDocImport = false }
+                }
             }
             .navigationDestination(isPresented: $vm.navigateToNotes) {
                 if let item = vm.navigationItem { NotesListView(item: item) }
             }
     }
 
-    private var contentWithImporters: some View {
-        contentWithNavigation
-            .fileImporter(isPresented: $showDocImporter, allowedContentTypes: [
-                .pdf, .plainText, .rtf, .html,
-                UTType(filenameExtension: "doc") ?? .data, UTType(filenameExtension: "docx") ?? .data,
-                UTType(filenameExtension: "xlsx") ?? .data, UTType(filenameExtension: "csv") ?? .data,
-                UTType(filenameExtension: "odt") ?? .data,
-            ], allowsMultipleSelection: false) { result in
-                guard let item = importTargetItem else { return }
-                Task { await handleDocumentImport(result: result, item: item) }
-            }
-    }
-
     private var navStack: some View {
         NavigationStack {
-            contentWithImporters
+            contentWithNavigation
         }
         .onChange(of: vm.navigateToMedia) { open in if !open { vm.refreshFromLocalStores() } }
         .onChange(of: vm.navigateToText)  { open in if !open { vm.refreshFromLocalStores() } }
@@ -975,51 +963,6 @@ struct DashboardView: View {
         vm.refreshFromLocalStores()
     }
 
-    // MARK: - Import image
-    @MainActor
-    private func handleImageImport(url: URL, item: Item) async {
-        let accessed = url.startAccessingSecurityScopedResource()
-        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
-
-        guard let imageData = try? Data(contentsOf: url),
-              let uiImage = UIImage(data: imageData) else { return }
-
-        let idx = LocalImageStore.shared.count(for: item.id) + 1
-        let imgName = "Image-\(item.name)-\(String(format: "%02d", idx))"
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let imgDir = docs.appendingPathComponent("images/\(item.id)", isDirectory: true)
-        try? FileManager.default.createDirectory(at: imgDir, withIntermediateDirectories: true)
-        let destURL = imgDir.appendingPathComponent("\(imgName).jpg")
-        if let data = uiImage.jpegData(compressionQuality: 0.9) {
-            try? data.write(to: destURL)
-        }
-        let entry = LocalImageEntry(id: UUID().uuidString, itemId: item.id, name: imgName,
-                                    localPath: destURL.path, createdAt: Date())
-        LocalImageStore.shared.add(entry)
-        vm.refreshLocalCounts()
-    }
-
-    // MARK: - Import document
-    private func handleDocumentImport(result: Result<[URL], Error>, item: Item) async {
-        guard case .success(let urls) = result, let url = urls.first else { return }
-        let accessing = url.startAccessingSecurityScopedResource()
-        defer { if accessing { url.stopAccessingSecurityScopedResource() } }
-        do {
-            let text = try await APIClient.shared.uploadDocument(fileURL: url)
-            let idx = LocalTranscriptStore.shared.count(for: item.id)
-            LocalTranscriptStore.shared.add(LocalTranscriptEntry(
-                id: UUID().uuidString,
-                itemId: item.id,
-                label: "transcript-\(item.name)-\(String(format: "%02d", idx + 1)).txt",
-                text: text,
-                durationSeconds: nil,
-                createdAt: Date()
-            ))
-            LocalTranscriptStore.shared.rebuildMerge(for: item.id, itemName: item.name)
-            vm.refreshLocalCounts()
-        } catch {}
-    }
-
     // MARK: - Extracted overlay computed vars
 
     private func isEligible(_ item: Item) -> Bool {
@@ -1060,12 +1003,12 @@ struct DashboardView: View {
                 vm.navigateTo(stage: .media, item: item)
             },
             onImportImageTapped: {
-                importTargetItem = item
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { showImageImporter = true }
+                vm.triggerMediaImageImport = true
+                vm.navigateTo(stage: .media, item: item)
             },
             onImportDocTapped: {
-                importTargetItem = item
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { showDocImporter = true }
+                vm.triggerTextDocImport = true
+                vm.navigateTo(stage: .text, item: item)
             },
             isInProcessMode: showProcessItemsMode,
             isProcessSelected: processItemsSelected.contains(item.id),
@@ -1862,6 +1805,8 @@ final class DashboardViewModel: ObservableObject {
     @Published var navigateToNotes = false
     @Published var navigationItem: Item?
     @Published var triggerMediaAudioImport = false
+    @Published var triggerMediaImageImport = false
+    @Published var triggerTextDocImport = false
 
     enum Stage { case media, text, notes }
 
