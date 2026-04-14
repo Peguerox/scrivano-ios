@@ -100,6 +100,15 @@ struct DashboardView: View {
             .onReceive(NotificationCenter.default.publisher(for: .scrivanoBackupRestored)) { _ in
                 vm.refreshFromLocalStores()
             }
+            // File importers at top level so they work reliably outside AnyView
+            .fileImporter(isPresented: $showAudioImporter, allowedContentTypes: [.audio, .mpeg4Movie, .movie], allowsMultipleSelection: false) { result in
+                guard let item = importTargetItem, case .success(let urls) = result, let url = urls.first else { return }
+                Task { await handleAudioImport(url: url, item: item) }
+            }
+            .fileImporter(isPresented: $showImageImporter, allowedContentTypes: [.image, .jpeg, .png, .heic, .webP, UTType(filenameExtension: "jpg") ?? .image], allowsMultipleSelection: false) { result in
+                guard let item = importTargetItem, case .success(let urls) = result, let url = urls.first else { return }
+                Task { await handleImageImport(url: url, item: item) }
+            }
     }
 
     private var withSheets: some View {
@@ -522,14 +531,6 @@ struct DashboardView: View {
     private var navStack: some View {
         NavigationStack {
             contentWithImporters
-        }
-        .fileImporter(isPresented: $showAudioImporter, allowedContentTypes: [.audio, .mpeg4Movie, .movie], allowsMultipleSelection: false) { result in
-            guard let item = importTargetItem, case .success(let urls) = result, let url = urls.first else { return }
-            Task { await handleAudioImport(url: url, item: item) }
-        }
-        .fileImporter(isPresented: $showImageImporter, allowedContentTypes: [.image, .jpeg, .png, .heic, .webP, UTType(filenameExtension: "jpg") ?? .image], allowsMultipleSelection: false) { result in
-            guard let item = importTargetItem, case .success(let urls) = result, let url = urls.first else { return }
-            Task { await handleImageImport(url: url, item: item) }
         }
         .onChange(of: vm.navigateToMedia) { open in if !open { vm.refreshFromLocalStores() } }
         .onChange(of: vm.navigateToText)  { open in if !open { vm.refreshFromLocalStores() } }
