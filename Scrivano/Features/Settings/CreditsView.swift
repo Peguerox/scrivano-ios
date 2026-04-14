@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct CreditsView: View {
     @EnvironmentObject var auth: AuthManager
@@ -48,7 +49,7 @@ struct CreditsView: View {
             }
         }
         .navigationBarHidden(true)
-        .task { await auth.refreshUser(); await rc.fetchPrices() }
+        .task { await rc.fetchPrices() }
         .alert("Purchase Error", isPresented: .init(
             get: { rc.errorMessage != nil },
             set: { if !$0 { rc.errorMessage = nil } }
@@ -150,6 +151,14 @@ struct CreditsView: View {
         .background(isFreePlan ? Color.brandCyan.opacity(0.06) : Color.white.opacity(0.04))
         .overlay(RoundedRectangle(cornerRadius: 16)
             .stroke(isFreePlan ? Color.brandCyan.opacity(0.30) : Color.white.opacity(0.08), lineWidth: isFreePlan ? 1.5 : 1))
+        .overlay(alignment: .topTrailing) {
+            if isFreePlan {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 18))
+                    .foregroundColor(.green)
+                    .padding(.trailing, 16).padding(.top, 13)
+            }
+        }
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .padding(.horizontal, 18)
         .padding(.top, 14)
@@ -295,25 +304,45 @@ struct CreditsView: View {
                 }
                 .padding(.bottom, 16)
 
-                Button {
-                    Task { await rc.purchase(productId: RCProduct.unlimited) }
-                } label: {
-                    Text(isUnlimited ? "Active Plan ✓" : "Subscribe Now →")
-                        .font(.inter(13, weight: .heavy))
-                        .foregroundColor(isUnlimited ? .brandCyan : Color(hex: "#060e1e"))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(isUnlimited
-                            ? LinearGradient(colors: [Color.brandCyan.opacity(0.12), Color.brandCyan.opacity(0.12)],
-                                             startPoint: .leading, endPoint: .trailing)
-                            : LinearGradient(colors: [Color.brandBlue, Color.brandCyan],
-                                             startPoint: .leading, endPoint: .trailing))
-                        .overlay(RoundedRectangle(cornerRadius: 14)
-                            .stroke(isUnlimited ? Color.brandCyan.opacity(0.50) : Color.clear, lineWidth: 1.5))
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .shadow(color: Color.brandCyan.opacity(isUnlimited ? 0 : 0.30), radius: 8, y: 4)
+                HStack(spacing: 10) {
+                    Button {
+                        Task { await rc.purchase(productId: RCProduct.unlimited) }
+                    } label: {
+                        Text(isUnlimited ? "Active Plan ✓" : "Subscribe Now →")
+                            .font(.inter(13, weight: .heavy))
+                            .foregroundColor(isUnlimited ? .brandCyan : Color(hex: "#060e1e"))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(isUnlimited
+                                ? LinearGradient(colors: [Color.brandCyan.opacity(0.12), Color.brandCyan.opacity(0.12)],
+                                                 startPoint: .leading, endPoint: .trailing)
+                                : LinearGradient(colors: [Color.brandBlue, Color.brandCyan],
+                                                 startPoint: .leading, endPoint: .trailing))
+                            .overlay(RoundedRectangle(cornerRadius: 14)
+                                .stroke(isUnlimited ? Color.brandCyan.opacity(0.50) : Color.clear, lineWidth: 1.5))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .shadow(color: Color.brandCyan.opacity(isUnlimited ? 0 : 0.30), radius: 8, y: 4)
+                    }
+                    .disabled(rc.isLoading || isUnlimited)
+
+                    if isUnlimited {
+                        Button {
+                            if let url = URL(string: "https://apps.apple.com/account/subscriptions") {
+                                UIApplication.shared.open(url)
+                            }
+                        } label: {
+                            Text("Manage →")
+                                .font(.inter(13, weight: .heavy))
+                                .foregroundColor(Color.brandCyan)
+                                .padding(.vertical, 12)
+                                .padding(.horizontal, 18)
+                                .background(Color.brandCyan.opacity(0.10))
+                                .overlay(RoundedRectangle(cornerRadius: 14)
+                                    .stroke(Color.brandCyan.opacity(0.45), lineWidth: 1.5))
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                    }
                 }
-                .disabled(rc.isLoading || isUnlimited)
             }
             .padding(18)
         }
@@ -323,6 +352,14 @@ struct CreditsView: View {
         )
         .overlay(RoundedRectangle(cornerRadius: 22)
             .stroke(Color.brandCyan.opacity(isUnlimited ? 0.70 : 0.38), lineWidth: isUnlimited ? 1.5 : 1))
+        .overlay(alignment: .topTrailing) {
+            if isUnlimited {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 18))
+                    .foregroundColor(.green)
+                    .padding(.trailing, 18).padding(.top, 18)
+            }
+        }
         .clipShape(RoundedRectangle(cornerRadius: 22))
         .shadow(color: Color.brandCyan.opacity(isUnlimited ? 0.22 : 0.12), radius: 28)
         .padding(.horizontal, 18)
@@ -382,19 +419,38 @@ struct CreditsView: View {
                             .foregroundColor(.textQuaternary)
                     }
                     Spacer()
-                    Button {
-                        Task { await rc.purchase(productId: RCProduct.bringapi) }
-                    } label: {
-                        Text(isBringAPI ? "Active Plan ✓" : "Connect API →")
-                            .font(.inter(12, weight: .heavy))
-                            .foregroundColor(Color(hex: "#a78bfa"))
-                            .padding(.horizontal, 18).padding(.vertical, 9)
-                            .background(Color(hex: "#a78bfa").opacity(isBringAPI ? 0.18 : 0.10))
-                            .overlay(RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color(hex: "#a78bfa").opacity(isBringAPI ? 0.70 : 0.50), lineWidth: 1.5))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    HStack(spacing: 10) {
+                        Button {
+                            Task { await rc.purchase(productId: RCProduct.bringapi) }
+                        } label: {
+                            Text(isBringAPI ? "Active Plan ✓" : "Connect API →")
+                                .font(.inter(12, weight: .heavy))
+                                .foregroundColor(Color(hex: "#a78bfa"))
+                                .padding(.horizontal, 18).padding(.vertical, 9)
+                                .background(Color(hex: "#a78bfa").opacity(isBringAPI ? 0.18 : 0.10))
+                                .overlay(RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color(hex: "#a78bfa").opacity(isBringAPI ? 0.70 : 0.50), lineWidth: 1.5))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                        .disabled(rc.isLoading || isBringAPI)
+
+                        if isBringAPI {
+                            Button {
+                                if let url = URL(string: "https://apps.apple.com/account/subscriptions") {
+                                    UIApplication.shared.open(url)
+                                }
+                            } label: {
+                                Text("Manage →")
+                                    .font(.inter(12, weight: .heavy))
+                                    .foregroundColor(Color(hex: "#a78bfa"))
+                                    .padding(.horizontal, 18).padding(.vertical, 9)
+                                    .background(Color(hex: "#a78bfa").opacity(0.08))
+                                    .overlay(RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color(hex: "#a78bfa").opacity(0.45), lineWidth: 1.5))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
+                        }
                     }
-                    .disabled(rc.isLoading || isBringAPI)
                 }
             }
             .padding(18)
@@ -406,6 +462,14 @@ struct CreditsView: View {
         )
         .overlay(RoundedRectangle(cornerRadius: 22)
             .stroke(Color(hex: "#a78bfa").opacity(isBringAPI ? 0.55 : 0.30), lineWidth: isBringAPI ? 1.5 : 1))
+        .overlay(alignment: .topTrailing) {
+            if isBringAPI {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 18))
+                    .foregroundColor(.green)
+                    .padding(.trailing, 18).padding(.top, 18)
+            }
+        }
         .clipShape(RoundedRectangle(cornerRadius: 22))
         .padding(.horizontal, 18)
     }
@@ -423,6 +487,7 @@ struct CreditsView: View {
         .disabled(rc.isLoading)
         .padding(.top, 20)
     }
+
 
     // MARK: - Section Label
 

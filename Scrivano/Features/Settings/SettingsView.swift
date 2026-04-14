@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct SettingsView: View {
     @EnvironmentObject var auth: AuthManager
@@ -14,6 +15,10 @@ struct SettingsView: View {
     @State private var showDisableConfirm = false
     @State private var showLogout = false
     @State private var showDeleteAccount = false
+    @State private var deleteStep = 0        // 0 = confirm, 1 = enter code
+    @State private var deleteCode = ""
+    @State private var deleteLoading = false
+    @State private var deleteError: String? = nil
     @State private var showLog = false
     @State private var showTrash = false
     @State private var trashCount = 0
@@ -58,11 +63,10 @@ struct SettingsView: View {
                         // Account hero
                         accountHero
                             .padding(.horizontal, 14)
-                            .padding(.bottom, 6)
+                            .padding(.bottom, 4)
 
                         // Content section
-                        SectionLabel(text: "Content")
-                        settingsGroup {
+                        settingsGroup(title: "Content") {
                             NavRow(icon: "✦", iconColor: Color(hex: "#a78bfa"), title: "Prompt Database", subtitle: "Manage AI prompt library") { showPrompts = true }
                             Divider().background(Color.white.opacity(0.05)).padding(.leading, 68)
                             NavRow(icon: "🤖", iconColor: .brandBlue, title: "Automation", subtitle: "Auto-process pipeline stages") { showAutomation = true }
@@ -70,10 +74,10 @@ struct SettingsView: View {
                             NavRow(icon: "🗑", iconColor: .danger, title: "Recycle Bin",
                                    subtitle: trashCount > 0 ? "\(trashCount) item\(trashCount == 1 ? "" : "s") in trash" : "Empty") { showTrash = true }
                         }
+                        .padding(.top, 3)
 
                         // System section
-                        SectionLabel(text: "System")
-                        settingsGroup {
+                        settingsGroup(title: "System") {
                             NavRow(icon: "🎙️", iconColor: .stageMedia, title: "Recorder Settings", subtitle: "Format · Quality · Bit depth") { showRecorder = true }
                             Divider().background(Color.white.opacity(0.05)).padding(.leading, 68)
                             NavRow(icon: "📋", iconColor: .brandCyan, title: "Connection Log", subtitle: "Server connection history") { showLog = true }
@@ -89,16 +93,17 @@ struct SettingsView: View {
                             Divider().background(Color.white.opacity(0.05)).padding(.leading, 68)
                             NavRow(icon: "☁️", iconColor: .brandBlue, title: "Backup", subtitle: "Export · Restore data") { showBackup = true }
                         }
+                        .padding(.top, 3)
 
                         // Account section
-                        SectionLabel(text: "Account")
-                        settingsGroup {
+                        settingsGroup(title: "Account") {
                             NavRow(icon: "🚪", iconColor: .textTertiary, title: "Logout", subtitle: nil) { showLogout = true }
                             Divider().background(Color.white.opacity(0.05)).padding(.leading, 68)
                             NavRow(icon: "⚠️", iconColor: .danger, title: "Delete Account", subtitle: "Permanent action", isDanger: true) { showDeleteAccount = true }
                         }
+                        .padding(.top, 3)
 
-                        Spacer().frame(height: 40)
+                        Spacer().frame(height: 16)
                     }
                     }
                     .refreshable { await auth.refreshUser() }
@@ -119,10 +124,28 @@ struct SettingsView: View {
                                 .font(.inter(16, weight: .heavy))
                                 .foregroundColor(.textPrimary)
 
-                            Text("You'll need to sign in again to access your account.")
+                            Text("If a different account signs in, all your local files will be permanently deleted. Would you like to back up your data first?")
                                 .font(.inter(13))
                                 .foregroundColor(.textSecondary)
                                 .multilineTextAlignment(.center)
+
+                            // Export & Logout
+                            Button {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showLogout = false }
+                                AuthManager.shared.pendingLogoutAfterBackup = true
+                                showBackup = true
+                            } label: {
+                                Text("Export & Logout")
+                                    .font(.inter(14, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 13)
+                                    .background(
+                                        LinearGradient(colors: [.brandBlue, .brandNavy],
+                                                       startPoint: .leading, endPoint: .trailing)
+                                    )
+                                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                            }
 
                             HStack(spacing: 10) {
                                 Button {
@@ -140,7 +163,7 @@ struct SettingsView: View {
                                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showLogout = false }
                                     auth.forceLogout()
                                 } label: {
-                                    Text("Log Out")
+                                    Text("Logout")
                                         .font(.inter(14, weight: .bold))
                                         .foregroundColor(.white)
                                         .frame(maxWidth: .infinity)
@@ -152,9 +175,9 @@ struct SettingsView: View {
                         }
                         .padding(24)
                         .background(Color(hex: "#081221"))
-                        .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.white.opacity(0.1), lineWidth: 1.5))
+                        .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.brandBlue.opacity(0.45), lineWidth: 1.5))
                         .clipShape(RoundedRectangle(cornerRadius: 22))
-                        .shadow(color: .black.opacity(0.4), radius: 20)
+                        .shadow(color: Color.brandBlue.opacity(0.2), radius: 20)
                         .padding(.horizontal, 24)
                         Spacer()
                     }
@@ -177,34 +200,152 @@ struct SettingsView: View {
                                 .font(.inter(16, weight: .heavy))
                                 .foregroundColor(.textPrimary)
 
-                            Text("This is permanent and cannot be undone. All your data will be deleted.")
-                                .font(.inter(13))
-                                .foregroundColor(.textSecondary)
-                                .multilineTextAlignment(.center)
+                            if deleteStep == 0 {
+                                Text("This is permanent and cannot be undone. We'll send a confirmation code to your email.")
+                                    .font(.inter(13))
+                                    .foregroundColor(.textSecondary)
+                                    .multilineTextAlignment(.center)
 
-                            HStack(spacing: 10) {
-                                Button {
-                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showDeleteAccount = false }
-                                } label: {
-                                    Text("Cancel")
-                                        .font(.inter(14, weight: .semibold))
-                                        .foregroundColor(.textSecondary)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 13)
-                                        .background(Color.white.opacity(0.07))
-                                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                                }
-                                Button {
-                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showDeleteAccount = false }
-                                    // TODO: implement account deletion
-                                } label: {
-                                    Text("Delete Account")
-                                        .font(.inter(14, weight: .bold))
-                                        .foregroundColor(.white)
+                                HStack(spacing: 10) {
+                                    Button {
+                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                            showDeleteAccount = false
+                                            deleteStep = 0; deleteCode = ""; deleteError = nil
+                                        }
+                                    } label: {
+                                        Text("Cancel")
+                                            .font(.inter(14, weight: .semibold))
+                                            .foregroundColor(.textSecondary)
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, 13)
+                                            .background(Color.white.opacity(0.07))
+                                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                                    }
+                                    Button {
+                                        deleteLoading = true
+                                        deleteError = nil
+                                        Task {
+                                            do {
+                                                struct Res: Decodable { let success: Bool; let message: String? }
+                                                let res = try await APIClient.shared.request(
+                                                    path: "/api/auth/request-delete-account",
+                                                    method: "POST",
+                                                    responseType: Res.self
+                                                )
+                                                await MainActor.run {
+                                                    deleteLoading = false
+                                                    if res.success {
+                                                        withAnimation { deleteStep = 1 }
+                                                    } else {
+                                                        deleteError = res.message ?? "Failed to send code."
+                                                    }
+                                                }
+                                            } catch {
+                                                await MainActor.run {
+                                                    deleteLoading = false
+                                                    deleteError = error.localizedDescription
+                                                }
+                                            }
+                                        }
+                                    } label: {
+                                        Group {
+                                            if deleteLoading {
+                                                ProgressView().tint(.white)
+                                            } else {
+                                                Text("Send Code")
+                                                    .font(.inter(14, weight: .bold))
+                                                    .foregroundColor(.white)
+                                            }
+                                        }
                                         .frame(maxWidth: .infinity)
                                         .padding(.vertical, 13)
                                         .background(Color.danger.opacity(0.85))
                                         .clipShape(RoundedRectangle(cornerRadius: 14))
+                                    }
+                                    .disabled(deleteLoading)
+                                }
+                            } else {
+                                Text("Enter the code sent to \(auth.currentUser?.email ?? "your email") to permanently delete your account.")
+                                    .font(.inter(13))
+                                    .foregroundColor(.textSecondary)
+                                    .multilineTextAlignment(.center)
+
+                                TextField("Confirmation code", text: $deleteCode)
+                                    .font(.inter(15, weight: .semibold))
+                                    .multilineTextAlignment(.center)
+                                    .keyboardType(.numberPad)
+                                    .padding(.vertical, 13)
+                                    .padding(.horizontal, 16)
+                                    .background(Color.white.opacity(0.06))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.danger.opacity(0.4), lineWidth: 1))
+
+                                if let err = deleteError {
+                                    Text(err)
+                                        .font(.inter(12))
+                                        .foregroundColor(.danger)
+                                        .multilineTextAlignment(.center)
+                                }
+
+                                HStack(spacing: 10) {
+                                    Button {
+                                        withAnimation { deleteStep = 0; deleteCode = ""; deleteError = nil }
+                                    } label: {
+                                        Text("Back")
+                                            .font(.inter(14, weight: .semibold))
+                                            .foregroundColor(.textSecondary)
+                                            .frame(maxWidth: .infinity)
+                                            .padding(.vertical, 13)
+                                            .background(Color.white.opacity(0.07))
+                                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                                    }
+                                    Button {
+                                        guard !deleteCode.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+                                        deleteLoading = true
+                                        deleteError = nil
+                                        Task {
+                                            do {
+                                                struct Body: Encodable { let confirmation_code: String }
+                                                struct Res: Decodable { let success: Bool; let message: String? }
+                                                let res = try await APIClient.shared.request(
+                                                    path: "/api/auth/confirm-delete-account",
+                                                    method: "POST",
+                                                    body: Body(confirmation_code: deleteCode.trimmingCharacters(in: .whitespaces)),
+                                                    responseType: Res.self
+                                                )
+                                                await MainActor.run {
+                                                    deleteLoading = false
+                                                    if res.success {
+                                                        showDeleteAccount = false
+                                                        deleteStep = 0; deleteCode = ""
+                                                        auth.forceLogout()
+                                                    } else {
+                                                        deleteError = res.message ?? "Invalid code."
+                                                    }
+                                                }
+                                            } catch {
+                                                await MainActor.run {
+                                                    deleteLoading = false
+                                                    deleteError = error.localizedDescription
+                                                }
+                                            }
+                                        }
+                                    } label: {
+                                        Group {
+                                            if deleteLoading {
+                                                ProgressView().tint(.white)
+                                            } else {
+                                                Text("Delete Forever")
+                                                    .font(.inter(14, weight: .bold))
+                                                    .foregroundColor(.white)
+                                            }
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 13)
+                                        .background(Color.danger.opacity(0.85))
+                                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                                    }
+                                    .disabled(deleteLoading || deleteCode.trimmingCharacters(in: .whitespaces).isEmpty)
                                 }
                             }
                         }
@@ -236,7 +377,6 @@ struct SettingsView: View {
         }
         .task {
             trashCount = TrashStore.shared.count
-            await auth.refreshUser()
         }
         .sheet(isPresented: $showPinSetup) {
             PinSetupView().environmentObject(lockMgr)
@@ -244,13 +384,15 @@ struct SettingsView: View {
         .sheet(isPresented: $showDisableConfirm) {
             PinVerifyView().environmentObject(lockMgr)
         }
-        .fullScreenCover(isPresented: $showBackup) { BackupView() }
+        .fullScreenCover(isPresented: $showBackup) {
+            BackupView()
+        }
         .fullScreenCover(isPresented: $showAPIKey) { APIKeyView().environmentObject(auth) }
     }
 
     // MARK: - Account Hero
     private var accountHero: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 8) {
             // Row 1: avatar + name/email + plan badge
             HStack(spacing: 12) {
                 ZStack {
@@ -279,22 +421,41 @@ struct SettingsView: View {
 
                 Spacer()
 
-                Text((user?.plan ?? "free").uppercased())
-                    .font(.inter(11, weight: .heavy))
-                    .foregroundColor(.brandCyan)
-                    .padding(.horizontal, 11).padding(.vertical, 5)
-                    .background(
-                        LinearGradient(colors: [Color.brandBlue.opacity(0.28), Color.brandCyan.opacity(0.15)],
-                                       startPoint: .leading, endPoint: .trailing)
-                    )
-                    .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.brandCyan.opacity(0.38), lineWidth: 1))
-                    .clipShape(RoundedRectangle(cornerRadius: 9))
+                VStack(alignment: .trailing, spacing: 8) {
+                    Text((user?.plan ?? "free").uppercased())
+                        .font(.inter(11, weight: .heavy))
+                        .foregroundColor(.brandCyan)
+                        .padding(.horizontal, 11).padding(.vertical, 5)
+                        .background(
+                            LinearGradient(colors: [Color.brandBlue.opacity(0.28), Color.brandCyan.opacity(0.15)],
+                                           startPoint: .leading, endPoint: .trailing)
+                        )
+                        .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color.brandCyan.opacity(0.38), lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: 9))
+
+                    let plan = (user?.plan ?? "free").lowercased()
+                    if plan == "unlimited" || plan.contains("api") {
+                        Button {
+                            if let url = URL(string: "https://apps.apple.com/account/subscriptions") {
+                                UIApplication.shared.open(url)
+                            }
+                        } label: {
+                            Text("MANAGE")
+                                .font(.inter(11, weight: .heavy))
+                                .foregroundColor(Color(hex: "#a78bfa"))
+                                .padding(.horizontal, 11).padding(.vertical, 5)
+                                .background(Color(hex: "#a78bfa").opacity(0.12))
+                                .overlay(RoundedRectangle(cornerRadius: 9).stroke(Color(hex: "#a78bfa").opacity(0.38), lineWidth: 1))
+                                .clipShape(RoundedRectangle(cornerRadius: 9))
+                        }
+                    }
+                }
             }
 
             // Row 2: credit boxes
             HStack(spacing: 7) {
                 creditBox(label: "Paid Credits", value: String(format: "%.2f", user?.credit ?? 0), isPaid: true)
-                creditBox(label: "Free Credits", value: String(format: "%.0f", user?.freeCredit ?? 0), isPaid: false)
+                creditBox(label: "Free Credits", value: String(format: "%.2f", user?.freeCredit ?? 0), isPaid: false)
             }
 
             // Row 3: Plans button
@@ -332,7 +493,8 @@ struct SettingsView: View {
                 }
             }
         }
-        .padding(16)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
         .blueBorderCard()
     }
 
@@ -347,7 +509,7 @@ struct SettingsView: View {
                 .tracking(0.7)
                 .textCase(.uppercase)
         }
-        .padding(.horizontal, 12).padding(.vertical, 11)
+        .padding(.horizontal, 12).padding(.vertical, 7)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(isPaid ? Color(hex: "#f59e0b").opacity(0.09) : Color.white.opacity(0.07))
         .overlay(RoundedRectangle(cornerRadius: 12)
@@ -356,9 +518,19 @@ struct SettingsView: View {
     }
 
     @ViewBuilder
-    private func settingsGroup<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+    private func settingsGroup<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(spacing: 0) {
+            Text(title)
+                .font(.inter(10, weight: .heavy))
+                .foregroundColor(.textQuaternary)
+                .tracking(0.7)
+                .textCase(.uppercase)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.top, 6)
+                .padding(.bottom, 0)
             content()
+            Spacer().frame(height: 2)
         }
         .background(Color.white.opacity(0.04))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.07), lineWidth: 1))

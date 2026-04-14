@@ -369,7 +369,10 @@ final class TranscriptionManager: ObservableObject {
                                 switch poll.status {
                                 case "completed":
                                     appLog("  ✓ text=\(poll.data?.responseData?.text?.count ?? 0)ch", level: .success)
-                                    appLog("[CREDITS] Charged: \(String(format: "%.4f", poll.data?.totalCost ?? 0)) | Balance: paid=\(String(format: "%.4f", poll.data?.credit ?? 0))  free=\(String(format: "%.0f", poll.data?.freeCredit ?? 0))", level: .info)
+                                    if let paid = poll.data?.credit, let free = poll.data?.freeCredit {
+                                        await AuthManager.shared.updateCredits(paid: paid, free: free)
+                                    }
+                                    appLog("[CREDITS] Charged: \(String(format: "%.4f", poll.data?.totalCost ?? 0)) | Balance: paid=\(String(format: "%.4f", poll.data?.credit ?? 0))  free=\(String(format: "%.4f", poll.data?.freeCredit ?? 0))", level: .info)
                                     transcribedText = poll.data?.responseData?.text
                                     break pollLoop
                                 case "failed":
@@ -560,7 +563,10 @@ final class TranscriptionManager: ObservableObject {
                             switch poll.status {
                             case "completed":
                                 transcribedText = poll.data?.responseData?.text
-                                appLog("[CREDITS] Charged: \(String(format: "%.4f", poll.data?.totalCost ?? 0)) | Balance: paid=\(String(format: "%.4f", poll.data?.credit ?? 0))  free=\(String(format: "%.0f", poll.data?.freeCredit ?? 0))", level: .info)
+                                if let paid = poll.data?.credit, let free = poll.data?.freeCredit {
+                                    await AuthManager.shared.updateCredits(paid: paid, free: free)
+                                }
+                                appLog("[CREDITS] Charged: \(String(format: "%.4f", poll.data?.totalCost ?? 0)) | Balance: paid=\(String(format: "%.4f", poll.data?.credit ?? 0))  free=\(String(format: "%.4f", poll.data?.freeCredit ?? 0))", level: .info)
                                 break pollLoop
                             case "failed": transcribingError = poll.message ?? "Transcription failed."; break pollLoop
                             default: transcribingStatus = "Transcribing \(name)… \(attempt * 5)s"
@@ -640,6 +646,10 @@ final class TranscriptionManager: ObservableObject {
                         switch poll.status {
                         case "completed":
                             transcribedText = poll.data?.responseData?.text
+                            if let paid = poll.data?.credit, let free = poll.data?.freeCredit {
+                                await AuthManager.shared.updateCredits(paid: paid, free: free)
+                            }
+                            appLog("[CREDITS] Resumed task — paid=\(String(format: "%.4f", poll.data?.credit ?? 0)) free=\(String(format: "%.4f", poll.data?.freeCredit ?? 0))", level: .info)
                             appLog("  ✓ Resumed '\(entry.label)'", level: .success)
                             break pollLoop
                         case "failed":
@@ -792,7 +802,10 @@ final class NoteGenerationManager: ObservableObject {
                         let result = try await api.pollNoteResult(taskId: taskId)
                         switch result.status {
                         case "completed":
-                            appLog("[CREDITS] Charged: \(String(format: "%.4f", result.creditCharge ?? 0)) | Balance: paid=\(String(format: "%.4f", result.credit ?? 0))  free=\(String(format: "%.0f", result.freeCredit ?? 0))", level: .info)
+                            if let paid = result.credit, let free = result.freeCredit {
+                            await AuthManager.shared.updateCredits(paid: paid, free: free)
+                        }
+                        appLog("[CREDITS] Charged: \(String(format: "%.4f", result.creditCharge ?? 0)) | Balance: paid=\(String(format: "%.4f", result.credit ?? 0))  free=\(String(format: "%.4f", result.freeCredit ?? 0))", level: .info)
                             if let text = result.note {
                                 try? await api.saveNote(text: text, itemId: itemId, promptLabel: promptId)
                                 state = .completed(text: text)
@@ -915,7 +928,10 @@ final class NoteGenerationManager: ObservableObject {
                     let result = try await api.pollNoteResult(taskId: taskId)
                     switch result.status {
                     case "completed":
-                        appLog("[CREDITS] Charged: \(String(format: "%.4f", result.creditCharge ?? 0)) | Balance: paid=\(String(format: "%.4f", result.credit ?? 0))  free=\(String(format: "%.0f", result.freeCredit ?? 0))", level: .info)
+                        if let paid = result.credit, let free = result.freeCredit {
+                            await AuthManager.shared.updateCredits(paid: paid, free: free)
+                        }
+                        appLog("[CREDITS] Charged: \(String(format: "%.4f", result.creditCharge ?? 0)) | Balance: paid=\(String(format: "%.4f", result.credit ?? 0))  free=\(String(format: "%.4f", result.freeCredit ?? 0))", level: .info)
                         if let noteText = result.note {
                             let label = "Note-\(itemName)-\(promptName)"
                             LocalNoteStore.shared.addOrReplace(LocalNoteEntry(
@@ -1097,7 +1113,10 @@ final class ImageProcessingManager: ObservableObject {
                     appLog("[IMG] Poll \(attempt + 1) — status: \(result.status)")
                     switch result.status {
                     case "completed":
-                        appLog("[CREDITS] Charged: \(String(format: "%.4f", result.creditCharge ?? 0)) | Balance: paid=\(String(format: "%.4f", result.credit ?? 0))  free=\(String(format: "%.0f", result.freeCredit ?? 0))", level: .info)
+                        if let paid = result.credit, let free = result.freeCredit {
+                            await AuthManager.shared.updateCredits(paid: paid, free: free)
+                        }
+                        appLog("[CREDITS] Charged: \(String(format: "%.4f", result.creditCharge ?? 0)) | Balance: paid=\(String(format: "%.4f", result.credit ?? 0))  free=\(String(format: "%.4f", result.freeCredit ?? 0))", level: .info)
                         if let text = result.note {
                             appLog("[IMG] Done — saving note (\(text.count) chars)", level: .success)
                             let idx = LocalTranscriptStore.shared.count(for: itemId)

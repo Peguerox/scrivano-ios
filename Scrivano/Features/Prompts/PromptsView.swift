@@ -187,6 +187,15 @@ struct PromptsView: View {
         author.isEmpty || author.lowercased() == "scrivano"
     }
 
+    private func matchesSearch(_ p: Prompt) -> Bool {
+        let q = search.lowercased()
+        if p.name.lowercased().contains(q) { return true }
+        if p.displayName.lowercased().contains(q) { return true }
+        if p.overview.lowercased().contains(q) { return true }
+        if p.description.lowercased().contains(q) { return true }
+        return false
+    }
+
     var filtered: [Prompt] {
         // Image context: only show prompts with note_type == "Image"
         if case .imageProcess = context {
@@ -199,10 +208,7 @@ struct PromptsView: View {
             return author == userEmail || isScrivano(author)
         }
         if !search.isEmpty {
-            list = list.filter {
-                $0.name.localizedCaseInsensitiveContains(search)
-                || $0.description.localizedCaseInsensitiveContains(search)
-            }
+            list = list.filter { matchesSearch($0) }
         }
         switch selectedTab {
         case .favorites: list = list.filter { favoriteIds.contains($0.id) }
@@ -635,6 +641,9 @@ struct PromptsView: View {
                     let result = try await api.pollNoteResult(taskId: taskId)
                     switch result.status {
                     case "completed":
+                        if let paid = result.credit, let free = result.freeCredit {
+                            await AuthManager.shared.updateCredits(paid: paid, free: free)
+                        }
                         if let text = result.note {
                             LocalNoteStore.shared.add(LocalNoteEntry(
                                 id: UUID().uuidString,
@@ -775,6 +784,9 @@ struct PromptsView: View {
                     switch result.status {
                     case "completed":
                         appLog("[CREDITS] Charged: \(String(format: "%.4f", result.creditCharge ?? 0)) | Balance: paid=\(String(format: "%.4f", result.credit ?? 0))  free=\(String(format: "%.0f", result.freeCredit ?? 0))", level: .info)
+                        if let paid = result.credit, let free = result.freeCredit {
+                            await AuthManager.shared.updateCredits(paid: paid, free: free)
+                        }
                         if let noteText = result.note {
                             let itemName = LocalItemStore.shared.all().first(where: { $0.id == itemId })?.name ?? itemId
                             let label = "Note-\(itemName)-\(promptName)"
@@ -941,7 +953,7 @@ struct PromptCard: View {
             Button(action: isSelectMode ? onToggleSelect : onToggleFavorite) {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(alignment: .top) {
-                        Text(prompt.name)
+                        Text(prompt.displayName)
                             .font(.inter(14, weight: .bold))
                             .foregroundColor(isHighlighted ? .brandCyan : .textPrimary)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -988,6 +1000,9 @@ struct PromptCard: View {
                 }
                 if let language = prompt.categories["language"], !language.isEmpty {
                     categoryTag(language)
+                }
+                if let cost = prompt.averageCreditCost, cost > 0 {
+                    creditTag(cost)
                 }
 
                 Spacer()
@@ -1037,6 +1052,19 @@ struct PromptCard: View {
                         lineWidth: isHighlighted ? 1.5 : 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func creditTag(_ cost: Double) -> some View {
+        let label = cost.truncatingRemainder(dividingBy: 1) == 0
+            ? String(format: "⚡ %.0f cr", cost)
+            : String(format: "⚡ %.1f cr", cost)
+        return Text(label)
+            .font(.inter(9, weight: .heavy))
+            .foregroundColor(Color(hex: "#facc15").opacity(0.85))
+            .padding(.horizontal, 7).padding(.vertical, 3)
+            .background(Color(hex: "#facc15").opacity(0.08))
+            .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color(hex: "#facc15").opacity(0.25), lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 5))
     }
 
     private func categoryTag(_ text: String) -> some View {

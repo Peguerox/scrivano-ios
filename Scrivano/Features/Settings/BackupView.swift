@@ -12,6 +12,7 @@ struct BackupView: View {
     @State private var createError: String?
     @State private var backupURL: URL?
     @State private var showShareSheet = false
+    @State private var isLoggingOut = false
 
     // ── Restore state ────────────────────────────────────────────────────
     @State private var showFilePicker = false
@@ -61,10 +62,33 @@ struct BackupView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 18))
                 .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.1), lineWidth: 1))
             }
+
+            // Logout overlay — shown after export when coming from logout flow
+            if isLoggingOut {
+                Color.black.opacity(0.6).ignoresSafeArea()
+                VStack(spacing: 14) {
+                    ProgressView().progressViewStyle(.circular).tint(.brandCyan).scaleEffect(1.4)
+                    Text("Saving file and logging out…")
+                        .font(.inter(13, weight: .semibold))
+                        .foregroundColor(.textSecondary)
+                }
+                .padding(28)
+                .background(Color(hex: "#0d1a2a"))
+                .clipShape(RoundedRectangle(cornerRadius: 18))
+                .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.brandBlue.opacity(0.35), lineWidth: 1))
+            }
         }
         .navigationBarHidden(true)
         // Share sheet — shown after backup file is created
-        .sheet(isPresented: $showShareSheet) {
+        .sheet(isPresented: $showShareSheet, onDismiss: {
+            guard AuthManager.shared.pendingLogoutAfterBackup else { return }
+            AuthManager.shared.pendingLogoutAfterBackup = false
+            isLoggingOut = true
+            Task {
+                try? await Task.sleep(for: .milliseconds(900))
+                AuthManager.shared.forceLogout()
+            }
+        }) {
             if let url = backupURL { ShareSheetView(url: url) }
         }
         // File picker — user selects a .scrivano file

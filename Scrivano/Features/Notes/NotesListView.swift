@@ -1,4 +1,6 @@
 import SwiftUI
+import MarkdownUI
+import UIKit
 
 // MARK: - NotesListView
 
@@ -494,6 +496,9 @@ struct NoteViewerEditorView: View {
     @Environment(\.dismiss) var dismiss
     @State private var editedText: String
     @State private var showSaveCard = false
+    @State private var showMarkdown = false
+    @State private var isGeneratingPDF = false
+    @State private var markdownScrollView: UIScrollView?
 
     init(note: LocalNoteEntry, onSaved: ((String) -> Void)? = nil) {
         self.note = note
@@ -502,6 +507,23 @@ struct NoteViewerEditorView: View {
     }
 
     private var hasChanges: Bool { editedText != note.text }
+
+    @MainActor
+    private func generatePDF() {
+        guard let sv = markdownScrollView else { return }
+        isGeneratingPDF = true
+        // Small delay so the "Building PDF…" overlay renders before we block the main thread
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            let url = PDFExporter.makePDF(from: sv, title: note.label)
+            isGeneratingPDF = false
+            guard let url else { return }
+            guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                  var top = scene.windows.first?.rootViewController else { return }
+            while let presented = top.presentedViewController { top = presented }
+            let vc = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+            top.present(vc, animated: true)
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -516,11 +538,70 @@ struct NoteViewerEditorView: View {
                 .overlay(alignment: .bottom) {
                     Rectangle().fill(Color.stageNotes.opacity(0.4)).frame(height: 1)
                 }
+                .overlay(alignment: .trailing) {
+                    HStack(spacing: 8) {
+                        if showMarkdown {
+                            Button { generatePDF() } label: {
+                                Image(systemName: "square.and.arrow.up")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.stageNotes)
+                                    .frame(width: 36, height: 36)
+                                    .background(Color.stageNotes.opacity(0.12))
+                                    .overlay(Circle().stroke(Color.stageNotes.opacity(0.3), lineWidth: 1))
+                                    .clipShape(Circle())
+                            }
+                        }
+                        Button { withAnimation(.easeInOut(duration: 0.2)) { showMarkdown.toggle() } } label: {
+                            Image(systemName: showMarkdown ? "doc.richtext.fill" : "doc.richtext")
+                                .font(.system(size: 15))
+                                .foregroundColor(showMarkdown ? .stageNotes : .textSecondary)
+                                .frame(width: 36, height: 36)
+                                .background(showMarkdown ? Color.stageNotes.opacity(0.15) : Color.white.opacity(0.07))
+                                .overlay(Circle().stroke(Color.white.opacity(0.1), lineWidth: 1))
+                                .clipShape(Circle())
+                        }
+                    }
+                    .padding(.trailing, 18)
+                }
 
-                TextEditor(text: $editedText)
-                    .font(.inter(14)).foregroundColor(.textPrimary)
-                    .scrollContentBackground(.hidden).background(Color.phoneBg)
-                    .padding(.horizontal, 14).padding(.vertical, 8)
+                if showMarkdown {
+                    ScrollView {
+                        Markdown(editedText)
+                            .markdownTheme(.gitHub)
+                            .environment(\.colorScheme, .light)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 16)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(ScrollViewFinder { sv in
+                                markdownScrollView = sv
+                            })
+                    }
+                    .background(Color.white)
+                } else {
+                    TextEditor(text: $editedText)
+                        .font(.inter(14)).foregroundColor(.textPrimary)
+                        .scrollContentBackground(.hidden).background(Color.phoneBg)
+                        .padding(.horizontal, 14).padding(.vertical, 8)
+                }
+            }
+
+            if isGeneratingPDF {
+                Color.black.opacity(0.55).ignoresSafeArea().zIndex(20)
+                VStack(spacing: 18) {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .tint(.stageNotes)
+                        .scaleEffect(1.4)
+                    Text("Building PDF…")
+                        .font(.inter(15, weight: .semibold))
+                        .foregroundColor(.textPrimary)
+                }
+                .padding(.horizontal, 40)
+                .padding(.vertical, 32)
+                .background(Color.phoneBg.opacity(0.97))
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .shadow(color: .black.opacity(0.3), radius: 20)
+                .zIndex(21)
             }
 
             if showSaveCard {
@@ -734,3 +815,30 @@ struct BulkMoveNoteSheet: View {
         Rectangle().fill(Color.white.opacity(0.04)).frame(height: 1).padding(.leading, 52)
     }
 }
+
+// MARK: - ScrollView finder (walks the UIKit hierarchy to capture the backing UIScrollView)
+
+private struct ScrollViewFinder: UIViewRepresentable {
+    let onFound: (UIScrollView) -> Void
+
+    func makeUIView(context: Context) -> UIView {
+        let v = UIView(frame: .zero)
+        v.backgroundColor = .clear
+        DispatchQueue.main.async { self.find(from: v) }
+        return v
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {}
+
+    private func find(from view: UIView) {
+        var current: UIView? = view.superview
+        while let v = current {
+            if let sv = v as? UIScrollView {
+                onFound(sv)
+                return
+            }
+            current = v.superview
+        }
+    }
+}
+

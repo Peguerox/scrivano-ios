@@ -34,6 +34,11 @@ final class KeychainService {
         return try? JSONDecoder().decode(User.self, from: data)
     }
 
+    // MARK: - Last logged-in user ID (for user-switch detection)
+    private let lastUserIdKey = "scrivano.auth.lastUserId"
+    func saveLastUserId(_ id: String) { save(key: lastUserIdKey, value: id) }
+    func getLastUserId() -> String? { load(key: lastUserIdKey) }
+
     // MARK: - Clear
     func clearAll() {
         delete(key: tokenKey)

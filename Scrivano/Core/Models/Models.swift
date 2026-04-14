@@ -4,16 +4,46 @@ import Foundation
 struct User: Codable {
     let id: String
     let email: String
-    let firstName: String
-    let plan: String
+    var firstName: String
+    var plan: String
     var credit: Double
     var freeCredit: Double
 
     enum CodingKeys: String, CodingKey {
-        case id, email
+        case id, email, plan, credit, name
         case firstName = "first_name"
-        case plan, credit
         case freeCredit = "free_credit"
+    }
+
+    init(id: String, email: String, firstName: String, plan: String, credit: Double, freeCredit: Double) {
+        self.id = id; self.email = email; self.firstName = firstName
+        self.plan = plan; self.credit = credit; self.freeCredit = freeCredit
+    }
+
+    // Custom decoder: handles both `first_name` (login) and `name` (/api/auth/me),
+    // and tolerates missing optional fields so a partial response never breaks decoding.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id         = try c.decode(String.self, forKey: .id)
+        email      = try c.decode(String.self, forKey: .email)
+        plan       = (try? c.decode(String.self, forKey: .plan)) ?? "free"
+        credit     = (try? c.decode(Double.self, forKey: .credit)) ?? 0
+        freeCredit = (try? c.decode(Double.self, forKey: .freeCredit)) ?? 0
+        if let fn = try? c.decode(String.self, forKey: .firstName), !fn.isEmpty {
+            firstName = fn
+        } else {
+            firstName = (try? c.decode(String.self, forKey: .name)) ?? ""
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id,         forKey: .id)
+        try c.encode(email,      forKey: .email)
+        try c.encode(firstName,  forKey: .firstName)
+        try c.encode(plan,       forKey: .plan)
+        try c.encode(credit,     forKey: .credit)
+        try c.encode(freeCredit, forKey: .freeCredit)
     }
 
     var hasBYOK: Bool {
@@ -28,11 +58,13 @@ struct LoginResponse: Codable {
     let token: String?
     let refreshToken: String?
     let user: User?
+    let confirmedEmail: Bool?
 
     enum CodingKeys: String, CodingKey {
         case success, message, token
         case refreshToken = "refresh_token"
         case user
+        case confirmedEmail = "confirmed_email"
     }
 }
 
@@ -74,6 +106,8 @@ final class LocalCollectionStore {
     }
 
     func all() -> [ScrivanoCollection] { collections }
+
+    func clearAll() { collections.removeAll(); persist() }
 
     private func load() {
         guard let data = try? Data(contentsOf: storeURL),
@@ -268,13 +302,26 @@ struct Prompt: Codable, Identifiable {
     let promptType: String?
     private let promptCategoriesRaw: String?
 
+    // New structured fields (optional — fall back to parsing description if absent)
+    private let promptTitle: String?
+    private let promptOverview: String?
+    private let promptExample: String?
+    let averageCreditCost: Double?
+
     enum CodingKeys: String, CodingKey {
         case id
         case name = "prompt_name"
         case description = "prompt_description"
         case promptType = "prompt_type"
         case promptCategoriesRaw = "prompt_categories"
+        case promptTitle = "prompt_title"
+        case promptOverview = "prompt_overview"
+        case promptExample = "prompt_example"
+        case averageCreditCost = "average_credit_cost"
     }
+
+    /// Display title — uses prompt_title if available, else prompt_name
+    var displayName: String { promptTitle ?? name }
 
     /// Parsed flat dict, e.g. ["profession": "Medical", "language": "English"]
     var categories: [String: String] {
@@ -285,8 +332,9 @@ struct Prompt: Codable, Identifiable {
         return dict
     }
 
-    /// First paragraph before "Average credit" / "Example:" sections
+    /// Uses prompt_overview if available, otherwise parses from description
     var overview: String {
+        if let o = promptOverview, !o.isEmpty { return o }
         let splits = ["\\n\\nAverage", "\\n\\nExample", "\n\nAverage", "\n\nExample"]
         for sep in splits {
             if let r = description.range(of: sep, options: [.caseInsensitive, .regularExpression]) {
@@ -296,8 +344,9 @@ struct Prompt: Codable, Identifiable {
         return description
     }
 
-    /// Text after "Example:" in the description
+    /// Uses prompt_example if available, otherwise parses from description
     var example: String? {
+        if let e = promptExample, !e.isEmpty { return e }
         guard let r = description.range(of: "Example:", options: .caseInsensitive) else { return nil }
         let raw = String(description[r.upperBound...]).trimmingCharacters(in: .whitespacesAndNewlines)
         return raw.isEmpty ? nil : raw
@@ -426,6 +475,16 @@ final class LocalRecordingStore {
         return dir.appendingPathComponent(name)
     }
 
+    func clearAll() {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        entries.removeAll()
+        persist()
+        queue.async {
+            let dir = docs.appendingPathComponent("recordings")
+            try? FileManager.default.removeItem(at: dir)
+        }
+    }
+
     static func relativePath(of url: URL) -> String {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].path
         let full = url.path
@@ -483,6 +542,8 @@ final class LocalItemStore {
     }
 
     func all() -> [LocalStoredItem] { items }
+
+    func clearAll() { items.removeAll(); persist() }
 
     /// Removes the collection assignment from all items that belonged to the deleted collection.
     func clearCollection(_ collectionId: String) {
@@ -639,6 +700,8 @@ final class LocalTranscriptStore {
 
     func deleteAll(for itemId: String) { entries.removeAll { $0.itemId == itemId }; persist() }
 
+    func clearAll() { entries.removeAll(); persist() }
+
     private func load() {
         guard let data = try? Data(contentsOf: storeURL),
               let decoded = try? JSONDecoder().decode([LocalTranscriptEntry].self, from: data)
@@ -702,6 +765,8 @@ final class LocalNoteStore {
     }
 
     func deleteAll(for itemId: String) { entries.removeAll { $0.itemId == itemId }; persist() }
+
+    func clearAll() { entries.removeAll(); persist() }
 
     private func load() {
         guard let data = try? Data(contentsOf: storeURL),
@@ -981,6 +1046,16 @@ final class LocalImageStore {
 
     func count(for itemId: String) -> Int {
         entries.filter { $0.itemId == itemId }.count
+    }
+
+    func clearAll() {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        entries.removeAll()
+        persist()
+        queue.async {
+            let dir = docs.appendingPathComponent("images")
+            try? FileManager.default.removeItem(at: dir)
+        }
     }
 
     private func load() {

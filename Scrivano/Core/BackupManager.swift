@@ -85,36 +85,38 @@ final class BackupManager: ObservableObject {
         encoder.dateEncodingStrategy = .iso8601
         guard let jsonData = try? encoder.encode(pkg) else { throw BackupError.encodingFailed }
 
-        // Build binary archive: [UInt32 jsonLen][json][repeated: UInt32 pathLen][pathUTF8][UInt64 dataLen][rawAudio]
-        // Audio is stored as raw bytes — no base64 — to avoid OOM on large libraries.
-        var archive = Data()
-        var jsonLen = UInt32(jsonData.count).littleEndian
-        archive.append(Data(bytes: &jsonLen, count: 4))
-        archive.append(jsonData)
+        // Run heavy I/O and CPU work off the main thread so the spinner stays visible
+        let dest = try await Task.detached(priority: .userInitiated) {
+            // Build binary archive: [UInt32 jsonLen][json][repeated: UInt32 pathLen][pathUTF8][UInt64 dataLen][rawAudio]
+            var archive = Data()
+            var jsonLen = UInt32(jsonData.count).littleEndian
+            archive.append(Data(bytes: &jsonLen, count: 4))
+            archive.append(jsonData)
 
-        if includeAudio {
-            progress = "Loading audio files…"
-            for rec in recsMeta {
-                guard let audioData = try? Data(contentsOf: rec.fileURL) else { continue }
-                let pathBytes = Data(rec.relativePath.utf8)
-                var pathLen = UInt32(pathBytes.count).littleEndian
-                var dataLen = UInt64(audioData.count).littleEndian
-                archive.append(Data(bytes: &pathLen, count: 4))
-                archive.append(pathBytes)
-                archive.append(Data(bytes: &dataLen, count: 8))
-                archive.append(audioData)
+            if includeAudio {
+                for rec in recsMeta {
+                    guard let audioData = try? Data(contentsOf: rec.fileURL) else { continue }
+                    let pathBytes = Data(rec.relativePath.utf8)
+                    var pathLen = UInt32(pathBytes.count).littleEndian
+                    var dataLen = UInt64(audioData.count).littleEndian
+                    archive.append(Data(bytes: &pathLen, count: 4))
+                    archive.append(pathBytes)
+                    archive.append(Data(bytes: &dataLen, count: 8))
+                    archive.append(audioData)
+                }
             }
-        }
 
-        progress = "Compressing…"
-        guard let compressed = try? (archive as NSData).compressed(using: .lzfse) as Data
-        else { throw BackupError.encodingFailed }
-        let encrypted = try Self.encryptData(compressed, password: password)
+            guard let compressed = try? (archive as NSData).compressed(using: .lzfse) as Data
+            else { throw BackupError.encodingFailed }
+            let encrypted = try BackupManager.encryptData(compressed, password: password)
 
-        let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
-        let name = "scrivano-\(df.string(from: Date())).scrivano"
-        let dest = FileManager.default.temporaryDirectory.appendingPathComponent(name)
-        try encrypted.write(to: dest, options: .atomic)
+            let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
+            let name = "scrivano-\(df.string(from: Date())).scrivano"
+            let dest = FileManager.default.temporaryDirectory.appendingPathComponent(name)
+            try encrypted.write(to: dest, options: .atomic)
+            return dest
+        }.value
+
         return dest
     }
 
@@ -288,20 +290,20 @@ final class BackupManager: ObservableObject {
 
     // MARK: - Crypto (static so Task.detached can use them)
 
-    static func encryptData(_ data: Data, password: String) throws -> Data {
+    nonisolated static func encryptData(_ data: Data, password: String) throws -> Data {
         let key = derivedKey(from: password)
         let sealed = try AES.GCM.seal(data, using: key)
         guard let combined = sealed.combined else { throw BackupError.encodingFailed }
         return combined
     }
 
-    static func decryptData(_ data: Data, password: String) throws -> Data {
+    nonisolated static func decryptData(_ data: Data, password: String) throws -> Data {
         let key = derivedKey(from: password)
         let box = try AES.GCM.SealedBox(combined: data)
         return try AES.GCM.open(box, using: key)
     }
 
-    private static func derivedKey(from password: String) -> SymmetricKey {
+    private nonisolated static func derivedKey(from password: String) -> SymmetricKey {
         var raw = Data(password.utf8)
         raw.append(Data("scrivano-backup-salt-v1".utf8))
         return SymmetricKey(data: SHA256.hash(data: raw))

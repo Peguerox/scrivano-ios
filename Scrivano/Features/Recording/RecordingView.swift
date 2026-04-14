@@ -658,6 +658,12 @@ struct RenameRecordingSheet: View {
 
                 ScrivanoTextField(label: "Name", text: $name, placeholder: "Item name", autoFocus: true)
                     .padding(.horizontal, 24)
+                    .onSubmit {
+                        let trimmed = name.trimmingCharacters(in: .whitespaces)
+                        guard !trimmed.isEmpty else { return }
+                        onRename?(trimmed)
+                        dismiss()
+                    }
 
                 Button {
                     let trimmed = name.trimmingCharacters(in: .whitespaces)
@@ -688,6 +694,7 @@ struct RenameRecordingSheet: View {
         .onAppear { name = currentName }
         .presentationDetents([.height(260)])
         .presentationDragIndicator(.visible)
+        .ignoresSafeArea(.keyboard)
     }
 }
 

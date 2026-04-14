@@ -63,7 +63,14 @@ final class APIClient {
         if let http = response as? HTTPURLResponse, http.statusCode == 401 {
             if let rebuild = rebuildOn401 {
                 appLog("  401 — auto-refreshing token", level: .warning)
-                do { try await refreshToken() } catch { throw APIClientError.unauthorized }
+                do { try await refreshToken() } catch {
+                    // Surface the server's actual error message from the 401 body if present
+                    if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                       let message = json["message"] as? String {
+                        throw APIClientError.serverError(message)
+                    }
+                    throw APIClientError.unauthorized
+                }
                 appLog("  Token refreshed — retrying", level: .success)
                 var req2 = rebuild()
                 if let token = authToken { req2.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
@@ -176,7 +183,8 @@ final class APIClient {
     // refresh endpoint would call refreshToken() again → infinite recursion.
     func refreshToken() async throws {
         guard let refresh = KeychainService.shared.getRefreshToken() else {
-            appLog("  refreshToken: no refresh token in keychain", level: .error)
+            appLog("  refreshToken: no refresh token in keychain — forcing logout", level: .error)
+            Task { @MainActor in AuthManager.shared.forceLogout() }
             throw APIClientError.unauthorized
         }
         struct Body: Encodable {
@@ -191,7 +199,6 @@ final class APIClient {
         var req = URLRequest(url: url, timeoutInterval: 30)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        // Include the current (expired) bearer token — some servers require it to identify the session
         if let token = authToken { req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         req.httpBody = try JSONEncoder().encode(Body(refreshToken: refresh))
 
@@ -202,7 +209,7 @@ final class APIClient {
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         appLog("  refreshToken: HTTP \(status)", level: status == 200 ? .info : .error)
 
-        // Backend refresh failed — try silent Google reauth as fallback
+        // Backend refresh failed — try silent Google reauth as fallback, else force logout
         if status != 200 {
             let provider = KeychainService.shared.getLoginProvider()
             if provider == "google" {
@@ -215,11 +222,15 @@ final class APIClient {
                     appLog("  refreshToken: silent Google reauth failed — \(error.localizedDescription)", level: .error)
                 }
             }
+            // All refresh options exhausted — force logout so user gets a clean login screen
+            appLog("  refreshToken: all attempts failed — forcing logout", level: .error)
+            Task { @MainActor in AuthManager.shared.forceLogout() }
             throw APIClientError.unauthorized
         }
 
         guard let res = try? JSONDecoder().decode(Res.self, from: data), let token = res.token else {
-            appLog("  refreshToken: decode failed or token missing", level: .error)
+            appLog("  refreshToken: decode failed or token missing — forcing logout", level: .error)
+            Task { @MainActor in AuthManager.shared.forceLogout() }
             throw APIClientError.unauthorized
         }
         KeychainService.shared.saveToken(token)

@@ -8,6 +8,7 @@ struct LoginView: View {
     @State private var password = ""
     @State private var showSignup = false
     @State private var showForgot = false
+    @State private var showVerify = false
     @State private var socialError: String?
     @State private var agreedToTerms = true
 
@@ -157,6 +158,37 @@ struct LoginView: View {
                             .disabled(auth.isLoading || email.isEmpty || password.isEmpty || !agreedToTerms)
                             .padding(.top, 4)
 
+                            // Unverified email banner
+                            if auth.unverifiedEmail != nil {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "envelope.badge.fill")
+                                            .font(.system(size: 14))
+                                            .foregroundColor(.brandCyan)
+                                        Text("Email not verified yet")
+                                            .font(.inter(13, weight: .bold))
+                                            .foregroundColor(.textPrimary)
+                                    }
+                                    Text("Your account exists but the email hasn't been confirmed. Check your inbox for the verification code.")
+                                        .font(.inter(12))
+                                        .foregroundColor(.textSecondary)
+                                        .lineSpacing(3)
+                                    Button {
+                                        showVerify = true
+                                    } label: {
+                                        Text("Verify Email →")
+                                            .font(.inter(13, weight: .bold))
+                                            .foregroundColor(.brandCyan)
+                                    }
+                                }
+                                .padding(14)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(Color.brandBlue.opacity(0.12))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.brandCyan.opacity(0.35), lineWidth: 1))
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                                .padding(.top, 4)
+                            }
+
                             // Terms of service
                             HStack(alignment: .top, spacing: 10) {
                                 Button { agreedToTerms.toggle() } label: {
@@ -215,10 +247,10 @@ struct LoginView: View {
                                     Task {
                                         do {
                                             let user = try await socialAuth.signInWithGoogle(presenting: vc)
-                                            auth.currentUser = user
-                                            auth.isLoggedIn = true
+                                            auth.completeLogin(user: user)
                                         } catch {
-                                            socialError = error.localizedDescription
+                                            let code = (error as NSError).code
+                                            if code != 1001 && code != -5 { socialError = error.localizedDescription }
                                         }
                                     }
                                 } label: {
@@ -239,10 +271,10 @@ struct LoginView: View {
                                     Task {
                                         do {
                                             let user = try await socialAuth.signInWithApple()
-                                            auth.currentUser = user
-                                            auth.isLoggedIn = true
+                                            auth.completeLogin(user: user)
                                         } catch {
-                                            socialError = error.localizedDescription
+                                            let code = (error as NSError).code
+                                            if code != 1001 && code != -5 { socialError = error.localizedDescription }
                                         }
                                     }
                                 } label: {
@@ -289,7 +321,16 @@ struct LoginView: View {
                 }
             }
         }
+        .onAppear {
+            auth.errorMessage = nil
+            auth.unverifiedEmail = nil
+        }
         .fullScreenCover(isPresented: $showSignup) { SignupView() }
         .fullScreenCover(isPresented: $showForgot) { ForgotPasswordView() }
+        .fullScreenCover(isPresented: $showVerify) {
+            VerifyCodeView(email: auth.unverifiedEmail ?? email) {
+                auth.unverifiedEmail = nil
+            }
+        }
     }
 }

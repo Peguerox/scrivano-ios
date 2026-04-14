@@ -84,8 +84,6 @@ struct ScrivanoApp: App {
             } else if phase == .active {
                 // Back in foreground — release the background task if we held one.
                 lifecycle.endBackgroundTask()
-                // Refresh user so plan/credit changes made on web or via Stripe are picked up.
-                if auth.isLoggedIn { Task { await auth.refreshUser() } }
             }
         }
         .onChange(of: taskQueue.isProcessing) { processing in
