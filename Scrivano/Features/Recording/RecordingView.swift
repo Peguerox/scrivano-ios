@@ -130,6 +130,21 @@ struct RecordingView: View {
                 .padding(.top, 14)
                 .padding(.bottom, 2)
 
+                // API key warning — shown for BYOK users who haven't set their key
+                let auth = AuthManager.shared
+                if auth.currentUser?.hasBYOK == true && !auth.hasOpenAIKey && !recorder.isRecording {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text("No API key set — auto-transcription will not work")
+                            .font(.inter(10, weight: .semibold))
+                    }
+                    .foregroundColor(Color(hex: "#f59e0b"))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 5)
+                    .background(Color(hex: "#f59e0b").opacity(0.10))
+                }
+
                 // Split interval banner — shown only when a split is configured
                 if splitInterval > 0 {
                     HStack(spacing: 5) {
@@ -627,74 +642,86 @@ struct RecorderSettingsSheet: View {
     }
 }
 
-// MARK: - Rename sheet
+// MARK: - Rename card (centered overlay)
 struct RenameRecordingSheet: View {
     let currentName: String
     var title: String = "Rename Item"
     var onRename: ((String) -> Void)?
     @Environment(\.dismiss) var dismiss
     @State private var name = ""
+    @FocusState private var focused: Bool
 
     var body: some View {
         ZStack {
-            Color.sheetBg.ignoresSafeArea()
-            VStack(spacing: 20) {
-                HStack {
+            Color(hex: "#030c1a").ignoresSafeArea()
+                .onTapGesture { dismiss() }
+
+            VStack {
+                Spacer()
+                VStack(spacing: 16) {
                     Text(title)
                         .font(.inter(16, weight: .heavy))
                         .foregroundColor(.textPrimary)
-                    Spacer()
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(.textTertiary)
-                            .frame(width: 30, height: 30)
-                            .background(Color.white.opacity(0.08))
-                            .clipShape(Circle())
+
+                    TextField(currentName, text: $name)
+                        .font(.inter(14))
+                        .foregroundColor(.textPrimary)
+                        .padding(.horizontal, 14).padding(.vertical, 12)
+                        .background(Color.white.opacity(0.06))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.brandCyan.opacity(0.35), lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .autocorrectionDisabled()
+                        .autocapitalization(.none)
+                        .focused($focused)
+                        .onSubmit {
+                            let trimmed = name.trimmingCharacters(in: .whitespaces)
+                            guard !trimmed.isEmpty else { return }
+                            onRename?(trimmed)
+                            dismiss()
+                        }
+
+                    HStack(spacing: 10) {
+                        Button {
+                            dismiss()
+                        } label: {
+                            Text("Cancel")
+                                .font(.inter(14, weight: .bold))
+                                .foregroundColor(.textTertiary)
+                                .frame(maxWidth: .infinity).padding(.vertical, 13)
+                                .background(Color.white.opacity(0.05))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.12), lineWidth: 1))
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                        Button {
+                            let trimmed = name.trimmingCharacters(in: .whitespaces)
+                            guard !trimmed.isEmpty else { return }
+                            onRename?(trimmed)
+                            dismiss()
+                        } label: {
+                            Text("Rename")
+                                .font(.inter(14, weight: .bold))
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity).padding(.vertical, 13)
+                                .background(LinearGradient(colors: [Color.brandBlue, Color.brandCyan],
+                                                           startPoint: .leading, endPoint: .trailing))
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                        .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
                 }
+                .padding(24)
+                .background(Color(hex: "#081221"))
+                .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.brandCyan.opacity(0.25), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 22))
+                .shadow(color: Color.brandCyan.opacity(0.15), radius: 20)
                 .padding(.horizontal, 24)
-                .padding(.top, 24)
-
-                ScrivanoTextField(label: "Name", text: $name, placeholder: "Item name", autoFocus: true)
-                    .padding(.horizontal, 24)
-                    .onSubmit {
-                        let trimmed = name.trimmingCharacters(in: .whitespaces)
-                        guard !trimmed.isEmpty else { return }
-                        onRename?(trimmed)
-                        dismiss()
-                    }
-
-                Button {
-                    let trimmed = name.trimmingCharacters(in: .whitespaces)
-                    guard !trimmed.isEmpty else { return }
-                    onRename?(trimmed)
-                    dismiss()
-                } label: {
-                    Text("Rename →")
-                        .font(.inter(15, weight: .heavy))
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 15)
-                        .background(
-                            LinearGradient(
-                                colors: [Color(hex: "#1e8ae0"), Color(hex: "#1060b0"), Color(hex: "#0a4d8e")],
-                                startPoint: .topLeading, endPoint: .bottomTrailing
-                            )
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
-                        .shadow(color: Color.brandBlue.opacity(0.5), radius: 12, y: 6)
-                }
-                .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
-                .padding(.horizontal, 24)
-
                 Spacer()
             }
         }
-        .onAppear { name = currentName }
-        .presentationDetents([.height(260)])
-        .presentationDragIndicator(.visible)
-        .ignoresSafeArea(.keyboard)
+        .onAppear {
+            name = currentName
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { focused = true }
+        }
     }
 }
 

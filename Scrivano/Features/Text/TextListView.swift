@@ -45,6 +45,10 @@ struct TextListView: View {
     @State private var showBulkMove = false
     @State private var showDeleteConfirm = false
 
+    // Rename overlay
+    @State private var renameTranscript: TranscriptSummary? = nil
+    @State private var renameText = ""
+
     private var inSelectionMode: Bool { pendingAction != nil }
 
     private var allTextIds: [String] { transcripts.map(\.id) }
@@ -135,7 +139,8 @@ struct TextListView: View {
                                         onDelete: { deleteTranscript(t) },
                                         onDraftNote: {},
                                         onRenamed: { rebuildAndReload() },
-                                        onMoved: { rebuildAndReload() }
+                                        onMoved: { rebuildAndReload() },
+                                        onRenameRequested: { renameTranscript = t; renameText = t.label }
                                     )
                                 }
                             }
@@ -313,6 +318,61 @@ struct TextListView: View {
                 }
                 .background(Color.phoneBg)
                 .animation(.spring(response: 0.3, dampingFraction: 0.85), value: inSelectionMode)
+            }
+
+            // Rename overlay
+            if renameTranscript != nil {
+                Color.black.opacity(0.65).ignoresSafeArea()
+                    .onTapGesture { renameTranscript = nil }
+                    .zIndex(20)
+                VStack {
+                    Spacer()
+                    VStack(spacing: 16) {
+                        Text("Rename Text")
+                            .font(.inter(16, weight: .heavy))
+                            .foregroundColor(.textPrimary)
+                        TextField("", text: $renameText)
+                            .font(.inter(14))
+                            .foregroundColor(.textPrimary)
+                            .padding(.horizontal, 14).padding(.vertical, 12)
+                            .background(Color.white.opacity(0.06))
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.brandCyan.opacity(0.35), lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .autocorrectionDisabled()
+                        HStack(spacing: 10) {
+                            Button { renameTranscript = nil } label: {
+                                Text("Cancel")
+                                    .font(.inter(14, weight: .bold)).foregroundColor(.textTertiary)
+                                    .frame(maxWidth: .infinity).padding(.vertical, 13)
+                                    .background(Color.white.opacity(0.05))
+                                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.12), lineWidth: 1))
+                                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                            }
+                            Button {
+                                let trimmed = renameText.trimmingCharacters(in: .whitespaces)
+                                guard !trimmed.isEmpty, let t = renameTranscript else { return }
+                                LocalTranscriptStore.shared.rename(id: t.id, newLabel: trimmed)
+                                renameTranscript = nil
+                                rebuildAndReload()
+                            } label: {
+                                Text("Rename")
+                                    .font(.inter(14, weight: .bold)).foregroundColor(.white)
+                                    .frame(maxWidth: .infinity).padding(.vertical, 13)
+                                    .background(LinearGradient(colors: [Color.brandBlue, Color.brandCyan], startPoint: .leading, endPoint: .trailing))
+                                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                            }
+                            .disabled(renameText.trimmingCharacters(in: .whitespaces).isEmpty)
+                        }
+                    }
+                    .padding(24)
+                    .background(Color(hex: "#081221"))
+                    .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.brandCyan.opacity(0.25), lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 22))
+                    .shadow(color: Color.brandCyan.opacity(0.15), radius: 20)
+                    .padding(.horizontal, 24)
+                    Spacer()
+                }
+                .zIndex(21)
             }
 
             // Process confirm card
@@ -664,8 +724,8 @@ struct LocalTextRow: View {
     var onDraftNote: () -> Void = {}
     var onRenamed: () -> Void = {}
     var onMoved: () -> Void = {}
+    var onRenameRequested: () -> Void = {}
 
-    @State private var showRename = false
     @State private var showMoreInfo = false
     @State private var showMoveTo = false
     @State private var showDraftPrompts = false
@@ -767,7 +827,7 @@ struct LocalTextRow: View {
                     }
                     if !transcript.isMerge {
                         Section("Manage") {
-                            Button { showRename = true } label: { Label("Rename", systemImage: "pencil") }
+                            Button { onRenameRequested() } label: { Label("Rename", systemImage: "pencil") }
                             Button { showMoveTo = true } label: { Label("Move to…", systemImage: "folder") }
                             Button(role: .destructive) { DeleteConfirmPresenter.show(itemName: transcript.label, onDelete: onDelete) } label: { Label("Delete", systemImage: "trash") }
                         }
@@ -790,12 +850,6 @@ struct LocalTextRow: View {
         .overlay(alignment: .bottom) { Rectangle().fill(Color.white.opacity(0.05)).frame(height: 1) }
         .contentShape(Rectangle())
         .onTapGesture { onSelect() }
-        .sheet(isPresented: $showRename) {
-            RenameRecordingSheet(currentName: transcript.label, title: "Rename Text") { newName in
-                LocalTranscriptStore.shared.rename(id: transcript.id, newLabel: newName)
-                onRenamed()
-            }
-        }
         .sheet(isPresented: $showMoreInfo) {
             TextMoreInfoSheet(transcript: transcript)
         }

@@ -20,6 +20,10 @@ struct NotesListView: View {
     @State private var showDeleteConfirm = false
     @State private var showProcessConfirm = false
 
+    // Rename overlay
+    @State private var renameNote: LocalNoteEntry? = nil
+    @State private var renameText = ""
+
     private var inSelectionMode: Bool { pendingAction != nil }
     private var selectedNotes: [LocalNoteEntry] { notes.filter { selected.contains($0.id) } }
 
@@ -77,7 +81,8 @@ struct NotesListView: View {
                                     onView: { viewerNote = note },
                                     onDelete: { deleteNote(note) },
                                     onRenamed: { reloadNotes() },
-                                    onMoved: { reloadNotes() }
+                                    onMoved: { reloadNotes() },
+                                    onRenameRequested: { renameNote = note; renameText = note.label }
                                 )
                             }
                         }
@@ -193,6 +198,62 @@ struct NotesListView: View {
                 }
                 .background(Color.phoneBg)
                 .animation(.spring(response: 0.3, dampingFraction: 0.85), value: inSelectionMode)
+            }
+
+            // Rename overlay
+            if renameNote != nil {
+                Color.black.opacity(0.65).ignoresSafeArea()
+                    .onTapGesture { renameNote = nil }
+                    .zIndex(20)
+                VStack {
+                    Spacer()
+                    VStack(spacing: 16) {
+                        Text("Rename Note")
+                            .font(.inter(16, weight: .heavy))
+                            .foregroundColor(.textPrimary)
+                        TextField("", text: $renameText)
+                            .font(.inter(14))
+                            .foregroundColor(.textPrimary)
+                            .padding(.horizontal, 14).padding(.vertical, 12)
+                            .background(Color.white.opacity(0.06))
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.stageNotes.opacity(0.35), lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .autocorrectionDisabled()
+                        HStack(spacing: 10) {
+                            Button { renameNote = nil } label: {
+                                Text("Cancel")
+                                    .font(.inter(14, weight: .bold)).foregroundColor(.textTertiary)
+                                    .frame(maxWidth: .infinity).padding(.vertical, 13)
+                                    .background(Color.white.opacity(0.05))
+                                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.12), lineWidth: 1))
+                                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                            }
+                            Button {
+                                let trimmed = renameText.trimmingCharacters(in: .whitespaces)
+                                guard !trimmed.isEmpty, let note = renameNote else { return }
+                                guard let entry = LocalNoteStore.shared.entries.first(where: { $0.id == note.id }) else { return }
+                                LocalNoteStore.shared.update(LocalNoteEntry(id: entry.id, itemId: entry.itemId, label: trimmed, text: entry.text, promptType: entry.promptType, createdAt: entry.createdAt))
+                                renameNote = nil
+                                reloadNotes()
+                            } label: {
+                                Text("Rename")
+                                    .font(.inter(14, weight: .bold)).foregroundColor(.white)
+                                    .frame(maxWidth: .infinity).padding(.vertical, 13)
+                                    .background(LinearGradient(colors: [Color.brandBlue, Color.brandCyan], startPoint: .leading, endPoint: .trailing))
+                                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                            }
+                            .disabled(renameText.trimmingCharacters(in: .whitespaces).isEmpty)
+                        }
+                    }
+                    .padding(24)
+                    .background(Color(hex: "#081221"))
+                    .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.stageNotes.opacity(0.25), lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 22))
+                    .shadow(color: Color.stageNotes.opacity(0.15), radius: 20)
+                    .padding(.horizontal, 24)
+                    Spacer()
+                }
+                .zIndex(21)
             }
 
             // Process confirm card
@@ -377,8 +438,8 @@ struct LocalNoteRow: View {
     var onDraftNote: () -> Void = {}
     var onRenamed: () -> Void = {}
     var onMoved: () -> Void = {}
+    var onRenameRequested: () -> Void = {}
 
-    @State private var showRename = false
     @State private var showMoreInfo = false
     @State private var showMoveTo = false
     @State private var showDraftPrompts = false
@@ -442,7 +503,7 @@ struct LocalNoteRow: View {
                         ShareLink(item: note.text) { Label("Share…", systemImage: "square.and.arrow.up") }
                     }
                     Section("Manage") {
-                        Button { showRename = true } label: { Label("Rename", systemImage: "pencil") }
+                        Button { onRenameRequested() } label: { Label("Rename", systemImage: "pencil") }
                         Button { showMoveTo = true } label: { Label("Move to…", systemImage: "folder") }
                         Button(role: .destructive) { DeleteConfirmPresenter.show(itemName: note.label, onDelete: onDelete) } label: { Label("Delete", systemImage: "trash") }
                     }
@@ -462,16 +523,6 @@ struct LocalNoteRow: View {
         .overlay(alignment: .bottom) { Rectangle().fill(Color.white.opacity(0.05)).frame(height: 1) }
         .contentShape(Rectangle())
         .onTapGesture { onSelect() }
-        .sheet(isPresented: $showRename) {
-            RenameRecordingSheet(currentName: note.label, title: "Rename Note") { newName in
-                guard let entry = LocalNoteStore.shared.entries.first(where: { $0.id == note.id }) else { return }
-                LocalNoteStore.shared.update(LocalNoteEntry(
-                    id: entry.id, itemId: entry.itemId, label: newName,
-                    text: entry.text, promptType: entry.promptType, createdAt: entry.createdAt
-                ))
-                onRenamed()
-            }
-        }
         .sheet(isPresented: $showMoreInfo) {
             NoteMoreInfoSheet(note: note)
         }

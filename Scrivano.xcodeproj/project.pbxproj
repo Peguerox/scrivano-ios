@@ -581,7 +581,7 @@
 				CODE_SIGN_ENTITLEMENTS = Scrivano/Resources/Scrivano.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 25;
+				CURRENT_PROJECT_VERSION = 26;
 				DEVELOPMENT_TEAM = 6MM4NQJ88Q;
 				INFOPLIST_FILE = Scrivano/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
@@ -607,7 +607,7 @@
 				CODE_SIGN_ENTITLEMENTS = Scrivano/Resources/Scrivano.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 25;
+				CURRENT_PROJECT_VERSION = 26;
 				DEVELOPMENT_TEAM = 6MM4NQJ88Q;
 				INFOPLIST_FILE = Scrivano/Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;

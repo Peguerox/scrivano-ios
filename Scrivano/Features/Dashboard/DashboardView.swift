@@ -65,6 +65,10 @@ struct DashboardView: View {
     @State private var showRenameCollectionCard    = false
     @State private var renameCollectionText        = ""
 
+    // Rename item overlay
+    @State private var renameItem: Item? = nil
+    @State private var renameItemText = ""
+
     // Prompt database
     @State private var showPromptDatabase          = false
 
@@ -192,6 +196,7 @@ struct DashboardView: View {
             createListCard
             renameCollectionCard
             deleteCollectionCard
+            renameItemCard
         }
     }
 
@@ -698,6 +703,68 @@ struct DashboardView: View {
         }
     }
 
+    // MARK: - Rename item card
+
+    @ViewBuilder
+    private var renameItemCard: some View {
+        if renameItem != nil {
+            Color.black.opacity(0.65).ignoresSafeArea()
+                .onTapGesture { renameItem = nil }
+                .zIndex(50)
+            VStack {
+                Spacer()
+                VStack(spacing: 16) {
+                    Text("Rename Item")
+                        .font(.inter(16, weight: .heavy))
+                        .foregroundColor(.textPrimary)
+                    TextField("", text: $renameItemText)
+                        .font(.inter(14))
+                        .foregroundColor(.textPrimary)
+                        .padding(.horizontal, 14).padding(.vertical, 12)
+                        .background(Color.white.opacity(0.06))
+                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.brandCyan.opacity(0.35), lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .autocorrectionDisabled()
+                    HStack(spacing: 10) {
+                        Button { renameItem = nil } label: {
+                            Text("Cancel")
+                                .font(.inter(14, weight: .bold)).foregroundColor(.textTertiary)
+                                .frame(maxWidth: .infinity).padding(.vertical, 13)
+                                .background(Color.white.opacity(0.05))
+                                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.12), lineWidth: 1))
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                        Button {
+                            let trimmed = renameItemText.trimmingCharacters(in: .whitespaces)
+                            guard !trimmed.isEmpty, let item = renameItem else { return }
+                            let stored = LocalStoredItem(id: item.id, name: trimmed, collection: item.collection, collectionId: item.collectionId, createdAt: item.createdAt)
+                            LocalItemStore.shared.save(stored)
+                            if let idx = vm.items.firstIndex(where: { $0.id == item.id }) {
+                                vm.items[idx] = vm.items[idx].renamed(to: trimmed)
+                            }
+                            renameItem = nil
+                        } label: {
+                            Text("Rename")
+                                .font(.inter(14, weight: .bold)).foregroundColor(.white)
+                                .frame(maxWidth: .infinity).padding(.vertical, 13)
+                                .background(LinearGradient(colors: [Color.brandBlue, Color.brandCyan], startPoint: .leading, endPoint: .trailing))
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                        .disabled(renameItemText.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
+                }
+                .padding(24)
+                .background(Color(hex: "#081221"))
+                .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.brandCyan.opacity(0.25), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 22))
+                .shadow(color: Color.brandCyan.opacity(0.15), radius: 20)
+                .padding(.horizontal, 24)
+                Spacer()
+            }
+            .zIndex(51)
+        }
+    }
+
     // MARK: - Delete collection card
 
     @ViewBuilder
@@ -899,7 +966,8 @@ struct DashboardView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { showDocImporter = true }
             },
             isInProcessMode: showProcessItemsMode,
-            isProcessSelected: processItemsSelected.contains(item.id)
+            isProcessSelected: processItemsSelected.contains(item.id),
+            onRenameRequested: { renameItem = item; renameItemText = item.name }
         )
         .opacity(showProcessItemsMode && !eligible ? 0.35 : 1.0)
     }

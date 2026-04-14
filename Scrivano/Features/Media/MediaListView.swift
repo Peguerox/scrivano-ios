@@ -244,6 +244,11 @@ struct MediaListView: View {
     @State private var showBulkMove = false
     @State private var showDeleteConfirm = false
 
+    // Rename overlay
+    @State private var renameRecording: LocalRecordingEntry? = nil
+    @State private var renameImage: LocalImageEntry? = nil
+    @State private var renameMediaText = ""
+
     private var inSelectionMode: Bool { pendingAction != nil }
 
     private var allAudioIds: [String] { localRecordings.map(\.id) }
@@ -307,52 +312,8 @@ struct MediaListView: View {
                 // File list
                 ScrollView(showsIndicators: false) {
                     LazyVStack(spacing: 0) {
-                        ForEach(Array(localRecordings.enumerated()), id: \.element.id) { idx, rec in
-                            SwipeToDelete(onDelete: { deleteRecording(rec) }) {
-                                LocalAudioRow(
-                                    entry: rec,
-                                    index: idx + 1,
-                                    itemName: item.name,
-                                    isSelected: selected.contains(rec.id),
-                                    isTranscribing: transcriptionMgr.transcribingRecordingId == rec.id,
-                                    isTranscribed: transcriptionMgr.transcribedRecordingIds.contains(rec.id),
-                                    isFailed: transcriptionMgr.failedRecordingIds.contains(rec.id),
-                                    isQueued: transcriptionMgr.queuedRecordingIds.contains(rec.id),
-                                    isConverting: convertingRecordingId == rec.id,
-                                    onSelect: { toggleSelect(rec.id) },
-                                    onPlay: { playerInitialEditMode = .none; playerRecording = rec },
-                                    onSplit: { playerInitialEditMode = .split; playerRecording = rec },
-                                    onTrim:  { playerInitialEditMode = .trim;  playerRecording = rec },
-                                    onDelete: { deleteRecording(rec) },
-                                    onRenamed: { localRecordings = LocalRecordingStore.shared.recordings(for: item.id) },
-                                    onTranscribe: {
-                                        selected = [rec.id]
-                                        validateAndProceed()
-                                    },
-                                    onMoveTo: { localRecordings = LocalRecordingStore.shared.recordings(for: item.id) },
-                                    onConvert: { convertRecordingToM4A(rec) }
-                                )
-                            }
-                        }
-
-                        ForEach(Array(imageFiles.enumerated()), id: \.element.id) { idx, img in
-                            SwipeToDelete(onDelete: { deleteImage(img) }) {
-                                ImageFileRow(
-                                    imageFile: img,
-                                    item: item,
-                                    index: idx + 1,
-                                    isSelected: selectedImages.contains(img.id),
-                                    isQueued: imageMgr.pendingImageIds.contains(img.id),
-                                    onSelect: {
-                                        if selectedImages.contains(img.id) { selectedImages.remove(img.id) }
-                                        else { selectedImages.insert(img.id) }
-                                    },
-                                    onDelete: { deleteImage(img) },
-                                    onMoved: { imageFiles = LocalImageStore.shared.images(for: item.id) },
-                                    onRenamed: { imageFiles = LocalImageStore.shared.images(for: item.id) }
-                                )
-                            }
-                        }
+                        audioFileRows
+                        imageFileRows
                     }
                 }
                 .overlay {
@@ -518,6 +479,8 @@ struct MediaListView: View {
             }
 
             if isLoading { LoadingOverlay(message: "Loading files…") }
+
+            renameMediaOverlay
 
             // Process confirm card
             if showProcessConfirm {
@@ -814,6 +777,127 @@ struct MediaListView: View {
         if selected.contains(id) { selected.remove(id) } else { selected.insert(id) }
     }
 
+    @ViewBuilder
+    private var audioFileRows: some View {
+        ForEach(Array(localRecordings.enumerated()), id: \.element.id) { idx, rec in
+            SwipeToDelete(onDelete: { deleteRecording(rec) }) {
+                LocalAudioRow(
+                    entry: rec, index: idx + 1, itemName: item.name,
+                    isSelected: selected.contains(rec.id),
+                    isTranscribing: transcriptionMgr.transcribingRecordingId == rec.id,
+                    isTranscribed: transcriptionMgr.transcribedRecordingIds.contains(rec.id),
+                    isFailed: transcriptionMgr.failedRecordingIds.contains(rec.id),
+                    isQueued: transcriptionMgr.queuedRecordingIds.contains(rec.id),
+                    isConverting: convertingRecordingId == rec.id,
+                    onSelect: { toggleSelect(rec.id) },
+                    onPlay: { playerInitialEditMode = .none; playerRecording = rec },
+                    onSplit: { playerInitialEditMode = .split; playerRecording = rec },
+                    onTrim:  { playerInitialEditMode = .trim;  playerRecording = rec },
+                    onDelete: { deleteRecording(rec) },
+                    onRenamed: { localRecordings = LocalRecordingStore.shared.recordings(for: item.id) },
+                    onTranscribe: { selected = [rec.id]; validateAndProceed() },
+                    onMoveTo: { localRecordings = LocalRecordingStore.shared.recordings(for: item.id) },
+                    onConvert: { convertRecordingToM4A(rec) },
+                    onRenameRequested: {
+                        let lbl = rec.label ?? ""
+                        renameRecording = rec
+                        renameMediaText = lbl.hasSuffix(".m4a") ? String(lbl.dropLast(4)) : lbl
+                    }
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var imageFileRows: some View {
+        ForEach(Array(imageFiles.enumerated()), id: \.element.id) { idx, img in
+            SwipeToDelete(onDelete: { deleteImage(img) }) {
+                ImageFileRow(
+                    imageFile: img, item: item, index: idx + 1,
+                    isSelected: selectedImages.contains(img.id),
+                    isQueued: imageMgr.pendingImageIds.contains(img.id),
+                    onSelect: {
+                        if selectedImages.contains(img.id) { selectedImages.remove(img.id) }
+                        else { selectedImages.insert(img.id) }
+                    },
+                    onDelete: { deleteImage(img) },
+                    onMoved: { imageFiles = LocalImageStore.shared.images(for: item.id) },
+                    onRenamed: { imageFiles = LocalImageStore.shared.images(for: item.id) },
+                    onRenameRequested: { renameImage = img; renameMediaText = img.name }
+                )
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var renameMediaOverlay: some View {
+        if renameRecording != nil || renameImage != nil {
+            Color.black.opacity(0.65).ignoresSafeArea()
+                .onTapGesture { renameRecording = nil; renameImage = nil }
+                .zIndex(20)
+            VStack {
+                Spacer()
+                renameMediaCard
+                Spacer()
+            }
+            .zIndex(21)
+        }
+    }
+
+    private var renameMediaCard: some View {
+        VStack(spacing: 16) {
+            Text(renameRecording != nil ? "Rename Audio" : "Rename Image")
+                .font(.inter(16, weight: .heavy))
+                .foregroundColor(.textPrimary)
+            TextField("", text: $renameMediaText)
+                .font(.inter(14))
+                .foregroundColor(.textPrimary)
+                .padding(.horizontal, 14).padding(.vertical, 12)
+                .background(Color.white.opacity(0.06))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.stageMedia.opacity(0.35), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .autocorrectionDisabled()
+            HStack(spacing: 10) {
+                Button { renameRecording = nil; renameImage = nil } label: {
+                    Text("Cancel")
+                        .font(.inter(14, weight: .bold)).foregroundColor(.textTertiary)
+                        .frame(maxWidth: .infinity).padding(.vertical, 13)
+                        .background(Color.white.opacity(0.05))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.white.opacity(0.12), lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                Button {
+                    let trimmed = renameMediaText.trimmingCharacters(in: .whitespaces)
+                    guard !trimmed.isEmpty else { return }
+                    if var rec = renameRecording {
+                        rec.label = trimmed.hasSuffix(".m4a") ? trimmed : "\(trimmed).m4a"
+                        LocalRecordingStore.shared.update(rec)
+                        localRecordings = LocalRecordingStore.shared.recordings(for: item.id)
+                        renameRecording = nil
+                    } else if var img = renameImage {
+                        img.name = trimmed
+                        LocalImageStore.shared.update(img)
+                        imageFiles = LocalImageStore.shared.images(for: item.id)
+                        renameImage = nil
+                    }
+                } label: {
+                    Text("Rename")
+                        .font(.inter(14, weight: .bold)).foregroundColor(.white)
+                        .frame(maxWidth: .infinity).padding(.vertical, 13)
+                        .background(LinearGradient(colors: [Color.brandBlue, Color.brandCyan], startPoint: .leading, endPoint: .trailing))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .disabled(renameMediaText.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+        .padding(24)
+        .background(Color(hex: "#081221"))
+        .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.stageMedia.opacity(0.25), lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 22))
+        .shadow(color: Color.stageMedia.opacity(0.15), radius: 20)
+        .padding(.horizontal, 24)
+    }
+
     private func deleteRecording(_ rec: LocalRecordingEntry) {
         selected.remove(rec.id)
         TrashStore.shared.trashRecording(rec, itemName: item.name)
@@ -1057,9 +1141,8 @@ struct LocalAudioRow: View {
     var onTranscribe: () -> Void = {}
     var onMoveTo: () -> Void = {}
     var onConvert: () -> Void = {}
+    var onRenameRequested: () -> Void = {}
 
-    @State private var showRename = false
-    @State private var renameText = ""
     @State private var showMoreInfo = false
     @State private var showMoveTo = false
     @State private var hourglassFlipped = false
@@ -1153,10 +1236,7 @@ struct LocalAudioRow: View {
                         }
                     }
                     Section("Manage") {
-                        Button {
-                            renameText = displayName.hasSuffix(".m4a") ? String(displayName.dropLast(4)) : displayName
-                            showRename = true
-                        } label: { Label("Rename", systemImage: "pencil") }
+                        Button { onRenameRequested() } label: { Label("Rename", systemImage: "pencil") }
                         Button { showMoveTo = true } label: { Label("Move to…", systemImage: "folder") }
                         Button(role: .destructive) { DeleteConfirmPresenter.show(itemName: displayName, onDelete: onDelete) } label: { Label("Delete", systemImage: "trash") }
                     }
@@ -1178,14 +1258,6 @@ struct LocalAudioRow: View {
         .overlay(alignment: .bottom) { Rectangle().fill(Color.white.opacity(0.05)).frame(height: 1) }
         .contentShape(Rectangle())
         .onTapGesture { onSelect() }
-        .sheet(isPresented: $showRename) {
-            RenameRecordingSheet(currentName: renameText, title: "Rename Audio") { newName in
-                var updated = entry
-                updated.label = newName.hasSuffix(".m4a") ? newName : "\(newName).m4a"
-                LocalRecordingStore.shared.update(updated)
-                onRenamed()
-            }
-        }
         .sheet(isPresented: $showMoreInfo) {
             AudioMoreInfoSheet(entry: entry, displayName: displayName)
         }
@@ -2050,13 +2122,13 @@ struct ImageFileRow: View {
     var onDelete: () -> Void = {}
     var onMoved: () -> Void = {}
     var onRenamed: () -> Void = {}
+    var onRenameRequested: () -> Void = {}
 
     @ObservedObject private var imageMgr = ImageProcessingManager.shared
 
     @State private var hourglassFlipped = false
     @State private var showViewer = false
     @State private var showPromptImage = false
-    @State private var showRename = false
     @State private var showMoreInfo = false
     @State private var showMoveTo = false
     private let imageColor = Color.stageMedia
@@ -2135,7 +2207,7 @@ struct ImageFileRow: View {
                         }
                     }
                     Section("Manage") {
-                        Button { showRename = true } label: { Label("Rename", systemImage: "pencil") }
+                        Button { onRenameRequested() } label: { Label("Rename", systemImage: "pencil") }
                         Button { showMoveTo = true } label: { Label("Move to…", systemImage: "folder") }
                         Button(role: .destructive) { DeleteConfirmPresenter.show(itemName: displayName, onDelete: onDelete) } label: { Label("Delete", systemImage: "trash") }
                     }
@@ -2179,14 +2251,6 @@ struct ImageFileRow: View {
                             .font(.inter(14, weight: .semibold)).foregroundColor(.brandCyan)
                     }
                 }
-            }
-        }
-        .sheet(isPresented: $showRename) {
-            RenameRecordingSheet(currentName: imageFile.name, title: "Rename Image") { newName in
-                var updated = imageFile
-                updated.name = newName
-                LocalImageStore.shared.update(updated)
-                onRenamed()
             }
         }
         .sheet(isPresented: $showMoveTo) {

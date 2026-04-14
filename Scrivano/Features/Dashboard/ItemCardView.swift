@@ -18,10 +18,10 @@ struct ItemCardView: View {
     var onImportDocTapped: () -> Void = {}
     var isInProcessMode: Bool = false
     var isProcessSelected: Bool = false
+    var onRenameRequested: () -> Void = {}
 
     @ObservedObject private var transcriptionMgr: TranscriptionManager = TranscriptionManager.shared
     @ObservedObject private var notesMgr: NoteGenerationManager = NoteGenerationManager.shared
-    @State private var showRename = false
     @State private var showClearConfirm = false
 
     private var mediaCount: Int { localAudioCount }
@@ -42,20 +42,6 @@ struct ItemCardView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { onTap() }
-        .sheet(isPresented: $showRename) {
-            RenameRecordingSheet(currentName: item.name, title: "Rename Item") { newName in
-                let stored = LocalStoredItem(
-                    id: item.id, name: newName,
-                    collection: item.collection,
-                    collectionId: item.collectionId,
-                    createdAt: item.createdAt
-                )
-                LocalItemStore.shared.save(stored)
-                if let idx = vm.items.firstIndex(where: { $0.id == item.id }) {
-                    vm.items[idx] = vm.items[idx].renamed(to: newName)
-                }
-            }
-        }
         .sheet(isPresented: $showClearConfirm) { clearConfirmSheet }
     }
 
@@ -153,7 +139,7 @@ struct ItemCardView: View {
                         Button { onImportDocTapped() } label: {
                             Label("Import Document", systemImage: "doc.badge.plus")
                         }
-                        Button { showRename = true } label: { Label("Rename Item", systemImage: "pencil") }
+                        Button { onRenameRequested() } label: { Label("Rename Item", systemImage: "pencil") }
                         Divider()
                         Button(role: .destructive) { showClearConfirm = true } label: {
                             Label("Clear All Content", systemImage: "trash.fill")
