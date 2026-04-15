@@ -183,6 +183,7 @@ struct BackupView: View {
             // Copy to temp so we keep access after the picker closes
             let tmp = FileManager.default.temporaryDirectory
                 .appendingPathComponent(url.lastPathComponent)
+            try? FileManager.default.removeItem(at: tmp)
             try? FileManager.default.copyItem(at: url, to: tmp)
             pendingRestoreURL = FileManager.default.fileExists(atPath: tmp.path) ? tmp : url
             restoreError = nil

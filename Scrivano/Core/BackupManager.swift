@@ -1,10 +1,11 @@
 import Foundation
 import CryptoKit
+import Compression
 
 // MARK: - Backup Package
 
 struct BackupPackage: Codable {
-    var version: Int = 2
+    var version: Int = 3
     let createdAt: Date
     let appVersion: String
     let collections: [ScrivanoCollection]
@@ -106,7 +107,7 @@ final class BackupManager: ObservableObject {
                 }
             }
 
-            guard let compressed = try? (archive as NSData).compressed(using: .lzfse) as Data
+            guard let compressed = try? (archive as NSData).compressed(using: .zlib) as Data
             else { throw BackupError.encodingFailed }
             let encrypted = try BackupManager.encryptData(compressed, password: password)
 
@@ -135,14 +136,24 @@ final class BackupManager: ObservableObject {
         } catch {
             throw BackupError.wrongPassword
         }
-        guard let archive = try? (compressed as NSData).decompressed(using: .lzfse) as Data
-        else { throw BackupError.invalidFile }
+        // Try each decompressor in order — no magic-byte guessing.
+        // Each returns nil on wrong-format data so falling through is safe.
+        let archive: Data
+        if let d = try? (compressed as NSData).decompressed(using: .zlib) as Data {
+            archive = d
+        } else if let d = try? Self.gzipDecompress(compressed) {
+            archive = d
+        } else if let d = try? (compressed as NSData).decompressed(using: .lzfse) as Data {
+            archive = d
+        } else {
+            throw BackupError.invalidFile
+        }
 
         // Parse archive: [UInt32 jsonLen][json][audio segments...]
         guard archive.count >= 4 else { throw BackupError.invalidFile }
-        let jsonLen = Int(UInt32(littleEndian: archive[0..<4].withUnsafeBytes { $0.load(as: UInt32.self) }))
+        let jsonLen = Int(Self.readLE(UInt32.self, from: archive, at: archive.startIndex))
         guard archive.count >= 4 + jsonLen else { throw BackupError.invalidFile }
-        let jsonData = archive[4 ..< 4 + jsonLen]
+        let jsonData = archive[archive.startIndex + 4 ..< archive.startIndex + 4 + jsonLen]
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
@@ -153,17 +164,17 @@ final class BackupManager: ObservableObject {
         var audioMap: [String: Data] = [:]
         if pkg.version >= 2 {
             // Binary segments follow the JSON block
-            var cursor = 4 + jsonLen
-            while cursor + 4 <= archive.count {
-                let pathLen = Int(UInt32(littleEndian: archive[cursor ..< cursor + 4].withUnsafeBytes { $0.load(as: UInt32.self) }))
+            var cursor = archive.startIndex + 4 + jsonLen
+            while cursor + 4 <= archive.endIndex {
+                let pathLen = Int(Self.readLE(UInt32.self, from: archive, at: cursor))
                 cursor += 4
-                guard cursor + pathLen + 8 <= archive.count else { break }
+                guard cursor + pathLen + 8 <= archive.endIndex else { break }
                 let pathData = archive[cursor ..< cursor + pathLen]
                 cursor += pathLen
                 guard let path = String(data: pathData, encoding: .utf8) else { break }
-                let dataLen = Int(UInt64(littleEndian: archive[cursor ..< cursor + 8].withUnsafeBytes { $0.load(as: UInt64.self) }))
+                let dataLen = Int(Self.readLE(UInt64.self, from: archive, at: cursor))
                 cursor += 8
-                guard cursor + dataLen <= archive.count else { break }
+                guard cursor + dataLen <= archive.endIndex else { break }
                 audioMap[path] = archive[cursor ..< cursor + dataLen]
                 cursor += dataLen
             }
@@ -308,6 +319,141 @@ final class BackupManager: ObservableObject {
         raw.append(Data("scrivano-backup-salt-v1".utf8))
         return SymmetricKey(data: SHA256.hash(data: raw))
     }
+
+    // MARK: - Safe integer reads (alignment-safe)
+
+    /// Reads a little-endian integer from `data` at the given index without
+    /// assuming pointer alignment — Data sub-slices are not guaranteed to be aligned.
+    nonisolated private static func readLE<T: FixedWidthInteger>(_ type: T.Type, from data: Data, at index: Data.Index) -> T {
+        var value = T.zero
+        withUnsafeMutableBytes(of: &value) { dest in
+            _ = data.copyBytes(to: dest, from: index ..< index + MemoryLayout<T>.size)
+        }
+        return T(littleEndian: value)
+    }
+
+    // MARK: - gzip (RFC 1952) helpers
+
+    /// Compress using gzip (RFC 1952): 10-byte header + raw DEFLATE + CRC32 + ISIZE.
+    /// Uses NSData.compressed(.zlib) to get zlib-wrapped deflate, strips the 2-byte zlib
+    /// header and 4-byte Adler32 trailer, then wraps in a proper gzip envelope.
+    nonisolated static func gzipCompress(_ data: Data) throws -> Data {
+        guard let zlibData = try? (data as NSData).compressed(using: .zlib) as Data,
+              zlibData.count >= 6
+        else { throw BackupError.encodingFailed }
+
+        // zlib format: [CMF][FLG][raw DEFLATE][Adler32 4 bytes]
+        let rawDeflate = zlibData[2 ..< zlibData.count - 4]
+
+        // gzip fixed 10-byte header
+        // ID1=0x1f ID2=0x8b CM=8(deflate) FLG=0 MTIME=0(4B) XFL=0 OS=255(unknown)
+        var gzip = Data([0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff])
+        gzip.append(rawDeflate)
+
+        var crc = crc32Checksum(data)
+        gzip.append(Data(bytes: &crc, count: 4))           // CRC32 LE
+        var isize = UInt32(data.count & 0xffff_ffff).littleEndian
+        gzip.append(Data(bytes: &isize, count: 4))         // ISIZE LE (mod 2^32)
+
+        return gzip
+    }
+
+    /// Decompress gzip (RFC 1952) data. Parses the header, extracts raw DEFLATE,
+    /// prepends a valid zlib header, then decompresses using compression_stream
+    /// WITHOUT COMPRESSION_STREAM_FINALIZE. This bypasses the Adler32 check:
+    /// after processing the last DEFLATE block the stream waits for the Adler32
+    /// but returns COMPRESSION_STATUS_OK (needs more input) rather than an error,
+    /// and the decompressed bytes are already in the output buffer.
+    nonisolated static func gzipDecompress(_ data: Data) throws -> Data {
+        guard data.count >= 18,
+              data[0] == 0x1f, data[1] == 0x8b,
+              data[2] == 8                               // CM must be 8 (deflate)
+        else { throw BackupError.invalidFile }
+
+        let flg = data[3]
+        var offset = 10                                   // skip fixed 10-byte header
+
+        if flg & 0x04 != 0 {                              // FEXTRA
+            guard offset + 2 <= data.count else { throw BackupError.invalidFile }
+            let xlen = Int(Self.readLE(UInt16.self, from: data, at: data.startIndex + offset))
+            offset += 2 + xlen
+        }
+        if flg & 0x08 != 0 {                              // FNAME (null-terminated)
+            while offset < data.count && data[offset] != 0 { offset += 1 }
+            offset += 1
+        }
+        if flg & 0x10 != 0 {                              // FCOMMENT (null-terminated)
+            while offset < data.count && data[offset] != 0 { offset += 1 }
+            offset += 1
+        }
+        if flg & 0x02 != 0 { offset += 2 }               // FHCRC
+
+        guard data.count >= offset + 8 else { throw BackupError.invalidFile }
+        let trailerStart = data.endIndex - 8
+        let isize = Int(Self.readLE(UInt32.self, from: data, at: trailerStart + 4))
+
+        // Build: [zlib header 0x78 0x9C] + [raw DEFLATE]
+        // (0x78*256 + 0x9C) % 31 == 0 — valid zlib CMF/FLG pair
+        // We intentionally omit the 4-byte Adler32 trailer so the stream
+        // stalls waiting for it (COMPRESSION_STATUS_OK) instead of failing.
+        var zlibInput = Data([0x78, 0x9C])
+        zlibInput.append(data[offset ..< trailerStart])
+
+        let outSize = max(isize, (data.count - offset) * 4, 65536)
+        var dst = [UInt8](repeating: 0, count: outSize)
+
+        // Swift requires non-nil values for the non-optional pointer fields at init time.
+        // compression_stream_init only touches `state`; src/dst are overwritten in the closure.
+        var dummyDst: UInt8 = 0
+        var dummySrc: UInt8 = 0
+        var stream = compression_stream(dst_ptr: &dummyDst, dst_size: 0,
+                                        src_ptr: &dummySrc, src_size: 0, state: nil)
+        guard compression_stream_init(&stream, COMPRESSION_STREAM_DECODE, COMPRESSION_ZLIB)
+                == COMPRESSION_STATUS_OK
+        else { throw BackupError.invalidFile }
+        defer { compression_stream_destroy(&stream) }
+
+        // Both input and output pointers must be obtained inside their respective
+        // withUnsafe… closures so they remain valid for the duration of the call.
+        let written = try dst.withUnsafeMutableBufferPointer { dstBuf throws -> Int in
+            try zlibInput.withUnsafeBytes { srcBuf throws -> Int in
+                guard let srcPtr = srcBuf.baseAddress,
+                      let dstPtr = dstBuf.baseAddress
+                else { throw BackupError.invalidFile }
+                stream.src_ptr  = srcPtr.assumingMemoryBound(to: UInt8.self)
+                stream.src_size = zlibInput.count
+                stream.dst_ptr  = dstPtr
+                stream.dst_size = outSize
+                // No COMPRESSION_STREAM_FINALIZE → Adler32 is never demanded
+                let status = compression_stream_process(&stream, 0)
+                guard status == COMPRESSION_STATUS_OK || status == COMPRESSION_STATUS_END
+                else { throw BackupError.invalidFile }
+                return outSize - stream.dst_size
+            }
+        }
+
+        guard written > 0 else { throw BackupError.invalidFile }
+        return Data(dst[0 ..< written])
+    }
+
+    /// Pure-Swift CRC32 (IEEE 802.3 polynomial).
+    nonisolated private static func crc32Checksum(_ data: Data) -> UInt32 {
+        var crc: UInt32 = 0xffff_ffff
+        for byte in data {
+            let idx = Int((crc ^ UInt32(byte)) & 0xff)
+            crc = crc32Table[idx] ^ (crc >> 8)
+        }
+        return (crc ^ 0xffff_ffff).littleEndian
+    }
+
+    // Pre-computed CRC32 lookup table (IEEE 802.3 / gzip polynomial 0xEDB88320)
+    nonisolated private static let crc32Table: [UInt32] = {
+        (0..<256).map { n -> UInt32 in
+            var c = UInt32(n)
+            for _ in 0..<8 { c = (c & 1) != 0 ? (0xEDB8_8320 ^ (c >> 1)) : (c >> 1) }
+            return c
+        }
+    }()
 }
 
 // MARK: - Notification

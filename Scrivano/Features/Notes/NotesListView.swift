@@ -470,7 +470,7 @@ struct LocalNoteRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading).padding(.trailing, 8)
 
-            HStack(spacing: 6) {
+            HStack(spacing: 10) {
                 // Processing state indicator
                 ZStack {
                     if isProcessing {

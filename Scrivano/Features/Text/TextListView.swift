@@ -784,7 +784,7 @@ struct LocalTextRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.trailing, 8)
 
-            HStack(spacing: 6) {
+            HStack(spacing: 10) {
                 // Processing state indicator — colour matches the file type
                 ZStack {
                     if isProcessing {

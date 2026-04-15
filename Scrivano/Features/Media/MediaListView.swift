@@ -1194,7 +1194,7 @@ struct LocalAudioRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.trailing, 8)
 
-            HStack(spacing: 6) {
+            HStack(spacing: 10) {
                 ZStack {
                     if isConverting {
                         ProgressView().progressViewStyle(.circular).tint(.stageText)
@@ -2166,7 +2166,7 @@ struct ImageFileRow: View {
                 .padding(.trailing, 8)
                 .onTapGesture { onSelect() }
 
-            HStack(spacing: 6) {
+            HStack(spacing: 10) {
                 // Status indicator — same position/pattern as audio rows
                 let isProcessing = imageMgr.processingImageId == imageFile.id
                 let isCompleted  = imageMgr.completedImageIds.contains(imageFile.id)

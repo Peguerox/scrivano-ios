@@ -1332,6 +1332,10 @@ struct DashboardView: View {
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showCollectionActiveError = true }
                             return
                         }
+                        guard vm.collections.count > 1 else {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showCollectionMinOne = true }
+                            return
+                        }
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showDeleteCollectionCard = true }
                     } label: { Label("Delete Collection", systemImage: "trash") }
                 }
