@@ -2,6 +2,7 @@ import SwiftUI
 
 struct APIKeyView: View {
     @EnvironmentObject var auth: AuthManager
+    @EnvironmentObject var langMgr: LanguageManager
     @Environment(\.dismiss) var dismiss
 
     @State private var keyText: String = ""
@@ -35,10 +36,10 @@ struct APIKeyView: View {
                             .padding(.top, 60)
 
                             VStack(spacing: 6) {
-                                Text("Your OpenAI API Key")
+                                Text(langMgr.t("settings.apiKey.title"))
                                     .font(.inter(18, weight: .heavy))
                                     .foregroundColor(.textPrimary)
-                                Text("Your key is encrypted and stored securely on our servers. You can also set it from the web app.")
+                                Text(langMgr.t("settings.apiKey.encrypted"))
                                     .font(.inter(13))
                                     .foregroundColor(.textSecondary)
                                     .multilineTextAlignment(.center)
@@ -53,7 +54,7 @@ struct APIKeyView: View {
                             HStack(spacing: 10) {
                                 Image(systemName: "checkmark.shield.fill")
                                     .foregroundColor(Color(hex: "#22c55e"))
-                                Text("API key is saved")
+                                Text(langMgr.t("settings.apiKey.saved"))
                                     .font(.inter(13, weight: .semibold))
                                     .foregroundColor(Color(hex: "#22c55e"))
                                 Spacer()
@@ -140,7 +141,7 @@ struct APIKeyView: View {
 
                             if auth.hasOpenAIKey {
                                 Button { showRemoveConfirm = true } label: {
-                                    Text("Remove Key")
+                                    Text(langMgr.t("settings.apiKey.removeKey"))
                                         .font(.inter(14, weight: .semibold))
                                         .foregroundColor(.danger)
                                         .frame(maxWidth: .infinity)
@@ -168,7 +169,7 @@ struct APIKeyView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Your OpenAI key will be deleted from the server.")
+            Text(langMgr.t("settings.apiKey.removeWarning"))
         }
     }
 

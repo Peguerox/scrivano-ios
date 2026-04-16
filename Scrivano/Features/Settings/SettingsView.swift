@@ -3,6 +3,7 @@ import UIKit
 
 struct SettingsView: View {
     @EnvironmentObject var auth: AuthManager
+    @EnvironmentObject var langMgr: LanguageManager
     @Environment(\.dismiss) var dismiss
     @State private var showHelp = false
     @State private var showCredits = false
@@ -21,6 +22,7 @@ struct SettingsView: View {
     @State private var deleteError: String? = nil
     @State private var showLog = false
     @State private var showTrash = false
+    @State private var showLanguage = false
     @State private var trashCount = 0
     @State private var showBackup = false
     @State private var showAPIKey = false
@@ -44,7 +46,7 @@ struct SettingsView: View {
                                 .clipShape(Circle())
                         }
                         Spacer()
-                        Text("Settings")
+                        Text(langMgr.t("settings.title"))
                             .font(.inter(16, weight: .heavy))
                             .foregroundColor(.textPrimary)
                         Spacer()
@@ -66,23 +68,23 @@ struct SettingsView: View {
                             .padding(.bottom, 4)
 
                         // Content section
-                        settingsGroup(title: "Content") {
-                            NavRow(icon: "✦", iconColor: Color(hex: "#a78bfa"), title: "Prompt Database", subtitle: "Manage AI prompt library") { showPrompts = true }
+                        settingsGroup(title: langMgr.t("settings.section.content")) {
+                            NavRow(icon: "✦", iconColor: Color(hex: "#a78bfa"), title: langMgr.t("settings.promptDatabase.title"), subtitle: langMgr.t("settings.promptDatabase.subtitle")) { showPrompts = true }
                             Divider().background(Color.white.opacity(0.05)).padding(.leading, 68)
-                            NavRow(icon: "🤖", iconColor: .brandBlue, title: "Automation", subtitle: "Auto-process pipeline stages") { showAutomation = true }
+                            NavRow(icon: "🤖", iconColor: .brandBlue, title: langMgr.t("settings.automation.title"), subtitle: langMgr.t("settings.automation.subtitle")) { showAutomation = true }
                             Divider().background(Color.white.opacity(0.05)).padding(.leading, 68)
-                            NavRow(icon: "🗑", iconColor: .danger, title: "Recycle Bin",
-                                   subtitle: trashCount > 0 ? "\(trashCount) item\(trashCount == 1 ? "" : "s") in trash" : "Empty") { showTrash = true }
+                            NavRow(icon: "🗑", iconColor: .danger, title: langMgr.t("settings.recycleBin.title"),
+                                   subtitle: trashCount > 0 ? "\(trashCount) \(trashCount == 1 ? "item" : "items")" : langMgr.t("settings.recycleBin.subtitle.empty")) { showTrash = true }
                         }
                         .padding(.top, 3)
 
                         // System section
-                        settingsGroup(title: "System") {
-                            NavRow(icon: "🎙️", iconColor: .stageMedia, title: "Recorder Settings", subtitle: "Format · Quality · Bit depth") { showRecorder = true }
+                        settingsGroup(title: langMgr.t("settings.section.system")) {
+                            NavRow(icon: "🎙️", iconColor: .stageMedia, title: langMgr.t("settings.recorderSettings.title"), subtitle: langMgr.t("settings.recorderSettings.subtitle")) { showRecorder = true }
                             Divider().background(Color.white.opacity(0.05)).padding(.leading, 68)
-                            NavRow(icon: "📋", iconColor: .brandCyan, title: "Connection Log", subtitle: "Server connection history") { showLog = true }
+                            NavRow(icon: "📋", iconColor: .brandCyan, title: langMgr.t("settings.connectionLog.title"), subtitle: langMgr.t("settings.connectionLog.subtitle")) { showLog = true }
                             Divider().background(Color.white.opacity(0.05)).padding(.leading, 68)
-                            ToggleRow(icon: "🔒", iconColor: .textSecondary, title: "Security Lock", subtitle: "Passcode lock",
+                            ToggleRow(icon: "🔒", iconColor: .textSecondary, title: langMgr.t("settings.securityLock.title"), subtitle: langMgr.t("settings.securityLock.subtitle"),
                                       isOn: Binding(
                                           get: { lockMgr.isEnabled },
                                           set: { newVal in
@@ -91,15 +93,17 @@ struct SettingsView: View {
                                           }
                                       ))
                             Divider().background(Color.white.opacity(0.05)).padding(.leading, 68)
-                            NavRow(icon: "☁️", iconColor: .brandBlue, title: "Backup", subtitle: "Export · Restore data") { showBackup = true }
+                            NavRow(icon: "☁️", iconColor: .brandBlue, title: langMgr.t("settings.backup.title"), subtitle: langMgr.t("settings.backup.subtitle")) { showBackup = true }
+                            Divider().background(Color.white.opacity(0.05)).padding(.leading, 68)
+                            NavRow(icon: "🌐", iconColor: .brandCyan, title: langMgr.t("settings.language.title"), subtitle: langMgr.t("settings.language.subtitle")) { showLanguage = true }
                         }
                         .padding(.top, 3)
 
                         // Account section
-                        settingsGroup(title: "Account") {
-                            NavRow(icon: "🚪", iconColor: .textTertiary, title: "Logout", subtitle: nil) { showLogout = true }
+                        settingsGroup(title: langMgr.t("settings.section.account")) {
+                            NavRow(icon: "🚪", iconColor: .textTertiary, title: langMgr.t("settings.logout.title"), subtitle: nil) { showLogout = true }
                             Divider().background(Color.white.opacity(0.05)).padding(.leading, 68)
-                            NavRow(icon: "⚠️", iconColor: .danger, title: "Delete Account", subtitle: "Permanent action", isDanger: true) { showDeleteAccount = true }
+                            NavRow(icon: "⚠️", iconColor: .danger, title: langMgr.t("settings.deleteAccount.title"), subtitle: langMgr.t("settings.deleteAccount.subtitle"), isDanger: true) { showDeleteAccount = true }
                         }
                         .padding(.top, 3)
 
@@ -120,11 +124,11 @@ struct SettingsView: View {
                                 .foregroundColor(.textTertiary)
                                 .shadow(color: Color.white.opacity(0.15), radius: 10)
 
-                            Text("Log Out")
+                            Text(langMgr.t("settings.logout.card.title"))
                                 .font(.inter(16, weight: .heavy))
                                 .foregroundColor(.textPrimary)
 
-                            Text("If a different account signs in, all your local files will be permanently deleted. Would you like to back up your data first?")
+                            Text(langMgr.t("settings.logout.card.warning"))
                                 .font(.inter(13))
                                 .foregroundColor(.textSecondary)
                                 .multilineTextAlignment(.center)
@@ -135,7 +139,7 @@ struct SettingsView: View {
                                 AuthManager.shared.pendingLogoutAfterBackup = true
                                 showBackup = true
                             } label: {
-                                Text("Export & Logout")
+                                Text(langMgr.t("settings.logout.card.exportLogout"))
                                     .font(.inter(14, weight: .bold))
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
@@ -151,7 +155,7 @@ struct SettingsView: View {
                                 Button {
                                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showLogout = false }
                                 } label: {
-                                    Text("Cancel")
+                                    Text(langMgr.t("common.cancel"))
                                         .font(.inter(14, weight: .semibold))
                                         .foregroundColor(.textSecondary)
                                         .frame(maxWidth: .infinity)
@@ -163,7 +167,7 @@ struct SettingsView: View {
                                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showLogout = false }
                                     auth.forceLogout()
                                 } label: {
-                                    Text("Logout")
+                                    Text(langMgr.t("settings.logout.card.logout"))
                                         .font(.inter(14, weight: .bold))
                                         .foregroundColor(.white)
                                         .frame(maxWidth: .infinity)
@@ -196,12 +200,12 @@ struct SettingsView: View {
                                 .foregroundColor(.danger)
                                 .shadow(color: Color.danger.opacity(0.7), radius: 10)
 
-                            Text("Delete Account")
+                            Text(langMgr.t("settings.deleteAccount.card.title"))
                                 .font(.inter(16, weight: .heavy))
                                 .foregroundColor(.textPrimary)
 
                             if deleteStep == 0 {
-                                Text("This is permanent and cannot be undone. We'll send a confirmation code to your email.")
+                                Text(langMgr.t("settings.deleteAccount.card.warning"))
                                     .font(.inter(13))
                                     .foregroundColor(.textSecondary)
                                     .multilineTextAlignment(.center)
@@ -213,7 +217,7 @@ struct SettingsView: View {
                                             deleteStep = 0; deleteCode = ""; deleteError = nil
                                         }
                                     } label: {
-                                        Text("Cancel")
+                                        Text(langMgr.t("common.cancel"))
                                             .font(.inter(14, weight: .semibold))
                                             .foregroundColor(.textSecondary)
                                             .frame(maxWidth: .infinity)
@@ -252,7 +256,7 @@ struct SettingsView: View {
                                             if deleteLoading {
                                                 ProgressView().tint(.white)
                                             } else {
-                                                Text("Send Code")
+                                                Text(langMgr.t("settings.deleteAccount.card.sendCode"))
                                                     .font(.inter(14, weight: .bold))
                                                     .foregroundColor(.white)
                                             }
@@ -265,7 +269,7 @@ struct SettingsView: View {
                                     .disabled(deleteLoading)
                                 }
                             } else {
-                                Text("Enter the code sent to \(auth.currentUser?.email ?? "your email") to permanently delete your account.")
+                                Text(langMgr.t("settings.deleteAccount.card.codeHint"))
                                     .font(.inter(13))
                                     .foregroundColor(.textSecondary)
                                     .multilineTextAlignment(.center)
@@ -291,7 +295,7 @@ struct SettingsView: View {
                                     Button {
                                         withAnimation { deleteStep = 0; deleteCode = ""; deleteError = nil }
                                     } label: {
-                                        Text("Back")
+                                        Text(langMgr.t("settings.deleteAccount.card.back"))
                                             .font(.inter(14, weight: .semibold))
                                             .foregroundColor(.textSecondary)
                                             .frame(maxWidth: .infinity)
@@ -335,7 +339,7 @@ struct SettingsView: View {
                                             if deleteLoading {
                                                 ProgressView().tint(.white)
                                             } else {
-                                                Text("Delete Forever")
+                                                Text(langMgr.t("settings.deleteAccount.card.delete"))
                                                     .font(.inter(14, weight: .bold))
                                                     .foregroundColor(.white)
                                             }
@@ -388,6 +392,7 @@ struct SettingsView: View {
             BackupView()
         }
         .fullScreenCover(isPresented: $showAPIKey) { APIKeyView().environmentObject(auth) }
+        .fullScreenCover(isPresented: $showLanguage) { LanguagePickerView() }
     }
 
     // MARK: - Account Hero
@@ -440,7 +445,7 @@ struct SettingsView: View {
                                 UIApplication.shared.open(url)
                             }
                         } label: {
-                            Text("MANAGE")
+                            Text(langMgr.t("settings.managePlan"))
                                 .font(.inter(11, weight: .heavy))
                                 .foregroundColor(Color(hex: "#a78bfa"))
                                 .padding(.horizontal, 11).padding(.vertical, 5)
@@ -454,13 +459,13 @@ struct SettingsView: View {
 
             // Row 2: credit boxes
             HStack(spacing: 7) {
-                creditBox(label: "Paid Credits", value: String(format: "%.2f", user?.credit ?? 0), isPaid: true)
-                creditBox(label: "Free Credits", value: String(format: "%.2f", user?.freeCredit ?? 0), isPaid: false)
+                creditBox(label: langMgr.t("plan.paidCredits"), value: String(format: "%.2f", user?.credit ?? 0), isPaid: true)
+                creditBox(label: langMgr.t("plan.freeCredits"), value: String(format: "%.2f", user?.freeCredit ?? 0), isPaid: false)
             }
 
             // Row 3: Plans button
             Button { showCredits = true } label: {
-                Text("＋  Plans")
+                Text(langMgr.t("settings.plans"))
                     .font(.inter(12, weight: .heavy))
                     .tracking(0.3)
                     .foregroundColor(.brandCyan)
@@ -544,6 +549,7 @@ struct SettingsView: View {
 
 struct ConnectionLogView: View {
     @ObservedObject private var logger = AppLogger.shared
+    @EnvironmentObject var langMgr: LanguageManager
     @Environment(\.dismiss) var dismiss
     @State private var showCopied = false
 
@@ -562,7 +568,7 @@ struct ConnectionLogView: View {
                             .clipShape(Circle())
                     }
                     Spacer()
-                    Text("Connection Log")
+                    Text(langMgr.t("settings.connectionLog.title"))
                         .font(.inter(16, weight: .heavy))
                         .foregroundColor(.textPrimary)
                     Spacer()
@@ -608,9 +614,9 @@ struct ConnectionLogView: View {
                     VStack(spacing: 10) {
                         Image(systemName: "antenna.radiowaves.left.and.right")
                             .font(.system(size: 32)).foregroundColor(.textQuaternary)
-                        Text("No log entries yet")
+                        Text(langMgr.t("settings.connectionLog.empty"))
                             .font(.inter(14, weight: .bold)).foregroundColor(.textTertiary)
-                        Text("Transcription activity will appear here")
+                        Text(langMgr.t("settings.connectionLog.emptySubtitle"))
                             .font(.inter(12)).foregroundColor(.textQuaternary)
                             .multilineTextAlignment(.center).padding(.horizontal, 40)
                     }

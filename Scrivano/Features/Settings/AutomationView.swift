@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct AutomationView: View {
+    @EnvironmentObject var langMgr: LanguageManager
     @Environment(\.dismiss) var dismiss
     @AppStorage("auto_transcription")   private var autoTranscription = true
     @AppStorage("auto_conversion")      private var autoConversion = true
@@ -29,10 +30,10 @@ struct AutomationView: View {
     }
 
     @ViewBuilder
-    private func pipelineStageNode(stage: String, color: Color) -> some View {
+    private func pipelineStageNode(stage: String, color: Color, displayLabel: String? = nil) -> some View {
         let status = stageStatus(for: stage)
         VStack(spacing: 3) {
-            Text(stage)
+            Text(displayLabel ?? stage)
                 .font(.inter(9, weight: .heavy))
                 .tracking(0.3)
                 .foregroundColor(color.opacity(0.85))
@@ -133,14 +134,14 @@ struct AutomationView: View {
             Color.phoneBg.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                SubScreenBar(title: "Automation", accentColor: .brandCyan, onBack: { dismiss() })
+                SubScreenBar(title: langMgr.t("settings.automation.title"), accentColor: .brandCyan, onBack: { dismiss() })
 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 14) {
 
                         // Pipeline preview
                         VStack(spacing: 12) {
-                            Text("Pipeline Preview")
+                            Text(langMgr.t("automation.diagramLabel"))
                                 .font(.inter(10, weight: .heavy))
                                 .tracking(0.7)
                                 .foregroundColor(.textTertiary)
@@ -149,11 +150,11 @@ struct AutomationView: View {
 
                             HStack(spacing: 0) {
                                 ForEach([
-                                    ("Media", Color.stageMedia, 0),
-                                    ("Text", Color.stageText, 1),
-                                    ("Notes", Color.stageNotes, 2),
-                                    ("Web", Color.stageWeb, -1)
-                                ], id: \.0) { stage, color, cardIndex in
+                                    ("Media", Color.stageMedia, 0, langMgr.t("automation.stage.media")),
+                                    ("Text", Color.stageText, 1, langMgr.t("automation.stage.text")),
+                                    ("Notes", Color.stageNotes, 2, langMgr.t("automation.stage.notes")),
+                                    ("Web", Color.stageWeb, -1, langMgr.t("automation.stage.web"))
+                                ], id: \.0) { stage, color, cardIndex, stageLabel in
                                     HStack(spacing: 0) {
                                         if cardIndex >= 0 {
                                             Button {
@@ -161,7 +162,7 @@ struct AutomationView: View {
                                                     expandedStage = expandedStage == cardIndex ? nil : cardIndex
                                                 }
                                             } label: {
-                                                pipelineStageNode(stage: stage, color: color)
+                                                pipelineStageNode(stage: stage, color: color, displayLabel: stageLabel)
                                                     .overlay(
                                                         RoundedRectangle(cornerRadius: 10)
                                                             .stroke(expandedStage == cardIndex ? color.opacity(0.7) : Color.clear, lineWidth: 1.5)
@@ -169,7 +170,7 @@ struct AutomationView: View {
                                             }
                                             .buttonStyle(.plain)
                                         } else {
-                                            pipelineStageNode(stage: stage, color: color)
+                                            pipelineStageNode(stage: stage, color: color, displayLabel: stageLabel)
                                         }
 
                                         if stage != "Web" {
@@ -204,20 +205,20 @@ struct AutomationView: View {
                         automationCard(
                             index: 0,
                             dotColor: .stageMedia,
-                            title: "Media → Text",
-                            subtitle: "Auto-transcribe new recordings"
+                            title: langMgr.t("automation.mediaToText.title"),
+                            subtitle: langMgr.t("automation.mediaToText.subtitle")
                         ) {
-                            miniToggle("Automatic Transcription",
-                                       desc: "Each segment is automatically converted and transcribed the moment it is saved. Requires a split interval and Automatic Conversion to be enabled.",
+                            miniToggle(langMgr.t("automation.autoTranscription"),
+                                       desc: langMgr.t("automation.autoTranscription.desc"),
                                        isOn: $autoTranscription,
                                        enabled: autoConversion && splittingEnabled)
-                            miniToggle("Automatic Conversion",
-                                       desc: "WAV recordings are automatically converted to M4A and the original file is deleted.",
+                            miniToggle(langMgr.t("automation.autoConversion"),
+                                       desc: langMgr.t("automation.autoConversion.desc"),
                                        isOn: $autoConversion)
-                            miniToggle("Automatic Splitting",
+                            miniToggle(langMgr.t("automation.autoSplitting"),
                                        desc: splittingEnabled
-                                            ? "Split interval active — recordings are divided every \(splitLabel) during recording."
-                                            : "No split interval set. Go to Recorder Settings to configure one.",
+                                            ? langMgr.t("automation.autoSplitting.active.desc").replacingOccurrences(of: "%@", with: splitLabel)
+                                            : langMgr.t("automation.autoSplitting.inactive.desc"),
                                        isOn: Binding(
                                             get: { splittingEnabled },
                                             set: { _ in }
@@ -235,18 +236,18 @@ struct AutomationView: View {
                         automationCard(
                             index: 1,
                             dotColor: .stageText,
-                            title: "Text → Notes",
-                            subtitle: "Auto-generate notes from transcripts"
+                            title: langMgr.t("automation.textToNotes.title"),
+                            subtitle: langMgr.t("automation.textToNotes.subtitle")
                         ) {
                             addPromptsButton()
-                            miniToggle("Automatic Note",
+                            miniToggle(langMgr.t("automation.autoNote"),
                                        desc: savedPromptCount == 0
-                                           ? "Select a prompt above before enabling automatic notes."
-                                           : "Transcripts will be automatically converted into structured notes using the selected prompt.",
+                                           ? langMgr.t("automation.autoNote.noPrompt.desc")
+                                           : langMgr.t("automation.autoNote.desc"),
                                        isOn: $autoNote,
                                        enabled: savedPromptCount > 0)
-                            miniToggle("Automatic Merge",
-                                       desc: "Transcripts within the same item are automatically merged into a single file. Always active.",
+                            miniToggle(langMgr.t("automation.autoMerge"),
+                                       desc: langMgr.t("automation.autoMerge.desc"),
                                        isOn: .constant(true),
                                        enabled: false)
                             defaultButton {
@@ -264,11 +265,11 @@ struct AutomationView: View {
                         automationCard(
                             index: 2,
                             dotColor: .stageNotes,
-                            title: "Notes → Web",
-                            subtitle: "Auto-publish notes to web"
+                            title: langMgr.t("automation.notesToWeb.title"),
+                            subtitle: langMgr.t("automation.notesToWeb.subtitle")
                         ) {
-                            miniToggle("Automatic Upload",
-                                       desc: "Notes will be automatically synced to the cloud for easy web and computer access.",
+                            miniToggle(langMgr.t("automation.autoUpload"),
+                                       desc: langMgr.t("automation.autoUpload.desc"),
                                        isOn: $autoUpload)
                             defaultButton {
                                 autoUpload = false
@@ -362,14 +363,14 @@ struct AutomationView: View {
                 Image(systemName: savedPromptCount > 0 ? "checkmark.circle.fill" : "plus.circle.fill")
                     .font(.system(size: 14, weight: .bold))
                 if savedPromptCount > 0 {
-                    Text("\(savedPromptCount) Prompt\(savedPromptCount == 1 ? "" : "s") Selected")
+                    Text("\(savedPromptCount) \(langMgr.t("prompts.title"))")
                         .font(.inter(13, weight: .bold))
                     Spacer()
-                    Text("Change")
+                    Text(langMgr.t("common.change"))
                         .font(.inter(12, weight: .semibold))
                         .foregroundColor(.brandCyan.opacity(0.7))
                 } else {
-                    Text("Add Prompts")
+                    Text(langMgr.t("common.add_prompts"))
                         .font(.inter(13, weight: .bold))
                 }
             }

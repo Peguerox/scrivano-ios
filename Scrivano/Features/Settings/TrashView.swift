@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct TrashView: View {
+    @EnvironmentObject var langMgr: LanguageManager
     @Environment(\.dismiss) var dismiss
     @State private var entries: [TrashEntry] = []
     @State private var showEmptyConfirm = false
@@ -39,7 +40,7 @@ struct TrashView: View {
 
             VStack(spacing: 0) {
                 SubScreenBar(
-                    title: "Recycle Bin",
+                    title: langMgr.t("settings.recycleBin.title"),
                     accentColor: .danger,
                     onBack: { dismiss() },
                     trailingIcon: entries.isEmpty ? nil : "🗑",
@@ -119,7 +120,7 @@ struct TrashView: View {
                     .foregroundColor(.brandCyan)
                     .shadow(color: Color.brandCyan.opacity(0.5), radius: 10)
 
-                Text("Collection Missing")
+                Text(langMgr.t("trash.collectionMissing"))
                     .font(.inter(16, weight: .heavy))
                     .foregroundColor(.textPrimary)
 
@@ -142,9 +143,9 @@ struct TrashView: View {
                                 Image(systemName: "folder.badge.plus")
                                     .font(.system(size: 13, weight: .semibold))
                                 VStack(alignment: .leading, spacing: 1) {
-                                    Text("Restore Collection Too")
+                                    Text(langMgr.t("trash.restoreCollectionToo"))
                                         .font(.inter(14, weight: .bold))
-                                    Text("Brings back \"\(collectionName)\" and the item")
+                                    Text(langMgr.t("trash.bringBackCollection"))
                                         .font(.inter(11))
                                         .opacity(0.7)
                                 }
@@ -168,9 +169,9 @@ struct TrashView: View {
                             Image(systemName: "tray")
                                 .font(.system(size: 13, weight: .semibold))
                             VStack(alignment: .leading, spacing: 1) {
-                                Text("Move to My Collection")
+                                Text(langMgr.t("trash.moveToMyCollection"))
                                     .font(.inter(14, weight: .bold))
-                                Text("Restore item without a collection")
+                                Text(langMgr.t("trash.restoreWithout"))
                                     .font(.inter(11))
                                     .opacity(0.7)
                             }
@@ -187,7 +188,7 @@ struct TrashView: View {
                     Button {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { resolution = nil }
                     } label: {
-                        Text("Cancel")
+                        Text(langMgr.t("common.cancel"))
                             .font(.inter(14, weight: .semibold))
                             .foregroundColor(.textSecondary)
                             .frame(maxWidth: .infinity)
@@ -209,7 +210,7 @@ struct TrashView: View {
                     .foregroundColor(kindColor(entry.kind))
                     .shadow(color: kindColor(entry.kind).opacity(0.5), radius: 10)
 
-                Text("Item Missing")
+                Text(langMgr.t("trash.itemMissing"))
                     .font(.inter(16, weight: .heavy))
                     .foregroundColor(.textPrimary)
 
@@ -230,9 +231,9 @@ struct TrashView: View {
                                 Image(systemName: "doc.badge.plus")
                                     .font(.system(size: 13, weight: .semibold))
                                 VStack(alignment: .leading, spacing: 1) {
-                                    Text("Restore Item Too")
+                                    Text(langMgr.t("trash.restoreItemToo"))
                                         .font(.inter(14, weight: .bold))
-                                    Text("Brings back \"\(parentItemName)\" and this content")
+                                    Text(langMgr.t("trash.bringBackItem"))
                                         .font(.inter(11))
                                         .opacity(0.7)
                                 }
@@ -257,7 +258,7 @@ struct TrashView: View {
                     Button {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { resolution = nil }
                     } label: {
-                        Text("Cancel")
+                        Text(langMgr.t("common.cancel"))
                             .font(.inter(14, weight: .semibold))
                             .foregroundColor(.textSecondary)
                             .frame(maxWidth: .infinity)
@@ -283,11 +284,11 @@ struct TrashView: View {
                 .foregroundColor(.danger)
                 .shadow(color: Color.danger.opacity(0.7), radius: 10)
 
-            Text("Empty Recycle Bin")
+            Text(langMgr.t("trash.emptyRecycleBin"))
                 .font(.inter(16, weight: .heavy))
                 .foregroundColor(.textPrimary)
 
-            Text("This will permanently delete all \(entries.count) item\(entries.count == 1 ? "" : "s"). This cannot be undone.")
+            Text(langMgr.t("common.this_cannot_undo"))
                 .font(.inter(13))
                 .foregroundColor(.textSecondary)
                 .multilineTextAlignment(.center)
@@ -296,7 +297,7 @@ struct TrashView: View {
                 Button {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showEmptyConfirm = false }
                 } label: {
-                    Text("Cancel")
+                    Text(langMgr.t("common.cancel"))
                         .font(.inter(14, weight: .semibold))
                         .foregroundColor(.textSecondary)
                         .frame(maxWidth: .infinity)
@@ -309,7 +310,7 @@ struct TrashView: View {
                     TrashStore.shared.empty()
                     reload()
                 } label: {
-                    Text("Empty All")
+                    Text(langMgr.t("trash.emptyAll"))
                         .font(.inter(14, weight: .bold))
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
@@ -339,10 +340,10 @@ struct TrashView: View {
                     .font(.system(size: 30, weight: .light))
                     .foregroundColor(.danger.opacity(0.5))
             }
-            Text("Recycle Bin is Empty")
+            Text(langMgr.t("settings.recycleBin.empty"))
                 .font(.inter(16, weight: .heavy))
                 .foregroundColor(.textSecondary)
-            Text("Deleted collections, items, texts and notes\nwill appear here for recovery.")
+            Text(langMgr.t("settings.recycleBin.deleted"))
                 .font(.inter(13))
                 .foregroundColor(.textQuaternary)
                 .multilineTextAlignment(.center)
@@ -417,7 +418,7 @@ struct TrashView: View {
                     HStack(spacing: 5) {
                         Image(systemName: restoredId == entry.id ? "checkmark" : "arrow.uturn.backward")
                             .font(.system(size: 11, weight: .bold))
-                        Text(restoredId == entry.id ? "Restored!" : "Restore")
+                        Text(restoredId == entry.id ? langMgr.t("trash.restored") : langMgr.t("trash.restore"))
                             .font(.inter(12, weight: .bold))
                     }
                     .foregroundColor(Color(hex: "#34d399"))
@@ -435,7 +436,7 @@ struct TrashView: View {
                     HStack(spacing: 5) {
                         Image(systemName: "trash")
                             .font(.system(size: 11, weight: .bold))
-                        Text("Delete")
+                        Text(langMgr.t("common.delete"))
                             .font(.inter(12, weight: .bold))
                     }
                     .foregroundColor(.danger)
@@ -607,11 +608,11 @@ struct TrashView: View {
 
     private func kindLabel(_ kind: TrashKind) -> String {
         switch kind {
-        case .collection: return "Collections"
-        case .item:       return "Items"
-        case .transcript: return "Texts"
-        case .note:       return "Notes"
-        case .recording:  return "Audio Files"
+        case .collection: return langMgr.t("trash.kind.collections")
+        case .item:       return langMgr.t("trash.kind.items")
+        case .transcript: return langMgr.t("trash.kind.texts")
+        case .note:       return langMgr.t("trash.kind.notes")
+        case .recording:  return langMgr.t("trash.kind.audio")
         }
     }
 

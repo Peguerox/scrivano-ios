@@ -3,6 +3,7 @@ import UniformTypeIdentifiers
 
 struct BackupView: View {
     @ObservedObject private var manager = BackupManager.shared
+    @EnvironmentObject var langMgr: LanguageManager
     @Environment(\.dismiss) var dismiss
 
     // ── Create backup state ──────────────────────────────────────────────
@@ -32,7 +33,7 @@ struct BackupView: View {
             Color.phoneBg.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                SubScreenBar(title: "Backup & Restore", accentColor: .brandBlue, onBack: { dismiss() })
+                SubScreenBar(title: langMgr.t("backup.screenTitle"), accentColor: .brandBlue, onBack: { dismiss() })
                     .overlay(alignment: .bottom) {
                         Rectangle().fill(Color.brandBlue.opacity(0.4)).frame(height: 1)
                     }
@@ -77,7 +78,7 @@ struct BackupView: View {
                             .foregroundColor(.brandCyan)
 
                         VStack(spacing: 5) {
-                            Text("Enter Backup Password")
+                            Text(langMgr.t("backup.enterPassword"))
                                 .font(.inter(17, weight: .bold))
                                 .foregroundColor(.textPrimary)
                             if let url = pendingRestoreURL {
@@ -110,7 +111,7 @@ struct BackupView: View {
                                 restorePassword = ""
                                 restoreError = nil
                             } label: {
-                                Text("Cancel")
+                                Text(langMgr.t("common.cancel"))
                                     .font(.inter(14, weight: .semibold))
                                     .foregroundColor(.textSecondary)
                                     .frame(maxWidth: .infinity)
@@ -119,7 +120,7 @@ struct BackupView: View {
                                     .clipShape(RoundedRectangle(cornerRadius: 13))
                             }
                             Button { Task { await doRestore() } } label: {
-                                Text("Restore")
+                                Text(langMgr.t("backup.restore"))
                                     .font(.inter(14, weight: .bold))
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
@@ -150,7 +151,7 @@ struct BackupView: View {
                 Color.black.opacity(0.6).ignoresSafeArea()
                 VStack(spacing: 14) {
                     ProgressView().progressViewStyle(.circular).tint(.brandCyan).scaleEffect(1.4)
-                    Text("Saving file and logging out…")
+                    Text(langMgr.t("backup.savingLogout"))
                         .font(.inter(13, weight: .semibold))
                         .foregroundColor(.textSecondary)
                 }
@@ -210,10 +211,10 @@ struct BackupView: View {
                 .font(.system(size: 18))
                 .foregroundColor(.brandCyan)
             VStack(alignment: .leading, spacing: 3) {
-                Text("Your data stays on-device")
+                Text(langMgr.t("backup.dataOnDevice"))
                     .font(.inter(13, weight: .bold))
                     .foregroundColor(.textPrimary)
-                Text("The backup includes all collections, items, transcripts, and notes. Audio recordings are optional — including them increases file size. Everything is encrypted with your password — only you can open it.")
+                Text(langMgr.t("backup.description"))
                     .font(.inter(11))
                     .foregroundColor(.textQuaternary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -229,14 +230,14 @@ struct BackupView: View {
 
     private var createCard: some View {
         VStack(alignment: .leading, spacing: 16) {
-            cardHeader(icon: "lock.doc.fill", title: "Create Backup",
-                       subtitle: "Exports all data as an encrypted .scrivano file")
+            cardHeader(icon: "lock.doc.fill", title: langMgr.t("backup.createTitle"),
+                       subtitle: langMgr.t("backup.createSubtitle"))
 
             VStack(spacing: 10) {
-                SecureField("Password", text: $createPassword)
+                SecureField(langMgr.t("backup.passwordPlaceholder"), text: $createPassword)
                     .styledField()
 
-                SecureField("Confirm Password", text: $createConfirm)
+                SecureField(langMgr.t("backup.confirmPlaceholder"), text: $createConfirm)
                     .styledField(
                         borderColor: createConfirm.isEmpty ? Color.white.opacity(0.1)
                             : passwordsMatch ? Color.green.opacity(0.4)
@@ -248,12 +249,12 @@ struct BackupView: View {
             VStack(alignment: .leading, spacing: 8) {
                 Toggle(isOn: $includeAudio) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Include Audio Files")
+                        Text(langMgr.t("backup.includeAudio"))
                             .font(.inter(13, weight: .semibold))
                             .foregroundColor(.textPrimary)
                         Text(includeAudio
-                             ? "Backup will include all recordings — larger file size"
-                             : "Text only — transcripts, notes & collections")
+                             ? langMgr.t("backup.includeAudio.on")
+                             : langMgr.t("backup.includeAudio.off"))
                             .font(.inter(11))
                             .foregroundColor(.textQuaternary)
                     }
@@ -263,7 +264,7 @@ struct BackupView: View {
                 if !includeAudio {
                     let untranscribed = untranscribedRecordingCount
                     if untranscribed > 0 {
-                        Label("\(untranscribed) recording\(untranscribed == 1 ? "" : "s") not yet transcribed — audio will be lost if excluded",
+                        Label(langMgr.t("backup.untranscribed").replacingOccurrences(of: "%d", with: "\(untranscribed)"),
                               systemImage: "exclamationmark.triangle.fill")
                             .font(.inter(11, weight: .semibold))
                             .foregroundColor(Color(hex: "#f59e0b"))
@@ -287,7 +288,7 @@ struct BackupView: View {
             }
 
             Button { Task { await doCreate() } } label: {
-                Label("Create & Export Backup", systemImage: "square.and.arrow.up")
+                Label(langMgr.t("backup.createExport"), systemImage: "square.and.arrow.up")
                     .font(.inter(14, weight: .bold))
                     .foregroundColor(passwordsMatch ? .white : .textQuaternary)
                     .frame(maxWidth: .infinity)
@@ -312,8 +313,8 @@ struct BackupView: View {
 
     private var restoreCard: some View {
         VStack(alignment: .leading, spacing: 16) {
-            cardHeader(icon: "arrow.down.doc.fill", title: "Restore Backup",
-                       subtitle: "Import a .scrivano file to your device")
+            cardHeader(icon: "arrow.down.doc.fill", title: langMgr.t("backup.restoreTitle"),
+                       subtitle: langMgr.t("backup.restoreSubtitle"))
 
             if let success = restoreSuccess {
                 Label(success, systemImage: "checkmark.circle.fill")
@@ -325,13 +326,13 @@ struct BackupView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 10))
             }
 
-            Text("Existing data is kept. Duplicate collection names will be renamed automatically (e.g. \"My Collection 1\").")
+            Text(langMgr.t("backup.mergingNote"))
                 .font(.inter(11))
                 .foregroundColor(.textQuaternary)
                 .fixedSize(horizontal: false, vertical: true)
 
             Button { showFilePicker = true } label: {
-                Label("Choose .scrivano File", systemImage: "doc.badge.plus")
+                Label(langMgr.t("backup.chooseFile"), systemImage: "doc.badge.plus")
                     .font(.inter(14, weight: .bold))
                     .foregroundColor(.brandCyan)
                     .frame(maxWidth: .infinity)

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct HelpView: View {
+    @ObservedObject private var langMgr = LanguageManager.shared
     @Environment(\.dismiss) var dismiss
     @Environment(\.openURL) var openURL
 
@@ -17,10 +18,10 @@ struct HelpView: View {
                         // Hero
                         ZStack(alignment: .bottomTrailing) {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("How can we help?")
+                                Text(langMgr.t("help.title"))
                                     .font(.inter(20, weight: .heavy))
                                     .foregroundColor(.textPrimary)
-                                Text("Find answers, watch tutorials,\nand connect with the community.")
+                                Text(langMgr.t("help.tutorials"))
                                     .font(.inter(12))
                                     .foregroundColor(.textTertiary)
                                     .lineSpacing(4)

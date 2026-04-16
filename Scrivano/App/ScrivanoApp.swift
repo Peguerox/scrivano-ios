@@ -30,6 +30,7 @@ struct ScrivanoApp: App {
     @StateObject private var lockMgr   = SecurityLockManager()
     @StateObject private var taskQueue = TaskQueueManager.shared
     @StateObject private var lifecycle = AppLifecycle()
+    @StateObject private var langMgr   = LanguageManager.shared
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
@@ -59,6 +60,7 @@ struct ScrivanoApp: App {
             RootView()
                 .environmentObject(auth)
                 .environmentObject(lockMgr)
+                .environmentObject(langMgr)
                 .preferredColorScheme(.dark)
                 .onOpenURL { url in
                     if url.pathExtension == "scrivano" {

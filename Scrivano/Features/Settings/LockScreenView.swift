@@ -5,6 +5,7 @@ import LocalAuthentication
 
 struct LockScreenView: View {
     @EnvironmentObject var lockMgr: SecurityLockManager
+    @ObservedObject private var langMgr = LanguageManager.shared
     @State private var entered  = ""
     @State private var shake    = false
     @State private var showError = false
@@ -28,10 +29,10 @@ struct LockScreenView: View {
                             .foregroundColor(.brandCyan)
                             .shadow(color: .brandCyan.opacity(0.6), radius: 10)
                     }
-                    Text("Scrivano")
+                    Text(langMgr.t("misc.scrivano"))
                         .font(.inter(22, weight: .heavy))
                         .foregroundColor(.textPrimary)
-                    Text("Enter your PIN to continue")
+                    Text(langMgr.t("pin.enterContinue"))
                         .font(.inter(13))
                         .foregroundColor(.textTertiary)
                 }
@@ -164,6 +165,7 @@ struct ShakeEffect: ViewModifier {
 
 struct PinSetupView: View {
     @EnvironmentObject var lockMgr: SecurityLockManager
+    @ObservedObject private var langMgr = LanguageManager.shared
     @Environment(\.dismiss) var dismiss
 
     @State private var step: Step = .enter
@@ -198,7 +200,7 @@ struct PinSetupView: View {
                             .clipShape(Circle())
                     }
                     Spacer()
-                    Text("Security Lock")
+                    Text(langMgr.t("settings.securityLock.title"))
                         .font(.inter(16, weight: .heavy))
                         .foregroundColor(.textPrimary)
                     Spacer()
@@ -316,6 +318,7 @@ struct PinSetupView: View {
 
 struct PinVerifyView: View {
     @EnvironmentObject var lockMgr: SecurityLockManager
+    @ObservedObject private var langMgr = LanguageManager.shared
     @Environment(\.dismiss) var dismiss
 
     @State private var entered  = ""
@@ -338,7 +341,7 @@ struct PinVerifyView: View {
                             .clipShape(Circle())
                     }
                     Spacer()
-                    Text("Disable Security Lock")
+                    Text(langMgr.t("settings.securityLock.disable"))
                         .font(.inter(16, weight: .heavy))
                         .foregroundColor(.textPrimary)
                     Spacer()
@@ -361,7 +364,7 @@ struct PinVerifyView: View {
                 }
                 .padding(.bottom, 16)
 
-                Text("Enter your PIN to disable")
+                Text(langMgr.t("pin.enterDisable"))
                     .font(.inter(15, weight: .bold))
                     .foregroundColor(.textPrimary)
                     .padding(.bottom, 28)

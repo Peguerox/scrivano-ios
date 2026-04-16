@@ -25,6 +25,15 @@ private enum FilterCategory: String, Identifiable, CaseIterable {
 
     var id: String { rawValue }
 
+    var translationKey: String {
+        switch self {
+        case .profession: return "prompts.cat.professions"
+        case .author:     return "prompts.cat.authors"
+        case .language:   return "prompts.cat.languages"
+        case .noteType:   return "prompts.cat.noteTypes"
+        }
+    }
+
     var key: String {
         switch self {
         case .profession: return "profession"
@@ -57,6 +66,7 @@ private enum FilterCategory: String, Identifiable, CaseIterable {
 
 struct PromptsView: View {
     let context: PromptsContext
+    @EnvironmentObject var langMgr: LanguageManager
     @Environment(\.dismiss) var dismiss
     @State private var prompts: [Prompt] = []
     @State private var search = ""
@@ -116,6 +126,14 @@ struct PromptsView: View {
         case all = "All"
         case favorites = "Favorites"
         case custom = "Custom"
+
+        var translationKey: String {
+            switch self {
+            case .all:       return "prompts.tab.all"
+            case .favorites: return "prompts.tab.favorites"
+            case .custom:    return "prompts.tab.custom"
+            }
+        }
 
         var icon: String {
             switch self {
@@ -253,7 +271,7 @@ struct PromptsView: View {
                             .clipShape(Circle())
                     }
                     Spacer()
-                    Text("Prompts")
+                    Text(langMgr.t("prompts.title"))
                         .font(.inter(16, weight: .heavy))
                         .foregroundColor(.textPrimary)
                     Spacer()
@@ -282,10 +300,10 @@ struct PromptsView: View {
                         .font(.system(size: 11))
                         .foregroundColor(.textQuaternary)
                     Text(isAutomationMode
-                         ? "These prompts will auto-run on every new transcript"
+                         ? langMgr.t("prompts.hint.automation")
                          : isSelectMode
-                             ? "Select one or more prompts to apply"
-                             : "Tap a prompt to add to the pipeline")
+                             ? langMgr.t("prompts.hint.select")
+                             : langMgr.t("prompts.hint.browse"))
                         .font(.inter(11))
                         .foregroundColor(.textQuaternary)
                     Spacer()
@@ -323,7 +341,7 @@ struct PromptsView: View {
                         HStack(spacing: 5) {
                             Image(systemName: "slider.horizontal.3")
                                 .font(.system(size: 13, weight: .semibold))
-                            Text("Filters")
+                            Text(langMgr.t("prompts.filter"))
                                 .font(.inter(14, weight: .bold))
                             Image(systemName: showFilters ? "chevron.up" : "chevron.down")
                                 .font(.system(size: 10, weight: .bold))
@@ -348,7 +366,7 @@ struct PromptsView: View {
 
                 // Results count
                 HStack {
-                    Text("RESULTS · \(filtered.count)")
+                    Text("\(langMgr.t("prompts.results")) · \(filtered.count)")
                         .font(.inter(10, weight: .heavy))
                         .tracking(0.5)
                         .foregroundColor(.textQuaternary)
@@ -395,7 +413,7 @@ struct PromptsView: View {
                             )
                         }
                         if filtered.isEmpty && !isLoading {
-                            Text("No prompts found").font(.inter(13)).foregroundColor(.textQuaternary).padding(.top, 40)
+                            Text(langMgr.t("prompts.noPrompts")).font(.inter(13)).foregroundColor(.textQuaternary).padding(.top, 40)
                         }
                     }
                     .padding(.horizontal, 18)
@@ -413,10 +431,10 @@ struct PromptsView: View {
                             HStack(spacing: 8) {
                                 Image(systemName: "bolt.fill").font(.system(size: 14, weight: .bold))
                                 Text(selectedPromptIds.isEmpty
-                                     ? "Select a Prompt"
+                                     ? langMgr.t("prompts.selectPrompt")
                                      : isAutomationMode
-                                         ? "Activate \(selectedPromptIds.count) Prompt\(selectedPromptIds.count == 1 ? "" : "s") for Automation"
-                                         : "Apply \(selectedPromptIds.count) Prompt\(selectedPromptIds.count == 1 ? "" : "s")")
+                                         ? langMgr.t("prompts.activateForAutomation").replacingOccurrences(of: "%d", with: "\(selectedPromptIds.count)")
+                                         : langMgr.t("prompts.applyPrompts").replacingOccurrences(of: "%d", with: "\(selectedPromptIds.count)"))
                                     .font(.inter(15, weight: .heavy))
                             }
                             .foregroundColor(.white)
@@ -452,7 +470,7 @@ struct PromptsView: View {
                             VStack(spacing: 5) {
                                 Image(systemName: tab.icon)
                                     .font(.system(size: 17, weight: .semibold))
-                                Text(tab.rawValue)
+                                Text(langMgr.t(tab.translationKey))
                                     .font(.inter(12, weight: .bold))
                             }
                             .foregroundColor(isOn ? tab.activeColor : Color.white.opacity(0.28))
@@ -498,7 +516,7 @@ struct PromptsView: View {
         }
         .sheet(item: $activeFilterCat) { cat in
             FilterPickerSheet(
-                title: cat.rawValue,
+                title: langMgr.t(cat.translationKey),
                 values: values(for: cat),
                 selected: selectedSet(for: cat)
             )
@@ -526,7 +544,7 @@ struct PromptsView: View {
                                     .foregroundColor(cat.iconColor)
                             }
 
-                            Text(cat.rawValue)
+                            Text(langMgr.t(cat.translationKey))
                                 .font(.inter(14, weight: .semibold))
                                 .foregroundColor(.textPrimary)
 
@@ -552,7 +570,7 @@ struct PromptsView: View {
                                 }
                                 .buttonStyle(.plain)
                             } else {
-                                Text("None")
+                                Text(langMgr.t("common.none"))
                                     .font(.inter(11, weight: .bold))
                                     .foregroundColor(Color.white.opacity(0.3))
                                     .padding(.horizontal, 9).padding(.vertical, 3)
@@ -584,7 +602,7 @@ struct PromptsView: View {
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) { showFilters = false }
             } label: {
-                Text("▲ Hide filters")
+                Text(langMgr.t("misc.hideFilters"))
                     .font(.inter(11, weight: .bold))
                     .foregroundColor(Color.brandCyan.opacity(0.5))
                     .padding(.vertical, 6)

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct RecorderSettingsView: View {
+    @EnvironmentObject var langMgr: LanguageManager
     @Environment(\.dismiss) var dismiss
     @AppStorage("pocket_mode") private var pocketMode = false
     @State private var showPocketExplanation = false
@@ -58,31 +59,31 @@ struct RecorderSettingsView: View {
         return formatLimit(mbPerHour: rates[quality][bitDepth])
     }
 
-    private let splitOptions: [(label: String, sublabel: String, seconds: Int)] = [
-        ("None",    "off",      0),
-        ("5 min",   "300s",     300),
-        ("10 min",  "600s",     600),
-        ("15 min",  "900s",     900),
-        ("18 min",  "1080s",    1080),
-        ("30 min",  "1800s",    1800),
-        ("1 hour",  "3600s",    3600)
-    ]
+    private var splitOptions: [(label: String, sublabel: String, seconds: Int)] {[
+        (langMgr.t("recorder.split.none"), "off",    0),
+        ("5 min",                          "300s",   300),
+        ("10 min",                         "600s",   600),
+        ("15 min",                         "900s",   900),
+        ("18 min",                         "1080s",  1080),
+        ("30 min",                         "1800s",  1800),
+        (langMgr.t("recorder.split.hour"), "3600s",  3600)
+    ]}
 
     var body: some View {
         ZStack {
             Color.phoneBg.ignoresSafeArea()
             VStack(spacing: 0) {
 
-                SubScreenBar(title: "Recorder Settings", onBack: { dismiss() })
+                SubScreenBar(title: langMgr.t("settings.recorderSettings.title"), onBack: { dismiss() })
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 4) {
                         settingsGroup {
-                            ToggleRow(icon: "🎙️", iconColor: .stageMedia, title: "Pocket Mode", isOn: $pocketMode)
+                            ToggleRow(icon: "🎙️", iconColor: .stageMedia, title: langMgr.t("recorder.pocketMode"), isOn: $pocketMode)
                         }
                         .padding(.top, 14)
 
                         // ── Audio Quality ──────────────────────────────────
-                        SectionLabel(text: "Audio Quality")
+                        SectionLabel(text: langMgr.t("recorder.section.quality"))
                         settingsGroup {
                             VStack(spacing: 10) {
                                 segmentedControl(options: qualityLabels, selected: $quality)
@@ -98,7 +99,7 @@ struct RecorderSettingsView: View {
                         }
 
                         // ── Audio Format ───────────────────────────────────
-                        SectionLabel(text: "Audio Format")
+                        SectionLabel(text: langMgr.t("recorder.section.format"))
                         settingsGroup {
                             VStack(spacing: 10) {
                                 segmentedControl(options: formatLabels, selected: $format)
@@ -113,7 +114,7 @@ struct RecorderSettingsView: View {
                         }
 
                         // ── Bit Depth (WAV only) ───────────────────────────
-                        SectionLabel(text: "Bit Depth")
+                        SectionLabel(text: langMgr.t("recorder.section.bitDepth"))
                         settingsGroup {
                             VStack(spacing: 10) {
                                 segmentedControl(options: depthLabels, selected: $bitDepth)
@@ -130,7 +131,7 @@ struct RecorderSettingsView: View {
                         }
 
                         // ── Splitting Interval ─────────────────────────────
-                        SectionLabel(text: "Splitting Interval")
+                        SectionLabel(text: langMgr.t("recorder.section.splitting"))
                         settingsGroup {
                             VStack(spacing: 12) {
                                 // Top row: None + first 3 time options
@@ -151,8 +152,8 @@ struct RecorderSettingsView: View {
                                     Image(systemName: splitInterval > 0 ? "scissors" : "infinity")
                                         .font(.system(size: 10, weight: .semibold))
                                     Text(splitInterval > 0
-                                         ? "Each segment auto-saves and a new one starts immediately"
-                                         : "No splitting — single continuous recording")
+                                         ? langMgr.t("recorder.split.autoSaves")
+                                         : langMgr.t("recorder.split.noSplit"))
                                         .font(.inter(11))
                                 }
                                 .foregroundColor(.textQuaternary)
@@ -163,7 +164,7 @@ struct RecorderSettingsView: View {
                                     Image(systemName: "exclamationmark.triangle.fill")
                                         .font(.system(size: 13))
                                         .foregroundColor(Color(hex: "#f59e0b"))
-                                    Text("Files over 4.5 MB are automatically split before transcription. At your current settings, that's around \(format == 0 || autoConversion ? limitLabelM4A : limitLabelWAV).")
+                                    Text(langMgr.t("recorder.split.sizeWarning").replacingOccurrences(of: "%@", with: format == 0 || autoConversion ? limitLabelM4A : limitLabelWAV))
                                         .font(.inter(11, weight: .medium))
                                         .foregroundColor(Color(hex: "#fbbf24"))
                                         .fixedSize(horizontal: false, vertical: true)
@@ -207,16 +208,16 @@ struct RecorderSettingsView: View {
                 .font(.system(size: 30, weight: .light))
                 .foregroundColor(Color.white.opacity(0.30))
 
-            Text("Pocket Mode Active")
+            Text(langMgr.t("dashboard.pocketMode"))
                 .font(.inter(16, weight: .heavy))
                 .foregroundColor(Color.white.opacity(0.70))
 
             VStack(alignment: .leading, spacing: 14) {
-                pocketRow(icon: "hand.tap",      title: "First tap arms the action",
+                pocketRow(icon: "hand.tap",      title: langMgr.t("recorder.firstTap"),
                           detail: "A strong vibration confirms the button is armed. Nothing happens yet.")
-                pocketRow(icon: "hand.tap.fill",  title: "Second tap confirms",
+                pocketRow(icon: "hand.tap.fill",  title: langMgr.t("recorder.secondTap"),
                           detail: "Tap again within 6 seconds to pause or stop the recording.")
-                pocketRow(icon: "timer",          title: "Inaction cancels",
+                pocketRow(icon: "timer",          title: langMgr.t("recorder.inaction"),
                           detail: "If you don't tap again, the action is cancelled with a soft vibration and recording continues.")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -224,7 +225,7 @@ struct RecorderSettingsView: View {
             Button {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showPocketExplanation = false }
             } label: {
-                Text("Got it")
+                Text(langMgr.t("recorder.gotIt"))
                     .font(.inter(14, weight: .heavy))
                     .foregroundColor(Color.white.opacity(0.60))
                     .frame(maxWidth: .infinity)
@@ -325,6 +326,7 @@ struct RecorderSettingsView: View {
 }
 
 struct PlayerSettingsView: View {
+    @EnvironmentObject var langMgr: LanguageManager
     @Environment(\.dismiss) var dismiss
     @AppStorage("forward_seconds")  private var forwardSec = 30.0
     @AppStorage("rewind_seconds")   private var rewindSec = 10.0
@@ -335,25 +337,25 @@ struct PlayerSettingsView: View {
             Color.phoneBg.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                SubScreenBar(title: "Player Settings", accentColor: .stageText, onBack: { dismiss() })
+                SubScreenBar(title: langMgr.t("recorder.playerSettings"), accentColor: .stageText, onBack: { dismiss() })
 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 4) {
-                        SectionLabel(text: "Rewind / Forward Time")
+                        SectionLabel(text: langMgr.t("recorder.section.rewindFwd"))
 
                         VStack(spacing: 0) {
-                            sliderRow(title: "Forward", value: $forwardSec, range: 5...60, unit: "sec")
+                            sliderRow(title: langMgr.t("recorder.forward"), value: $forwardSec, range: 5...60, unit: langMgr.t("recorder.sec"))
                             Divider().background(Color.white.opacity(0.05)).padding(.leading, 16)
-                            sliderRow(title: "Rewind", value: $rewindSec, range: 5...60, unit: "sec")
+                            sliderRow(title: langMgr.t("recorder.rewind"), value: $rewindSec, range: 5...60, unit: langMgr.t("recorder.sec"))
                         }
                         .background(Color.white.opacity(0.04))
                         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.07), lineWidth: 1))
                         .clipShape(RoundedRectangle(cornerRadius: 16))
                         .padding(.horizontal, 14)
 
-                        SectionLabel(text: "Repeat Audio")
+                        SectionLabel(text: langMgr.t("recorder.section.repeatAudio"))
                         VStack(spacing: 0) {
-                            ToggleRow(icon: "repeat", iconColor: .brandBlue, title: "Repeat", isOn: $repeatAudio)
+                            ToggleRow(icon: "repeat", iconColor: .brandBlue, title: langMgr.t("recorder.repeat"), isOn: $repeatAudio)
                         }
                         .background(Color.white.opacity(0.04))
                         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.07), lineWidth: 1))
