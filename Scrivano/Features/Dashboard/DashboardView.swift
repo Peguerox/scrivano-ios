@@ -66,6 +66,7 @@ struct DashboardView: View {
 
     // New item overlay
     @State private var newItemName = ""
+    @State private var newItemDuplicateError = false
     @FocusState private var newItemFocused: Bool
 
     // Clear confirm overlay
@@ -780,7 +781,7 @@ struct DashboardView: View {
     private var newItemCard: some View {
         if showNewItem {
             Color.black.opacity(0.65).ignoresSafeArea()
-                .onTapGesture { showNewItem = false; newItemName = "" }
+                .onTapGesture { showNewItem = false; newItemName = ""; newItemDuplicateError = false }
                 .zIndex(20)
             VStack {
                 Spacer()
@@ -790,7 +791,7 @@ struct DashboardView: View {
                             .font(.inter(16, weight: .heavy))
                             .foregroundColor(.textPrimary)
                         Spacer()
-                        Button { showNewItem = false; newItemName = "" } label: {
+                        Button { showNewItem = false; newItemName = ""; newItemDuplicateError = false } label: {
                             Image(systemName: "xmark")
                                 .font(.system(size: 14, weight: .bold))
                                 .foregroundColor(.textTertiary)
@@ -799,29 +800,44 @@ struct DashboardView: View {
                                 .clipShape(Circle())
                         }
                     }
-                    TextField("Item name", text: $newItemName)
-                        .font(.inter(14))
-                        .foregroundColor(.textPrimary)
-                        .padding(.horizontal, 14).padding(.vertical, 12)
-                        .background(Color.white.opacity(0.06))
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.brandCyan.opacity(0.35), lineWidth: 1))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .autocorrectionDisabled()
-                        .focused($newItemFocused)
-                        .onSubmit {
-                            let t = newItemName.trimmingCharacters(in: .whitespaces)
-                            guard !t.isEmpty else { return }
-                            let item = vm.createItem(name: t)
-                            selectedItem = item
-                            showNewItem = false; newItemName = ""
-                            if recordAfterNewItem { recordAfterNewItem = false; showRecorder = true }
+                    VStack(alignment: .leading, spacing: 6) {
+                        TextField("Item name", text: $newItemName)
+                            .font(.inter(14))
+                            .foregroundColor(.textPrimary)
+                            .padding(.horizontal, 14).padding(.vertical, 12)
+                            .background(Color.white.opacity(0.06))
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(newItemDuplicateError ? Color.red.opacity(0.7) : Color.brandCyan.opacity(0.35), lineWidth: 1))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .autocorrectionDisabled()
+                            .focused($newItemFocused)
+                            .onChange(of: newItemName) { _ in newItemDuplicateError = false }
+                            .onSubmit {
+                                let t = newItemName.trimmingCharacters(in: .whitespaces)
+                                guard !t.isEmpty else { return }
+                                if vm.items.contains(where: { $0.name.localizedCaseInsensitiveCompare(t) == .orderedSame }) {
+                                    newItemDuplicateError = true; return
+                                }
+                                let item = vm.createItem(name: t)
+                                selectedItem = item
+                                showNewItem = false; newItemName = ""; newItemDuplicateError = false
+                                if recordAfterNewItem { recordAfterNewItem = false; showRecorder = true }
+                            }
+                        if newItemDuplicateError {
+                            Text("An item with this name already exists.")
+                                .font(.inter(12))
+                                .foregroundColor(.red.opacity(0.85))
+                                .padding(.horizontal, 4)
                         }
+                    }
                     Button {
                         let t = newItemName.trimmingCharacters(in: .whitespaces)
                         guard !t.isEmpty else { return }
+                        if vm.items.contains(where: { $0.name.localizedCaseInsensitiveCompare(t) == .orderedSame }) {
+                            newItemDuplicateError = true; return
+                        }
                         let item = vm.createItem(name: t)
                         selectedItem = item
-                        showNewItem = false; newItemName = ""
+                        showNewItem = false; newItemName = ""; newItemDuplicateError = false
                         if recordAfterNewItem { recordAfterNewItem = false; showRecorder = true }
                     } label: {
                         Text("Create Item →")
@@ -1434,18 +1450,17 @@ struct DashboardView: View {
                     } label: {
                         ZStack {
                             Circle()
-                                .fill(Color(hex: "#ef4444").opacity(fabPulse ? 0.12 : 0.07))
-                                .frame(width: 84, height: 84)
-                            Circle()
-                                .fill(Color(hex: "#ef4444").opacity(fabPulse ? 0.05 : 0.02))
-                                .frame(width: 100, height: 100)
-                            Circle()
-                                .fill(LinearGradient(colors: [Color(hex: "#ef4444"), Color(hex: "#c41e1e")], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                .fill(LinearGradient(colors: [Color(hex: "#081526"), Color(hex: "#030c1a")],
+                                                     startPoint: .topLeading, endPoint: .bottomTrailing))
                                 .frame(width: 66, height: 66)
-                                .shadow(color: Color(hex: "#ef4444").opacity(0.45), radius: 16, y: 10)
-                            Circle()
-                                .fill(Color.white.opacity(0.93))
-                                .frame(width: 26, height: 26)
+                                .overlay(Circle().stroke(Color.brandCyan.opacity(0.45), lineWidth: 2))
+                                .shadow(color: Color.brandCyan.opacity(0.5), radius: 10)
+                            Image("ScrivanoLogo")
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 66, height: 66)
+                                .clipShape(Circle())
+                                .shadow(color: Color.brandCyan.opacity(0.8), radius: 6)
                         }
                         .frame(width: 66, height: 66)
                     }
