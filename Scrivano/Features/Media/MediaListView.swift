@@ -235,6 +235,7 @@ struct MediaListView: View {
     // Observe shared transcription/image state
     @ObservedObject private var transcriptionMgr = TranscriptionManager.shared
     @ObservedObject private var imageMgr = ImageProcessingManager.shared
+    @ObservedObject private var langMgr = LanguageManager.shared
 
     // Conversion
     @State private var convertingRecordingId: String? = nil
@@ -276,23 +277,23 @@ struct MediaListView: View {
 
             VStack(spacing: 0) {
                 // Top bar
-                SubScreenBar(title: "Media", accentColor: .stageMedia, onBack: { dismiss() })
+                SubScreenBar(title: langMgr.t("automation.stage.media"), accentColor: .stageMedia, onBack: { dismiss() })
                     .overlay(alignment: .trailing) {
                         Menu {
-                            Button { showAudioImporter = true } label: { Label("Import Audio File", systemImage: "waveform") }
-                            Button { showPhotoLibrary = true } label: { Label("Import Image", systemImage: "photo") }
+                            Button { showAudioImporter = true } label: { Label(langMgr.t("media.importAudioFile"), systemImage: "waveform") }
+                            Button { showPhotoLibrary = true } label: { Label(langMgr.t("media.importImage"), systemImage: "photo") }
                             Button {
                                 selected.removeAll()
                                 pendingAction = .move
                             } label: {
-                                Label("Move", systemImage: "folder")
+                                Label(langMgr.t("common.move"), systemImage: "folder")
                             }
                             .disabled(allAudioIds.isEmpty)
                             Button(role: .destructive) {
                                 selected.removeAll()
                                 pendingAction = .delete
                             } label: {
-                                Label("Delete", systemImage: "trash")
+                                Label(langMgr.t("common.delete"), systemImage: "trash")
                             }
                             .disabled(allAudioIds.isEmpty)
                         } label: {
@@ -324,10 +325,10 @@ struct MediaListView: View {
                             Image(systemName: "tray")
                                 .font(.system(size: 40))
                                 .foregroundColor(.textQuaternary)
-                            Text("No audio yet")
+                            Text(langMgr.t("media.noAudio"))
                                 .font(.inter(16, weight: .bold))
                                 .foregroundColor(.textTertiary)
-                            Text("Tap the microphone button to record")
+                            Text(langMgr.t("media.noAudio.hint"))
                                 .font(.inter(12))
                                 .foregroundColor(.textQuaternary)
                                 .multilineTextAlignment(.center)
@@ -349,8 +350,8 @@ struct MediaListView: View {
                     if inSelectionMode {
                         VStack(spacing: 6) {
                             Text(pendingAction == .delete
-                                 ? "Select files to delete"
-                                 : "Select files to move")
+                                 ? langMgr.t("media.selectToDelete")
+                                 : langMgr.t("media.selectToMove"))
                                 .font(.inter(12, weight: .semibold))
                                 .foregroundColor(.textTertiary)
                                 .padding(.top, 10)
@@ -360,7 +361,7 @@ struct MediaListView: View {
                                     selected.removeAll()
                                     pendingAction = nil
                                 } label: {
-                                    Text("Cancel")
+                                    Text(langMgr.t("common.cancel"))
                                         .font(.inter(14, weight: .semibold))
                                         .foregroundColor(.textSecondary)
                                         .frame(maxWidth: .infinity)
@@ -380,8 +381,8 @@ struct MediaListView: View {
                                         Image(systemName: pendingAction == .delete ? "trash" : "folder")
                                             .font(.system(size: 13, weight: .bold))
                                         Text(pendingAction == .delete
-                                             ? "Delete \(selected.count)"
-                                             : "Move \(selected.count)")
+                                             ? langMgr.t("media.deleteCount").replacingOccurrences(of: "%d", with: "\(selected.count)")
+                                             : langMgr.t("media.moveCount").replacingOccurrences(of: "%d", with: "\(selected.count)"))
                                             .font(.inter(14, weight: .bold))
                                     }
                                     .foregroundColor(.white)
@@ -397,7 +398,7 @@ struct MediaListView: View {
                                 .disabled(selected.isEmpty)
                             }
 
-                            Text("\(selected.count) file\(selected.count == 1 ? "" : "s") selected")
+                            Text(langMgr.t("media.filesSelected").replacingOccurrences(of: "%d", with: "\(selected.count)"))
                                 .font(.inter(11))
                                 .foregroundColor(.textQuaternary)
                         }
@@ -421,7 +422,7 @@ struct MediaListView: View {
                         } else if isThisItem, transcriptionMgr.transcriptionResult == true {
                             HStack(spacing: 6) {
                                 Image(systemName: "checkmark.circle.fill").font(.system(size: 13)).foregroundColor(Color(hex: "#34d399"))
-                                Text("Transcription saved to Text").font(.inter(11)).foregroundColor(Color(hex: "#34d399"))
+                                Text(langMgr.t("recording.saved")).font(.inter(11)).foregroundColor(Color(hex: "#34d399"))
                             }
                             .padding(.horizontal, 18).padding(.top, 8)
                         } else if imageMgr.processingItemId == item.id {
@@ -434,7 +435,7 @@ struct MediaListView: View {
                             } else if imageMgr.processingResult == true {
                                 HStack(spacing: 6) {
                                     Image(systemName: "checkmark.circle.fill").font(.system(size: 13)).foregroundColor(Color(hex: "#34d399"))
-                                    Text("Image note saved to Text").font(.inter(11)).foregroundColor(Color(hex: "#34d399"))
+                                    Text(langMgr.t("recording.imageSaved")).font(.inter(11)).foregroundColor(Color(hex: "#34d399"))
                                 }
                                 .padding(.horizontal, 18).padding(.top, 8)
                             }
@@ -452,7 +453,7 @@ struct MediaListView: View {
                             } label: {
                                 HStack(spacing: 8) {
                                     Image(systemName: "bolt.fill").font(.system(size: 14, weight: .bold))
-                                    Text("Process Media").font(.inter(15, weight: .heavy))
+                                    Text(langMgr.t("media.processMedia")).font(.inter(15, weight: .heavy))
                                 }
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
@@ -467,7 +468,7 @@ struct MediaListView: View {
                             }
                             .disabled(!hasProcessableMedia)
 
-                            Text(selected.isEmpty ? "Tap to select all and process" : "\(selected.count) audio file\(selected.count == 1 ? "" : "s") selected")
+                            Text(selected.isEmpty ? langMgr.t("media.tapToSelectAll") : langMgr.t("media.audioFilesSelected").replacingOccurrences(of: "%d", with: "\(selected.count)"))
                                 .font(.inter(11))
                                 .foregroundColor(.textQuaternary)
                         }
@@ -480,7 +481,7 @@ struct MediaListView: View {
                 .animation(.spring(response: 0.3, dampingFraction: 0.85), value: inSelectionMode)
             }
 
-            if isLoading { LoadingOverlay(message: "Loading files…") }
+            if isLoading { LoadingOverlay(message: langMgr.t("media.loadingFiles")) }
 
             renameMediaOverlay
 
@@ -495,11 +496,11 @@ struct MediaListView: View {
                             .foregroundColor(.stageMedia)
                             .shadow(color: Color.stageMedia.opacity(0.7), radius: 10)
 
-                        Text("Process Media")
+                        Text(langMgr.t("media.processMedia"))
                             .font(.inter(16, weight: .heavy))
                             .foregroundColor(.textPrimary)
 
-                        Text("Continue with \(selected.count) audio file\(selected.count == 1 ? "" : "s")?")
+                        Text(langMgr.t("media.continueWith").replacingOccurrences(of: "%d", with: "\(selected.count)"))
                             .font(.inter(13))
                             .foregroundColor(.textSecondary)
                             .multilineTextAlignment(.center)
@@ -517,7 +518,7 @@ struct MediaListView: View {
                             Button {
                                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showProcessConfirm = false }
                             } label: {
-                                Text("Cancel")
+                                Text(langMgr.t("common.cancel"))
                                     .font(.inter(14, weight: .semibold))
                                     .foregroundColor(.textSecondary)
                                     .frame(maxWidth: .infinity)
@@ -534,7 +535,7 @@ struct MediaListView: View {
                                 TranscriptionManager.shared.queuedRecordingIds.formUnion(queuedIds)
                                 processQueueNext()
                             } label: {
-                                Text("Continue")
+                                Text(langMgr.t("dashboard.record.continue"))
                                     .font(.inter(14, weight: .bold))
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
@@ -570,11 +571,11 @@ struct MediaListView: View {
                             .foregroundColor(.danger)
                             .shadow(color: Color.danger.opacity(0.7), radius: 10)
 
-                        Text("Delete Files")
+                        Text(langMgr.t("media.deleteFiles"))
                             .font(.inter(16, weight: .heavy))
                             .foregroundColor(.textPrimary)
 
-                        Text("Permanently delete \(selected.count) file\(selected.count == 1 ? "" : "s")?")
+                        Text(langMgr.t("media.deleteFilesMsg").replacingOccurrences(of: "%d", with: "\(selected.count)"))
                             .font(.inter(13))
                             .foregroundColor(.textSecondary)
                             .multilineTextAlignment(.center)
@@ -592,7 +593,7 @@ struct MediaListView: View {
                             Button {
                                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showDeleteConfirm = false }
                             } label: {
-                                Text("Cancel")
+                                Text(langMgr.t("common.cancel"))
                                     .font(.inter(14, weight: .semibold))
                                     .foregroundColor(.textSecondary)
                                     .frame(maxWidth: .infinity)
@@ -610,7 +611,7 @@ struct MediaListView: View {
                                 selected.removeAll()
                                 pendingAction = nil
                             } label: {
-                                Text("Delete")
+                                Text(langMgr.t("common.delete"))
                                     .font(.inter(14, weight: .bold))
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
@@ -648,11 +649,11 @@ struct MediaListView: View {
                                 .foregroundColor(.stageMedia)
                                 .shadow(color: Color.stageMedia.opacity(0.7), radius: 10)
 
-                            Text("Preparation Required")
+                            Text(langMgr.t("media.preparationRequired"))
                                 .font(.inter(16, weight: .heavy))
                                 .foregroundColor(.textPrimary)
 
-                            Text("These files will be prepared automatically before transcription.")
+                            Text(langMgr.t("media.processMedia.hint"))
                                 .font(.inter(12))
                                 .foregroundColor(.textSecondary)
                                 .multilineTextAlignment(.center)
@@ -670,7 +671,7 @@ struct MediaListView: View {
                                 Button {
                                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showPreparation = false }
                                 } label: {
-                                    Text("Cancel")
+                                    Text(langMgr.t("common.cancel"))
                                         .font(.inter(14, weight: .semibold))
                                         .foregroundColor(.textSecondary)
                                         .frame(maxWidth: .infinity)
@@ -682,7 +683,7 @@ struct MediaListView: View {
                                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showPreparation = false }
                                     startTranscription()
                                 } label: {
-                                    Text("Continue")
+                                    Text(langMgr.t("dashboard.record.continue"))
                                         .font(.inter(14, weight: .bold))
                                         .foregroundColor(.white)
                                         .frame(maxWidth: .infinity)
@@ -855,7 +856,7 @@ struct MediaListView: View {
 
     private var renameMediaCard: some View {
         VStack(spacing: 16) {
-            Text(renameRecording != nil ? "Rename Audio" : "Rename Image")
+            Text(renameRecording != nil ? langMgr.t("media.renameAudio") : langMgr.t("media.renameImage"))
                 .font(.inter(16, weight: .heavy))
                 .foregroundColor(.textPrimary)
             TextField("", text: $renameMediaText)
@@ -868,7 +869,7 @@ struct MediaListView: View {
                 .autocorrectionDisabled()
             HStack(spacing: 10) {
                 Button { renameRecording = nil; renameImage = nil } label: {
-                    Text("Cancel")
+                    Text(langMgr.t("common.cancel"))
                         .font(.inter(14, weight: .bold)).foregroundColor(.textTertiary)
                         .frame(maxWidth: .infinity).padding(.vertical, 13)
                         .background(Color.white.opacity(0.05))
@@ -890,7 +891,7 @@ struct MediaListView: View {
                         renameImage = nil
                     }
                 } label: {
-                    Text("Rename")
+                    Text(langMgr.t("common.rename"))
                         .font(.inter(14, weight: .bold)).foregroundColor(.white)
                         .frame(maxWidth: .infinity).padding(.vertical, 13)
                         .background(LinearGradient(colors: [Color.brandBlue, Color.brandCyan], startPoint: .leading, endPoint: .trailing))
@@ -1057,7 +1058,7 @@ struct MediaListView: View {
                 Spacer()
             }
             if result.isReady {
-                Text("Ready to transcribe")
+                Text(langMgr.t("media.readyToTranscribe"))
                     .font(.inter(11))
                     .foregroundColor(.stageNotes)
                     .padding(.leading, 21)
@@ -1152,6 +1153,7 @@ struct LocalAudioRow: View {
     var onConvert: () -> Void = {}
     var onRenameRequested: () -> Void = {}
 
+    @ObservedObject private var langMgr = LanguageManager.shared
     @State private var showMoreInfo = false
     @State private var showMoveTo = false
     @State private var hourglassFlipped = false
@@ -1229,28 +1231,28 @@ struct LocalAudioRow: View {
                 .buttonStyle(.plain)
 
                 Menu {
-                    Section("Process Audio") {
-                        Button { onTranscribe() } label: { Label("Transcribe", systemImage: "waveform.badge.magnifyingglass") }
+                    Section(langMgr.t("media.section.processAudio")) {
+                        Button { onTranscribe() } label: { Label(langMgr.t("dashboard.transcribe"), systemImage: "waveform.badge.magnifyingglass") }
                         let fileExt = entry.fileURL.pathExtension.lowercased()
                         if fileExt != "m4a" && fileExt != "mp3" {
-                            Button { onConvert() } label: { Label("Convert to M4A", systemImage: "arrow.triangle.2.circlepath") }
+                            Button { onConvert() } label: { Label(langMgr.t("media.convertToM4A"), systemImage: "arrow.triangle.2.circlepath") }
                                 .disabled(isConverting)
                         }
-                        Button { onSplit() } label: { Label("Split Audio", systemImage: "scissors") }
-                        Button { onTrim() }  label: { Label("Trim Audio",  systemImage: "crop") }
+                        Button { onSplit() } label: { Label(langMgr.t("media.splitAudio"), systemImage: "scissors") }
+                        Button { onTrim() }  label: { Label(langMgr.t("media.trimAudio"),  systemImage: "crop") }
                     }
-                    Section("Share") {
+                    Section(langMgr.t("common.section.share")) {
                         ShareLink(item: entry.fileURL) {
-                            Label("Share…", systemImage: "square.and.arrow.up")
+                            Label(langMgr.t("common.shareEllipsis"), systemImage: "square.and.arrow.up")
                         }
                     }
-                    Section("Manage") {
-                        Button { onRenameRequested() } label: { Label("Rename", systemImage: "pencil") }
-                        Button { showMoveTo = true } label: { Label("Move to…", systemImage: "folder") }
-                        Button(role: .destructive) { DeleteConfirmPresenter.show(itemName: displayName, onDelete: onDelete) } label: { Label("Delete", systemImage: "trash") }
+                    Section(langMgr.t("common.section.manage")) {
+                        Button { onRenameRequested() } label: { Label(langMgr.t("common.rename"), systemImage: "pencil") }
+                        Button { showMoveTo = true } label: { Label(langMgr.t("common.moveTo"), systemImage: "folder") }
+                        Button(role: .destructive) { DeleteConfirmPresenter.show(itemName: displayName, onDelete: onDelete) } label: { Label(langMgr.t("common.delete"), systemImage: "trash") }
                     }
-                    Section("Info") {
-                        Button { showMoreInfo = true } label: { Label("More Info", systemImage: "info.circle") }
+                    Section(langMgr.t("common.section.info")) {
+                        Button { showMoreInfo = true } label: { Label(langMgr.t("common.moreInfo"), systemImage: "info.circle") }
                     }
                 } label: {
                     Text("···")
@@ -1281,6 +1283,7 @@ struct AudioMoreInfoSheet: View {
     let entry: LocalRecordingEntry
     let displayName: String
     @Environment(\.dismiss) var dismiss
+    @ObservedObject private var langMgr = LanguageManager.shared
 
     struct Meta {
         var fileSize    = "—"
@@ -1305,7 +1308,7 @@ struct AudioMoreInfoSheet: View {
             Color(hex: "#081221").ignoresSafeArea()
             VStack(spacing: 0) {
                 HStack {
-                    Text("More Info")
+                    Text(langMgr.t("common.moreInfo"))
                         .font(.inter(17, weight: .heavy)).foregroundColor(.textPrimary)
                     Spacer()
                     Button { dismiss() } label: {
@@ -1318,15 +1321,15 @@ struct AudioMoreInfoSheet: View {
 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 1) {
-                        infoRow("Name",          displayName)
-                        infoRow("Format",        format)
-                        infoRow("Duration",      duration)
-                        infoRow("File Size",     meta.fileSize)
-                        infoRow("Sample Rate",   meta.sampleRate)
-                        infoRow("Channels",      meta.channels)
-                        infoRow("Bit Rate",      meta.bitRate)
-                        infoRow("Created",       meta.dateCreated)
-                        infoRow("Modified",      meta.dateModified)
+                        infoRow(langMgr.t("info.name"),       displayName)
+                        infoRow(langMgr.t("info.format"),     format)
+                        infoRow(langMgr.t("info.duration"),   duration)
+                        infoRow(langMgr.t("info.fileSize"),   meta.fileSize)
+                        infoRow(langMgr.t("info.sampleRate"), meta.sampleRate)
+                        infoRow(langMgr.t("info.channels"),   meta.channels)
+                        infoRow(langMgr.t("info.bitRate"),    meta.bitRate)
+                        infoRow(langMgr.t("info.created"),    meta.dateCreated)
+                        infoRow(langMgr.t("info.modified"),   meta.dateModified)
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                     .padding(.horizontal, 20)
@@ -1385,6 +1388,7 @@ struct LocalAudioPlayerView: View {
 
     @StateObject private var player = AudioPlayerManager()
     @Environment(\.dismiss) var dismiss
+    @ObservedObject private var langMgr = LanguageManager.shared
 
     enum EditMode { case none, split, trim }
     @State private var editMode: EditMode = .none
@@ -1408,7 +1412,7 @@ struct LocalAudioPlayerView: View {
             Color.phoneBg.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                SubScreenBar(title: "Audio", accentColor: .stageMedia, backIcon: "xmark", onBack: { dismiss() })
+                SubScreenBar(title: langMgr.t("media.audio"), accentColor: .stageMedia, backIcon: "xmark", onBack: { dismiss() })
                     .overlay(alignment: .bottom) { Rectangle().fill(Color.stageMedia.opacity(0.4)).frame(height: 2) }
 
                 // ── Waveform ──────────────────────────────────────────
@@ -1610,7 +1614,7 @@ struct LocalAudioPlayerView: View {
                 Color.black.opacity(0.55).ignoresSafeArea()
                 VStack(spacing: 14) {
                     ProgressView().progressViewStyle(.circular).tint(.stageMedia).scaleEffect(1.3)
-                    Text("Processing…").font(.inter(13, weight: .semibold)).foregroundColor(.textSecondary)
+                    Text(langMgr.t("common.processing")).font(.inter(13, weight: .semibold)).foregroundColor(.textSecondary)
                 }
             }
         }
@@ -1635,12 +1639,12 @@ struct LocalAudioPlayerView: View {
         switch editMode {
         case .none:
             HStack(spacing: 14) {
-                editPill(icon: "scissors", label: "Split") {
+                editPill(icon: "scissors", label: langMgr.t("media.split")) {
                     player.pause()
                     splitFraction = progress > 0.05 ? progress : 0.5
                     editMode = .split
                 }
-                editPill(icon: "crop", label: "Trim") {
+                editPill(icon: "crop", label: langMgr.t("media.trim")) {
                     player.pause()
                     // Position handles around current playhead; default 25–75 if not yet played
                     let p = progress > 0.05 ? progress : 0.5
@@ -1653,17 +1657,19 @@ struct LocalAudioPlayerView: View {
 
         case .split:
             VStack(spacing: 10) {
-                Text("Cut at \(formatTime(splitFraction * player.duration)) — drag scissors to reposition")
+                Text(langMgr.t("media.cutAt").replacingOccurrences(of: "%@", with: formatTime(splitFraction * player.duration)))
                     .font(.inter(12)).foregroundColor(Color.white.opacity(0.45))
-                confirmRow(confirmLabel: "Confirm Split", action: { Task { await doSplit() } })
+                confirmRow(confirmLabel: langMgr.t("media.confirmSplit"), action: { Task { await doSplit() } })
             }
             .padding(.horizontal, 20).padding(.bottom, 8)
 
         case .trim:
             VStack(spacing: 10) {
-                Text("Keep \(formatTime(trimStart * player.duration)) → \(formatTime(trimEnd * player.duration))")
+                Text(langMgr.t("media.keepRange")
+                    .replacingOccurrences(of: "%1@", with: formatTime(trimStart * player.duration))
+                    .replacingOccurrences(of: "%2@", with: formatTime(trimEnd * player.duration)))
                     .font(.inter(12)).foregroundColor(Color.white.opacity(0.45))
-                confirmRow(confirmLabel: "Confirm Trim", action: { Task { await doTrim() } })
+                confirmRow(confirmLabel: langMgr.t("media.confirmTrim"), action: { Task { await doTrim() } })
             }
             .padding(.horizontal, 20).padding(.bottom, 8)
         }
@@ -1690,7 +1696,7 @@ struct LocalAudioPlayerView: View {
     private func confirmRow(confirmLabel: String, action: @escaping () -> Void) -> some View {
         HStack(spacing: 12) {
             Button { editMode = .none } label: {
-                Text("Cancel")
+                Text(langMgr.t("common.cancel"))
                     .font(.inter(13, weight: .semibold)).foregroundColor(.textSecondary)
                     .frame(maxWidth: .infinity).padding(.vertical, 11)
                     .background(Color.white.opacity(0.07))
@@ -1793,6 +1799,7 @@ struct MoveToSheet: View {
     let entry: LocalRecordingEntry
     var onMoved: () -> Void
     @Environment(\.dismiss) var dismiss
+    @ObservedObject private var langMgr = LanguageManager.shared
 
     @State private var expanded = Set<String>()
     private let allItems   = LocalItemStore.shared.all()
@@ -1809,7 +1816,7 @@ struct MoveToSheet: View {
             VStack(spacing: 0) {
                 Capsule().fill(Color.white.opacity(0.2)).frame(width: 36, height: 4).padding(.top, 12)
                 HStack {
-                    Text("Move to…")
+                    Text(langMgr.t("common.moveTo"))
                         .font(.inter(17, weight: .heavy)).foregroundColor(.textPrimary)
                     Spacer()
                     Button { dismiss() } label: {
@@ -1932,6 +1939,7 @@ struct ImageMoveToSheet: View {
     let currentItemId: String
     var onMoved: () -> Void
     @Environment(\.dismiss) var dismiss
+    @ObservedObject private var langMgr = LanguageManager.shared
 
     @State private var expanded = Set<String>()
     private let allItems    = LocalItemStore.shared.all()
@@ -1948,7 +1956,7 @@ struct ImageMoveToSheet: View {
             VStack(spacing: 0) {
                 Capsule().fill(Color.white.opacity(0.2)).frame(width: 36, height: 4).padding(.top, 12)
                 HStack {
-                    Text("Move to…").font(.inter(17, weight: .heavy)).foregroundColor(.textPrimary)
+                    Text(langMgr.t("common.moveTo")).font(.inter(17, weight: .heavy)).foregroundColor(.textPrimary)
                     Spacer()
                     Button { dismiss() } label: {
                         Image(systemName: "xmark").font(.system(size: 13, weight: .bold))
@@ -2310,6 +2318,7 @@ struct ImageViewerSheet: View {
 struct ImageMoreInfoSheet: View {
     let imageFile: ImageFile
     @Environment(\.dismiss) var dismiss
+    @ObservedObject private var langMgr = LanguageManager.shared
 
     struct Meta {
         var fileSize   = "—"
@@ -2325,7 +2334,7 @@ struct ImageMoreInfoSheet: View {
             Color(hex: "#081221").ignoresSafeArea()
             VStack(spacing: 0) {
                 HStack {
-                    Text("More Info")
+                    Text(langMgr.t("common.moreInfo"))
                         .font(.inter(17, weight: .heavy)).foregroundColor(.textPrimary)
                     Spacer()
                     Button { dismiss() } label: {
@@ -2338,12 +2347,12 @@ struct ImageMoreInfoSheet: View {
 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 1) {
-                        infoRow("Name",       imageFile.name)
-                        infoRow("Format",     meta.format)
-                        infoRow("Dimensions", meta.dimensions)
-                        infoRow("File Size",  meta.fileSize)
-                        infoRow("Created",    meta.created)
-                        infoRow("Modified",   meta.modified)
+                        infoRow(langMgr.t("info.name"),       imageFile.name)
+                        infoRow(langMgr.t("info.format"),     meta.format)
+                        infoRow(langMgr.t("info.dimensions"), meta.dimensions)
+                        infoRow(langMgr.t("info.fileSize"),   meta.fileSize)
+                        infoRow(langMgr.t("info.created"),    meta.created)
+                        infoRow(langMgr.t("info.modified"),   meta.modified)
                     }
                     .clipShape(RoundedRectangle(cornerRadius: 14))
                     .padding(.horizontal, 20)
@@ -2393,6 +2402,7 @@ struct BulkMoveAudioSheet: View {
     let currentItemId: String
     var onMoved: () -> Void
     @Environment(\.dismiss) var dismiss
+    @ObservedObject private var langMgr = LanguageManager.shared
 
     @State private var expanded = Set<String>()
     private let allItems    = LocalItemStore.shared.all()
@@ -2409,7 +2419,7 @@ struct BulkMoveAudioSheet: View {
             VStack(spacing: 0) {
                 Capsule().fill(Color.white.opacity(0.2)).frame(width: 36, height: 4).padding(.top, 12)
                 HStack {
-                    Text("Move \(ids.count) file\(ids.count == 1 ? "" : "s") to…")
+                    Text(langMgr.t("media.moveTo").replacingOccurrences(of: "%d", with: "\(ids.count)"))
                         .font(.inter(17, weight: .heavy)).foregroundColor(.textPrimary)
                     Spacer()
                     Button { dismiss() } label: {

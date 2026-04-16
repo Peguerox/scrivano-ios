@@ -23,6 +23,7 @@ struct TextListView: View {
     var triggerDocImport: Bool = false
     @Environment(\.dismiss) var dismiss
     @ObservedObject private var notesMgr = NoteGenerationManager.shared
+    @ObservedObject private var langMgr = LanguageManager.shared
     @State private var transcripts: [TranscriptSummary] = []
     @State private var selected = Set<String>()
     @State private var showPrompts = false
@@ -61,31 +62,31 @@ struct TextListView: View {
 
             VStack(spacing: 0) {
                 // Top bar
-                SubScreenBar(title: "Text", accentColor: .stageText, onBack: { dismiss() })
+                SubScreenBar(title: langMgr.t("automation.stage.text"), accentColor: .stageText, onBack: { dismiss() })
                     .overlay(alignment: .trailing) {
                         Menu {
                             Button { showDocImporter = true } label: {
-                                Label("Import Document", systemImage: "doc.badge.plus")
+                                Label(langMgr.t("dashboard.importDocument"), systemImage: "doc.badge.plus")
                             }
                             Button {
                                 selected.removeAll()
                                 pendingAction = .merge
                             } label: {
-                                Label("Merge Texts", systemImage: "text.append")
+                                Label(langMgr.t("text.mergeTexts"), systemImage: "text.append")
                             }
                             .disabled(transcripts.filter { !$0.isMerge }.count < 2)
                             Button {
                                 selected.removeAll()
                                 pendingAction = .move
                             } label: {
-                                Label("Move", systemImage: "folder")
+                                Label(langMgr.t("common.move"), systemImage: "folder")
                             }
                             .disabled(transcripts.filter { !$0.isMerge }.isEmpty)
                             Button(role: .destructive) {
                                 selected.removeAll()
                                 pendingAction = .delete
                             } label: {
-                                Label("Delete", systemImage: "trash")
+                                Label(langMgr.t("common.delete"), systemImage: "trash")
                             }
                             .disabled(transcripts.filter { !$0.isMerge }.isEmpty)
                         } label: {
@@ -154,10 +155,10 @@ struct TextListView: View {
                             Image(systemName: "doc.text")
                                 .font(.system(size: 40))
                                 .foregroundColor(.textQuaternary)
-                            Text("No text yet")
+                            Text(langMgr.t("text.noText"))
                                 .font(.inter(16, weight: .bold))
                                 .foregroundColor(.textTertiary)
-                            Text("Transcribe audio files to generate text")
+                            Text(langMgr.t("text.noText.hint"))
                                 .font(.inter(12))
                                 .foregroundColor(.textQuaternary)
                                 .multilineTextAlignment(.center)
@@ -181,9 +182,9 @@ struct TextListView: View {
                         VStack(spacing: 6) {
                             Text({
                                 switch pendingAction {
-                                case .delete: return "Select files to delete"
-                                case .merge:  return "Select files to merge"
-                                default:      return "Select files to move"
+                                case .delete: return langMgr.t("text.selectToDelete")
+                                case .merge:  return langMgr.t("text.selectToMerge")
+                                default:      return langMgr.t("text.selectToMove")
                                 }
                             }())
                             .font(.inter(12, weight: .semibold))
@@ -195,7 +196,7 @@ struct TextListView: View {
                                     selected.removeAll()
                                     pendingAction = nil
                                 } label: {
-                                    Text("Cancel")
+                                    Text(langMgr.t("common.cancel"))
                                         .font(.inter(14, weight: .semibold))
                                         .foregroundColor(.textSecondary)
                                         .frame(maxWidth: .infinity)
@@ -220,9 +221,9 @@ struct TextListView: View {
                                 }()
                                 let actionLabel: String = {
                                     switch pendingAction {
-                                    case .delete: return "Delete \(selected.count)"
-                                    case .merge:  return "Merge \(selected.count)"
-                                    default:      return "Move \(selected.count)"
+                                    case .delete: return langMgr.t("text.deleteCount").replacingOccurrences(of: "%d", with: "\(selected.count)")
+                                    case .merge:  return langMgr.t("text.mergeCount").replacingOccurrences(of: "%d", with: "\(selected.count)")
+                                    default:      return langMgr.t("text.moveCount").replacingOccurrences(of: "%d", with: "\(selected.count)")
                                     }
                                 }()
 
@@ -248,7 +249,7 @@ struct TextListView: View {
                                 .disabled(selected.count < (pendingAction == .merge ? 2 : 1))
                             }
 
-                            Text("\(selected.count) file\(selected.count == 1 ? "" : "s") selected")
+                            Text(langMgr.t("text.filesSelected").replacingOccurrences(of: "%d", with: "\(selected.count)"))
                                 .font(.inter(11))
                                 .foregroundColor(.textQuaternary)
                         }
@@ -261,7 +262,7 @@ struct TextListView: View {
                             HStack(spacing: 6) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 13)).foregroundColor(Color(hex: "#34d399"))
-                                Text("Texts merged and saved!")
+                                Text(langMgr.t("text.textsMerged"))
                                     .font(.inter(11)).foregroundColor(Color(hex: "#34d399"))
                             }
                             .padding(.horizontal, 18).padding(.top, 8)
@@ -291,7 +292,7 @@ struct TextListView: View {
                             } label: {
                                 HStack(spacing: 8) {
                                     Image(systemName: "bolt.fill").font(.system(size: 14, weight: .bold))
-                                    Text("Process Text").font(.inter(15, weight: .heavy))
+                                    Text(langMgr.t("text.processText")).font(.inter(15, weight: .heavy))
                                 }
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
@@ -307,8 +308,8 @@ struct TextListView: View {
                             .disabled(allTextIds.isEmpty)
 
                             Text(selected.isEmpty
-                                 ? "Tap to select all and process"
-                                 : "\(selected.count) file\(selected.count == 1 ? "" : "s") selected")
+                                 ? langMgr.t("media.tapToSelectAll")
+                                 : langMgr.t("text.filesSelected").replacingOccurrences(of: "%d", with: "\(selected.count)"))
                                 .font(.inter(11))
                                 .foregroundColor(.textQuaternary)
                         }
@@ -329,7 +330,7 @@ struct TextListView: View {
                 VStack {
                     Spacer()
                     VStack(spacing: 16) {
-                        Text("Rename Text")
+                        Text(langMgr.t("text.renameText"))
                             .font(.inter(16, weight: .heavy))
                             .foregroundColor(.textPrimary)
                         TextField("", text: $renameText)
@@ -342,7 +343,7 @@ struct TextListView: View {
                             .autocorrectionDisabled()
                         HStack(spacing: 10) {
                             Button { renameTranscript = nil } label: {
-                                Text("Cancel")
+                                Text(langMgr.t("common.cancel"))
                                     .font(.inter(14, weight: .bold)).foregroundColor(.textTertiary)
                                     .frame(maxWidth: .infinity).padding(.vertical, 13)
                                     .background(Color.white.opacity(0.05))
@@ -356,7 +357,7 @@ struct TextListView: View {
                                 renameTranscript = nil
                                 rebuildAndReload()
                             } label: {
-                                Text("Rename")
+                                Text(langMgr.t("common.rename"))
                                     .font(.inter(14, weight: .bold)).foregroundColor(.white)
                                     .frame(maxWidth: .infinity).padding(.vertical, 13)
                                     .background(LinearGradient(colors: [Color.brandBlue, Color.brandCyan], startPoint: .leading, endPoint: .trailing))
@@ -387,11 +388,11 @@ struct TextListView: View {
                             .foregroundColor(.stageText)
                             .shadow(color: Color.stageText.opacity(0.7), radius: 10)
 
-                        Text("Process Text")
+                        Text(langMgr.t("text.processText"))
                             .font(.inter(16, weight: .heavy))
                             .foregroundColor(.textPrimary)
 
-                        Text("Continue with \(selected.count) selected file\(selected.count == 1 ? "" : "s")?")
+                        Text(langMgr.t("text.continueWith").replacingOccurrences(of: "%d", with: "\(selected.count)"))
                             .font(.inter(13))
                             .foregroundColor(.textSecondary)
                             .multilineTextAlignment(.center)
@@ -411,7 +412,7 @@ struct TextListView: View {
                                     showProcessConfirm = false
                                 }
                             } label: {
-                                Text("Cancel")
+                                Text(langMgr.t("common.cancel"))
                                     .font(.inter(14, weight: .semibold))
                                     .foregroundColor(.textSecondary)
                                     .frame(maxWidth: .infinity)
@@ -425,7 +426,7 @@ struct TextListView: View {
                                 }
                                 showPrompts = true
                             } label: {
-                                Text("Continue")
+                                Text(langMgr.t("dashboard.record.continue"))
                                     .font(.inter(14, weight: .bold))
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
@@ -463,11 +464,11 @@ struct TextListView: View {
                             .foregroundColor(.danger)
                             .shadow(color: Color.danger.opacity(0.7), radius: 10)
 
-                        Text("Delete Files")
+                        Text(langMgr.t("text.deleteFiles.btn"))
                             .font(.inter(16, weight: .heavy))
                             .foregroundColor(.textPrimary)
 
-                        Text("Permanently delete \(selected.count) file\(selected.count == 1 ? "" : "s")?")
+                        Text(langMgr.t("text.deleteFiles").replacingOccurrences(of: "%d", with: "\(selected.count)"))
                             .font(.inter(13))
                             .foregroundColor(.textSecondary)
                             .multilineTextAlignment(.center)
@@ -487,7 +488,7 @@ struct TextListView: View {
                             Button {
                                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showDeleteConfirm = false }
                             } label: {
-                                Text("Cancel")
+                                Text(langMgr.t("common.cancel"))
                                     .font(.inter(14, weight: .semibold))
                                     .foregroundColor(.textSecondary)
                                     .frame(maxWidth: .infinity)
@@ -508,7 +509,7 @@ struct TextListView: View {
                                 pendingAction = nil
                                 rebuildAndReload()
                             } label: {
-                                Text("Delete")
+                                Text(langMgr.t("common.delete"))
                                     .font(.inter(14, weight: .bold))
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
@@ -732,6 +733,7 @@ struct LocalTextRow: View {
     var onMoved: () -> Void = {}
     var onRenameRequested: () -> Void = {}
 
+    @ObservedObject private var langMgr = LanguageManager.shared
     @State private var showMoreInfo = false
     @State private var showMoveTo = false
     @State private var showDraftPrompts = false
@@ -739,7 +741,9 @@ struct LocalTextRow: View {
 
     private var wordCount: String {
         let words = transcript.text.split(separator: " ").count
-        return words == 1 ? "1 word" : "\(words) words"
+        return words == 1
+            ? langMgr.t("notes.wordSingular")
+            : langMgr.t("notes.wordPlural").replacingOccurrences(of: "%d", with: "\(words)")
     }
 
     private var rowColor: Color { transcript.isMerge ? .brandCyan : .stageText }
@@ -824,22 +828,22 @@ struct LocalTextRow: View {
 
                 // Context menu
                 Menu {
-                    Section("Text") {
-                        Button { onView() } label: { Label("View / Edit Text", systemImage: "pencil") }
-                        Button { showDraftPrompts = true } label: { Label("Draft Note", systemImage: "note.text") }
+                    Section(langMgr.t("common.section.text")) {
+                        Button { onView() } label: { Label(langMgr.t("text.viewEditText"), systemImage: "pencil") }
+                        Button { showDraftPrompts = true } label: { Label(langMgr.t("notes.draftNote"), systemImage: "note.text") }
                     }
-                    Section("Share") {
-                        ShareLink(item: transcript.text) { Label("Share…", systemImage: "square.and.arrow.up") }
+                    Section(langMgr.t("common.section.share")) {
+                        ShareLink(item: transcript.text) { Label(langMgr.t("common.shareEllipsis"), systemImage: "square.and.arrow.up") }
                     }
                     if !transcript.isMerge {
-                        Section("Manage") {
-                            Button { onRenameRequested() } label: { Label("Rename", systemImage: "pencil") }
-                            Button { showMoveTo = true } label: { Label("Move to…", systemImage: "folder") }
-                            Button(role: .destructive) { DeleteConfirmPresenter.show(itemName: transcript.label, onDelete: onDelete) } label: { Label("Delete", systemImage: "trash") }
+                        Section(langMgr.t("common.section.manage")) {
+                            Button { onRenameRequested() } label: { Label(langMgr.t("common.rename"), systemImage: "pencil") }
+                            Button { showMoveTo = true } label: { Label(langMgr.t("common.moveTo"), systemImage: "folder") }
+                            Button(role: .destructive) { DeleteConfirmPresenter.show(itemName: transcript.label, onDelete: onDelete) } label: { Label(langMgr.t("common.delete"), systemImage: "trash") }
                         }
                     }
-                    Section("Info") {
-                        Button { showMoreInfo = true } label: { Label("More Info", systemImage: "info.circle") }
+                    Section(langMgr.t("common.section.info")) {
+                        Button { showMoreInfo = true } label: { Label(langMgr.t("common.moreInfo"), systemImage: "info.circle") }
                     }
                 } label: {
                     Text("···")
@@ -879,6 +883,7 @@ struct TranscriptViewerView: View {
     var onSaved: ((String) -> Void)? = nil
     @Environment(\.dismiss) var dismiss
 
+    @ObservedObject private var langMgr = LanguageManager.shared
     @State private var editedText: String
     @State private var showSaveCard = false
 
@@ -926,11 +931,11 @@ struct TranscriptViewerView: View {
                             .foregroundColor(.stageText)
                             .shadow(color: Color.stageText.opacity(0.7), radius: 10)
 
-                        Text("Save Changes?")
+                        Text(langMgr.t("common.save_changes"))
                             .font(.inter(16, weight: .heavy))
                             .foregroundColor(.textPrimary)
 
-                        Text("Do you want to save your edits to this file?")
+                        Text(langMgr.t("text.doYouWantSave"))
                             .font(.inter(13))
                             .foregroundColor(.textSecondary)
                             .multilineTextAlignment(.center)
@@ -940,7 +945,7 @@ struct TranscriptViewerView: View {
                                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showSaveCard = false }
                                 dismiss()
                             } label: {
-                                Text("Discard")
+                                Text(langMgr.t("common.discard"))
                                     .font(.inter(14, weight: .semibold))
                                     .foregroundColor(.danger)
                                     .frame(maxWidth: .infinity)
@@ -953,7 +958,7 @@ struct TranscriptViewerView: View {
                                 onSaved?(editedText)
                                 dismiss()
                             } label: {
-                                Text("Save")
+                                Text(langMgr.t("common.save"))
                                     .font(.inter(14, weight: .bold))
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
@@ -988,6 +993,7 @@ struct TranscriptViewerView: View {
 struct TextMoreInfoSheet: View {
     let transcript: TranscriptSummary
     @Environment(\.dismiss) var dismiss
+    @ObservedObject private var langMgr = LanguageManager.shared
 
     private var wordCount: Int { transcript.text.split(separator: " ").count }
     private var charCount: Int { transcript.text.count }
@@ -1003,7 +1009,7 @@ struct TextMoreInfoSheet: View {
             Color(hex: "#081221").ignoresSafeArea()
             VStack(spacing: 0) {
                 HStack {
-                    Text("More Info")
+                    Text(langMgr.t("common.moreInfo"))
                         .font(.inter(17, weight: .heavy)).foregroundColor(.textPrimary)
                     Spacer()
                     Button { dismiss() } label: {
@@ -1015,11 +1021,11 @@ struct TextMoreInfoSheet: View {
                 .padding(.horizontal, 24).padding(.top, 24).padding(.bottom, 20)
 
                 VStack(spacing: 1) {
-                    infoRow("Name",       transcript.label)
-                    infoRow("Words",      "\(wordCount)")
-                    infoRow("Characters", "\(charCount)")
-                    infoRow("Duration",   transcript.duration.isEmpty ? "—" : transcript.duration)
-                    infoRow("Created",    created)
+                    infoRow(langMgr.t("info.name"),       transcript.label)
+                    infoRow(langMgr.t("info.words"),      "\(wordCount)")
+                    infoRow(langMgr.t("info.characters"), "\(charCount)")
+                    infoRow(langMgr.t("info.duration"),   transcript.duration.isEmpty ? "—" : transcript.duration)
+                    infoRow(langMgr.t("info.created"),    created)
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 14))
                 .padding(.horizontal, 20)
@@ -1050,6 +1056,7 @@ struct BulkMoveTranscriptSheet: View {
     let currentItemId: String
     var onMoved: () -> Void
     @Environment(\.dismiss) var dismiss
+    @ObservedObject private var langMgr = LanguageManager.shared
 
     @State private var expanded = Set<String>()
     private let allItems     = LocalItemStore.shared.all()
@@ -1066,7 +1073,7 @@ struct BulkMoveTranscriptSheet: View {
             VStack(spacing: 0) {
                 Capsule().fill(Color.white.opacity(0.2)).frame(width: 36, height: 4).padding(.top, 12)
                 HStack {
-                    Text("Move \(ids.count) file\(ids.count == 1 ? "" : "s") to…")
+                    Text(langMgr.t("text.moveTo").replacingOccurrences(of: "%d", with: "\(ids.count)"))
                         .font(.inter(17, weight: .heavy)).foregroundColor(.textPrimary)
                     Spacer()
                     Button { dismiss() } label: {

@@ -23,6 +23,7 @@ struct ItemCardView: View {
 
     @ObservedObject private var transcriptionMgr: TranscriptionManager = TranscriptionManager.shared
     @ObservedObject private var notesMgr: NoteGenerationManager = NoteGenerationManager.shared
+    @ObservedObject private var langMgr = LanguageManager.shared
 
     private var mediaCount: Int { localAudioCount }
     private var textCount: Int { localTextCount ?? item.textCount }
@@ -80,23 +81,23 @@ struct ItemCardView: View {
                 if !isInProcessMode {
                     Menu {
                         Button { onImportAudioTapped() } label: {
-                            Label("Import Audio", systemImage: "waveform")
+                            Label(langMgr.t("dashboard.importAudio"), systemImage: "waveform")
                         }
                         Button { onImportImageTapped() } label: {
-                            Label("Import Image", systemImage: "photo.badge.plus")
+                            Label(langMgr.t("dashboard.importImage"), systemImage: "photo.badge.plus")
                         }
                         Button { onImportDocTapped() } label: {
-                            Label("Import Document", systemImage: "doc.badge.plus")
+                            Label(langMgr.t("dashboard.importDocument"), systemImage: "doc.badge.plus")
                         }
-                        Button { onRenameRequested() } label: { Label("Rename Item", systemImage: "pencil") }
+                        Button { onRenameRequested() } label: { Label(langMgr.t("dashboard.renameItem"), systemImage: "pencil") }
                         Divider()
                         Button(role: .destructive) { onClearAllRequested() } label: {
-                            Label("Clear All Content", systemImage: "trash.fill")
+                            Label(langMgr.t("dashboard.clearContent"), systemImage: "trash.fill")
                         }
                         Button(role: .destructive) {
                             DeleteConfirmPresenter.show(itemName: item.name) { vm.deleteItem(item) }
                         } label: {
-                            Label("Delete Item", systemImage: "trash")
+                            Label(langMgr.t("dashboard.deleteItemMenu"), systemImage: "trash")
                         }
                     } label: {
                         Text("···")
@@ -109,11 +110,11 @@ struct ItemCardView: View {
 
             // Pipeline
             HStack(spacing: 5) {
-                stageButton(.media, label: "Media", count: mediaCount)
+                stageButton(.media, label: langMgr.t("automation.stage.media"), count: mediaCount)
                 connector(filled: mediaCount > 0 && textCount > 0, isTranscribing: isTranscribingThisItem)
-                stageButton(.text, label: "Text", count: textCount)
+                stageButton(.text, label: langMgr.t("automation.stage.text"), count: textCount)
                 connector(filled: textCount > 0 && noteCount > 0, isTranscribing: isGeneratingNotesThisItem)
-                stageButton(.notes, label: "Notes", count: noteCount)
+                stageButton(.notes, label: langMgr.t("automation.stage.notes"), count: noteCount)
             }
         }
         .padding(.horizontal, 14)

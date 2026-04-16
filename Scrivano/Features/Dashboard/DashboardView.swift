@@ -6,6 +6,7 @@ import Vision
 
 struct DashboardView: View {
     @EnvironmentObject var auth: AuthManager
+    @EnvironmentObject var langMgr: LanguageManager
     @StateObject private var vm = DashboardViewModel()
     @ObservedObject private var transcriptionMgr = TranscriptionManager.shared
     @ObservedObject private var recorder = AudioRecorderManager.shared
@@ -223,7 +224,7 @@ struct DashboardView: View {
                         .font(.system(size: 30))
                         .foregroundColor(submitSuccess ? .stageNotes : .danger)
                         .shadow(color: (submitSuccess ? Color.stageNotes : Color.danger).opacity(0.7), radius: 10)
-                    Text(submitSuccess ? "Submitted!" : "Submission Failed")
+                    Text(submitSuccess ? langMgr.t("dashboard.submitted") : langMgr.t("dashboard.submitFailed"))
                         .font(.inter(16, weight: .heavy)).foregroundColor(.textPrimary)
                     Text(submitMessage ?? "")
                         .font(.inter(13)).foregroundColor(.textSecondary).multilineTextAlignment(.center)
@@ -231,9 +232,9 @@ struct DashboardView: View {
                         HStack(spacing: 6) {
                             Image(systemName: "globe")
                                 .font(.system(size: 11, weight: .semibold))
-                            Text("Published to ")
+                            Text(langMgr.t("recorder.publishedTo"))
                                 .font(.inter(12)) +
-                            Text("app.scrivano.net")
+                            Text(langMgr.t("misc.appDomain"))
                                 .font(.inter(12, weight: .bold))
                         }
                         .foregroundColor(Color.stageNotes)
@@ -245,7 +246,7 @@ struct DashboardView: View {
                     Button {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showSubmitCard = false }
                     } label: {
-                        Text("OK")
+                        Text(langMgr.t("common.ok"))
                             .font(.inter(14, weight: .bold)).foregroundColor(.white)
                             .frame(maxWidth: .infinity).padding(.vertical, 13)
                             .background(LinearGradient(
@@ -289,15 +290,15 @@ struct DashboardView: View {
                                 .font(.system(size: 24, weight: .semibold))
                                 .foregroundColor(.brandCyan)
                         }
-                        Text("Create Item List")
+                        Text(langMgr.t("prompts.createList"))
                             .font(.inter(17, weight: .heavy)).foregroundColor(.textPrimary)
                         Text(isCreatingList
-                             ? "Analyzing image…"
+                             ? langMgr.t("dashboard.analyzing")
                              : createListResult != nil || createListError != nil
-                               ? (createListError != nil ? "Something went wrong" : "Items created")
+                               ? (createListError != nil ? langMgr.t("dashboard.somethingWrong") : langMgr.t("dashboard.itemsCreated"))
                                : pendingListImage != nil
-                                 ? "How should the image be processed?"
-                                 : "Take or upload a photo of your list")
+                                 ? langMgr.t("dashboard.howProcess")
+                                 : langMgr.t("dashboard.takeOrUpload"))
                             .font(.inter(12)).foregroundColor(.textTertiary)
                             .multilineTextAlignment(.center)
                     }
@@ -309,7 +310,7 @@ struct DashboardView: View {
                         // Processing state
                         VStack(spacing: 12) {
                             ProgressView().tint(.brandCyan).scaleEffect(1.2)
-                            Text("Processing image with AI…")
+                            Text(langMgr.t("media.imageProcessing"))
                                 .font(.inter(12)).foregroundColor(.textQuaternary)
                         }
                         .frame(maxWidth: .infinity)
@@ -325,7 +326,7 @@ struct DashboardView: View {
                             Button {
                                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showCreateListCard = false }
                             } label: {
-                                Text("Dismiss")
+                                Text(langMgr.t("common.dismiss"))
                                     .font(.inter(14, weight: .bold)).foregroundColor(.white)
                                     .frame(maxWidth: .infinity).padding(.vertical, 13)
                                     .background(Color.white.opacity(0.12))
@@ -346,7 +347,7 @@ struct DashboardView: View {
                             Button {
                                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showCreateListCard = false }
                             } label: {
-                                Text("Done")
+                                Text(langMgr.t("common.done"))
                                     .font(.inter(14, weight: .bold)).foregroundColor(.white)
                                     .frame(maxWidth: .infinity).padding(.vertical, 13)
                                     .background(LinearGradient(
@@ -370,7 +371,7 @@ struct DashboardView: View {
                                             Circle().fill(Color.brandBlue.opacity(0.18)).frame(width: 36, height: 36)
                                             Image(systemName: "camera.fill").font(.system(size: 14, weight: .semibold)).foregroundColor(.brandCyan)
                                         }
-                                        Text("Take Photo").font(.inter(14, weight: .bold)).foregroundColor(.textPrimary)
+                                        Text(langMgr.t("media.takePhoto")).font(.inter(14, weight: .bold)).foregroundColor(.textPrimary)
                                         Spacer()
                                         Image(systemName: "chevron.right").font(.system(size: 11, weight: .bold)).foregroundColor(.textQuaternary)
                                     }
@@ -390,7 +391,7 @@ struct DashboardView: View {
                                         Circle().fill(Color.brandBlue.opacity(0.18)).frame(width: 36, height: 36)
                                         Image(systemName: "photo.on.rectangle").font(.system(size: 14, weight: .semibold)).foregroundColor(.brandCyan)
                                     }
-                                    Text("Choose from Library").font(.inter(14, weight: .bold)).foregroundColor(.textPrimary)
+                                    Text(langMgr.t("media.chooseLibrary")).font(.inter(14, weight: .bold)).foregroundColor(.textPrimary)
                                     Spacer()
                                     Image(systemName: "chevron.right").font(.system(size: 11, weight: .bold)).foregroundColor(.textQuaternary)
                                 }
@@ -404,7 +405,7 @@ struct DashboardView: View {
                             Button {
                                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showCreateListCard = false }
                             } label: {
-                                Text("Cancel").font(.inter(13, weight: .semibold)).foregroundColor(.textQuaternary)
+                                Text(langMgr.t("common.cancel")).font(.inter(13, weight: .semibold)).foregroundColor(.textQuaternary)
                                     .frame(maxWidth: .infinity).padding(.vertical, 8)
                             }
                             .buttonStyle(.plain)
@@ -414,7 +415,7 @@ struct DashboardView: View {
                     } else {
                         // Step 2: pick processing algorithm
                         VStack(spacing: 8) {
-                            Text("Select Processing Algorithm")
+                            Text(langMgr.t("automation.selectAlgorithm"))
                                 .font(.inter(11, weight: .bold)).foregroundColor(.textQuaternary)
                                 .tracking(0.5).textCase(.uppercase)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -431,8 +432,8 @@ struct DashboardView: View {
                                         Image(systemName: "sparkles").font(.system(size: 14, weight: .semibold)).foregroundColor(.brandCyan)
                                     }
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text("Image Prompt").font(.inter(14, weight: .bold)).foregroundColor(.textPrimary)
-                                        Text("AI reads and extracts the list").font(.inter(11)).foregroundColor(.textQuaternary)
+                                        Text(langMgr.t("media.imagePrompt")).font(.inter(14, weight: .bold)).foregroundColor(.textPrimary)
+                                        Text(langMgr.t("prompts.aiReads")).font(.inter(11)).foregroundColor(.textQuaternary)
                                     }
                                     Spacer()
                                     Image(systemName: "chevron.right").font(.system(size: 11, weight: .bold)).foregroundColor(.textQuaternary)
@@ -455,8 +456,8 @@ struct DashboardView: View {
                                         Image(systemName: "doc.viewfinder").font(.system(size: 14, weight: .semibold)).foregroundColor(.brandCyan)
                                     }
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text("OCR").font(.inter(14, weight: .bold)).foregroundColor(.textPrimary)
-                                        Text("Fast, reads text directly on device").font(.inter(11)).foregroundColor(.textQuaternary)
+                                        Text(langMgr.t("automation.ocr")).font(.inter(14, weight: .bold)).foregroundColor(.textPrimary)
+                                        Text(langMgr.t("automation.fast")).font(.inter(11)).foregroundColor(.textQuaternary)
                                     }
                                     Spacer()
                                     Image(systemName: "chevron.right").font(.system(size: 11, weight: .bold)).foregroundColor(.textQuaternary)
@@ -471,7 +472,7 @@ struct DashboardView: View {
                             Button {
                                 pendingListImage = nil
                             } label: {
-                                Text("← Back").font(.inter(13, weight: .semibold)).foregroundColor(.textQuaternary)
+                                Text(langMgr.t("dashboard.back")).font(.inter(13, weight: .semibold)).foregroundColor(.textQuaternary)
                                     .frame(maxWidth: .infinity).padding(.vertical, 8)
                             }
                             .buttonStyle(.plain)
@@ -552,8 +553,8 @@ struct DashboardView: View {
                             .font(.system(size: 11, weight: .bold))
                             .foregroundColor(processType == .audio ? .stageMedia : .stageText)
                         Text(processItemsSelected.isEmpty
-                             ? (processType == .audio ? "Select items with recordings" : "Select items with transcripts")
-                             : "\(processItemsSelected.count) item\(processItemsSelected.count == 1 ? "" : "s") selected")
+                             ? (processType == .audio ? langMgr.t("dashboard.selectWithRecordings") : langMgr.t("dashboard.selectWithTranscripts"))
+                             : langMgr.t("dashboard.selectedCount").replacingOccurrences(of: "%d", with: "\(processItemsSelected.count)"))
                             .font(.inter(12, weight: .semibold))
                             .foregroundColor(.textQuaternary)
                     }
@@ -564,7 +565,7 @@ struct DashboardView: View {
                                 showProcessItemsMode = false
                             }
                         } label: {
-                            Text("Cancel")
+                            Text(langMgr.t("common.cancel"))
                                 .font(.inter(14, weight: .semibold)).foregroundColor(.textSecondary)
                                 .frame(maxWidth: .infinity).padding(.vertical, 13)
                                 .background(Color.white.opacity(0.07)).clipShape(RoundedRectangle(cornerRadius: 14))
@@ -581,8 +582,10 @@ struct DashboardView: View {
                                 Image(systemName: processType == .audio ? "waveform" : "sparkles")
                                     .font(.system(size: 13, weight: .semibold))
                                 Text(processItemsSelected.isEmpty
-                                     ? (processType == .audio ? "Transcribe" : "Generate Notes")
-                                     : (processType == .audio ? "Transcribe \(processItemsSelected.count)" : "Notes for \(processItemsSelected.count)"))
+                                     ? (processType == .audio ? langMgr.t("dashboard.transcribe") : langMgr.t("dashboard.generateNotes"))
+                                     : (processType == .audio
+                                        ? langMgr.t("dashboard.transcribeCount").replacingOccurrences(of: "%d", with: "\(processItemsSelected.count)")
+                                        : langMgr.t("dashboard.notesForCount").replacingOccurrences(of: "%d", with: "\(processItemsSelected.count)")))
                                     .font(.inter(14, weight: .bold))
                             }
                             .foregroundColor(.white)
@@ -649,11 +652,11 @@ struct DashboardView: View {
                         .foregroundColor(.brandCyan)
                         .shadow(color: Color.brandCyan.opacity(0.6), radius: 10)
 
-                    Text("Rename Collection")
+                    Text(langMgr.t("dashboard.renameCollection"))
                         .font(.inter(16, weight: .heavy))
                         .foregroundColor(.textPrimary)
 
-                    TextField("Collection name", text: $renameCollectionText)
+                    TextField(langMgr.t("dashboard.collectionPlaceholder"), text: $renameCollectionText)
                         .font(.inter(14))
                         .foregroundColor(.textPrimary)
                         .padding(.horizontal, 14).padding(.vertical, 12)
@@ -666,7 +669,7 @@ struct DashboardView: View {
                         Button {
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showRenameCollectionCard = false }
                         } label: {
-                            Text("Cancel")
+                            Text(langMgr.t("common.cancel"))
                                 .font(.inter(14, weight: .bold)).foregroundColor(.textTertiary)
                                 .frame(maxWidth: .infinity).padding(.vertical, 13)
                                 .background(Color.white.opacity(0.05))
@@ -692,7 +695,7 @@ struct DashboardView: View {
                             }
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showRenameCollectionCard = false }
                         } label: {
-                            Text("Save")
+                            Text(langMgr.t("common.save"))
                                 .font(.inter(14, weight: .heavy)).foregroundColor(.brandCyan)
                                 .frame(maxWidth: .infinity).padding(.vertical, 13)
                                 .background(LinearGradient(colors: [Color.brandBlue.opacity(0.28), Color.brandNavy.opacity(0.20)], startPoint: .topLeading, endPoint: .bottomTrailing))
@@ -724,7 +727,7 @@ struct DashboardView: View {
             VStack {
                 Spacer()
                 VStack(spacing: 16) {
-                    Text("Rename Item")
+                    Text(langMgr.t("dashboard.renameItem"))
                         .font(.inter(16, weight: .heavy))
                         .foregroundColor(.textPrimary)
                     TextField("", text: $renameItemText)
@@ -737,7 +740,7 @@ struct DashboardView: View {
                         .autocorrectionDisabled()
                     HStack(spacing: 10) {
                         Button { renameItem = nil } label: {
-                            Text("Cancel")
+                            Text(langMgr.t("common.cancel"))
                                 .font(.inter(14, weight: .bold)).foregroundColor(.textTertiary)
                                 .frame(maxWidth: .infinity).padding(.vertical, 13)
                                 .background(Color.white.opacity(0.05))
@@ -754,7 +757,7 @@ struct DashboardView: View {
                             }
                             renameItem = nil
                         } label: {
-                            Text("Rename")
+                            Text(langMgr.t("common.rename"))
                                 .font(.inter(14, weight: .bold)).foregroundColor(.white)
                                 .frame(maxWidth: .infinity).padding(.vertical, 13)
                                 .background(LinearGradient(colors: [Color.brandBlue, Color.brandCyan], startPoint: .leading, endPoint: .trailing))
@@ -787,7 +790,7 @@ struct DashboardView: View {
                 Spacer()
                 VStack(spacing: 20) {
                     HStack {
-                        Text("New Item")
+                        Text(langMgr.t("dashboard.newItem"))
                             .font(.inter(16, weight: .heavy))
                             .foregroundColor(.textPrimary)
                         Spacer()
@@ -801,7 +804,7 @@ struct DashboardView: View {
                         }
                     }
                     VStack(alignment: .leading, spacing: 6) {
-                        TextField("Item name", text: $newItemName)
+                        TextField(langMgr.t("dashboard.newItem.namePlaceholder"), text: $newItemName)
                             .font(.inter(14))
                             .foregroundColor(.textPrimary)
                             .padding(.horizontal, 14).padding(.vertical, 12)
@@ -823,7 +826,7 @@ struct DashboardView: View {
                                 if recordAfterNewItem { recordAfterNewItem = false; showRecorder = true }
                             }
                         if newItemDuplicateError {
-                            Text("An item with this name already exists.")
+                            Text(langMgr.t("dashboard.newItem.duplicate"))
                                 .font(.inter(12))
                                 .foregroundColor(.red.opacity(0.85))
                                 .padding(.horizontal, 4)
@@ -840,7 +843,7 @@ struct DashboardView: View {
                         showNewItem = false; newItemName = ""; newItemDuplicateError = false
                         if recordAfterNewItem { recordAfterNewItem = false; showRecorder = true }
                     } label: {
-                        Text("Create Item →")
+                        Text(langMgr.t("dashboard.newItem.create"))
                             .font(.inter(15, weight: .heavy))
                             .foregroundColor(newItemName.trimmingCharacters(in: .whitespaces).isEmpty ? .textQuaternary : .white)
                             .frame(maxWidth: .infinity)
@@ -881,13 +884,13 @@ struct DashboardView: View {
                     Image(systemName: "trash.fill")
                         .font(.system(size: 30)).foregroundColor(.danger)
                         .shadow(color: Color.danger.opacity(0.7), radius: 10)
-                    Text("Clear All Content")
+                    Text(langMgr.t("dashboard.clearContent"))
                         .font(.inter(16, weight: .heavy)).foregroundColor(.textPrimary)
-                    Text("All media, text and notes in \"\(item.name)\" will be deleted. The item itself will remain.")
+                    Text(langMgr.t("dashboard.clearContentMsg").replacingOccurrences(of: "%@", with: item.name))
                         .font(.inter(13)).foregroundColor(.textSecondary).multilineTextAlignment(.center)
                     HStack(spacing: 10) {
                         Button { clearConfirmItem = nil } label: {
-                            Text("Cancel").font(.inter(14, weight: .semibold)).foregroundColor(.textSecondary)
+                            Text(langMgr.t("common.cancel")).font(.inter(14, weight: .semibold)).foregroundColor(.textSecondary)
                                 .frame(maxWidth: .infinity).padding(.vertical, 13)
                                 .background(Color.white.opacity(0.07)).clipShape(RoundedRectangle(cornerRadius: 14))
                         }
@@ -898,7 +901,7 @@ struct DashboardView: View {
                             LocalNoteStore.shared.deleteAll(for: item.id)
                             vm.refreshLocalCounts()
                         } label: {
-                            Text("Clear All").font(.inter(14, weight: .bold)).foregroundColor(.white)
+                            Text(langMgr.t("dashboard.clearAll")).font(.inter(14, weight: .bold)).foregroundColor(.white)
                                 .frame(maxWidth: .infinity).padding(.vertical, 13)
                                 .background(Color.danger.opacity(0.85)).clipShape(RoundedRectangle(cornerRadius: 14))
                         }
@@ -933,12 +936,12 @@ struct DashboardView: View {
                         .foregroundColor(Color(hex: "#ef4444"))
                         .shadow(color: Color(hex: "#ef4444").opacity(0.5), radius: 10)
 
-                    Text("Delete \"\(vm.activeCollection?.name ?? "Collection")\"?")
+                    Text(langMgr.t("dashboard.deleteCollection").replacingOccurrences(of: "%@", with: vm.activeCollection?.name ?? ""))
                         .font(.inter(16, weight: .heavy))
                         .foregroundColor(.textPrimary)
                         .multilineTextAlignment(.center)
 
-                    Text("Items inside will not be deleted.")
+                    Text(langMgr.t("dashboard.deleteItemHint"))
                         .font(.inter(13))
                         .foregroundColor(.textSecondary)
                         .multilineTextAlignment(.center)
@@ -947,7 +950,7 @@ struct DashboardView: View {
                         Button {
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showDeleteCollectionCard = false }
                         } label: {
-                            Text("Cancel")
+                            Text(langMgr.t("common.cancel"))
                                 .font(.inter(14, weight: .bold)).foregroundColor(.textTertiary)
                                 .frame(maxWidth: .infinity).padding(.vertical, 13)
                                 .background(Color.white.opacity(0.05))
@@ -958,7 +961,7 @@ struct DashboardView: View {
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showDeleteCollectionCard = false }
                             deleteActiveCollection()
                         } label: {
-                            Text("Delete")
+                            Text(langMgr.t("common.delete"))
                                 .font(.inter(14, weight: .heavy)).foregroundColor(.white)
                                 .frame(maxWidth: .infinity).padding(.vertical, 13)
                                 .background(Color(hex: "#ef4444").opacity(0.80))
@@ -1097,9 +1100,9 @@ struct DashboardView: View {
                 VStack(spacing: 18) {
                     Image(systemName: "mic.circle.fill").font(.system(size: 36))
                         .foregroundColor(.brandCyan).shadow(color: Color.brandCyan.opacity(0.6), radius: 10)
-                    Text("Record Audio").font(.inter(16, weight: .heavy)).foregroundColor(.textPrimary)
+                    Text(langMgr.t("dashboard.record")).font(.inter(16, weight: .heavy)).foregroundColor(.textPrimary)
                     if let item = selectedItem, vm.items.contains(where: { $0.id == item.id }) {
-                        Text("Continue recording on \"\(item.name)\" or start a new item.")
+                        Text(langMgr.t("dashboard.record.continueOn").replacingOccurrences(of: "%@", with: item.name))
                             .font(.inter(13)).foregroundColor(.textSecondary).multilineTextAlignment(.center)
                     }
                     VStack(spacing: 10) {
@@ -1110,7 +1113,7 @@ struct DashboardView: View {
                             } label: {
                                 HStack(spacing: 8) {
                                     Image(systemName: "waveform").font(.system(size: 13, weight: .semibold))
-                                    Text("Continue").font(.inter(14, weight: .bold))
+                                    Text(langMgr.t("dashboard.record.continue")).font(.inter(14, weight: .bold))
                                 }
                                 .foregroundColor(.brandCyan).frame(maxWidth: .infinity).padding(.vertical, 13)
                                 .background(LinearGradient(colors: [Color.brandBlue.opacity(0.28), Color.brandNavy.opacity(0.20)], startPoint: .topLeading, endPoint: .bottomTrailing))
@@ -1124,7 +1127,7 @@ struct DashboardView: View {
                         } label: {
                             HStack(spacing: 8) {
                                 Image(systemName: "plus.circle").font(.system(size: 13, weight: .semibold))
-                                Text("New Item").font(.inter(14, weight: .bold))
+                                Text(langMgr.t("dashboard.record.newItem")).font(.inter(14, weight: .bold))
                             }
                             .foregroundColor(.textSecondary).frame(maxWidth: .infinity).padding(.vertical, 13)
                             .background(Color.white.opacity(0.07))
@@ -1134,7 +1137,7 @@ struct DashboardView: View {
                         Button {
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showRecordCard = false }
                         } label: {
-                            Text("Cancel").font(.inter(14, weight: .semibold)).foregroundColor(.textSecondary)
+                            Text(langMgr.t("common.cancel")).font(.inter(14, weight: .semibold)).foregroundColor(.textSecondary)
                                 .frame(maxWidth: .infinity).padding(.vertical, 13)
                                 .background(Color.white.opacity(0.07)).clipShape(RoundedRectangle(cornerRadius: 14))
                         }
@@ -1183,8 +1186,8 @@ struct DashboardView: View {
                 VStack(spacing: 18) {
                     Image(systemName: "tray.full").font(.system(size: 32))
                         .foregroundColor(.brandCyan).shadow(color: Color.brandCyan.opacity(0.6), radius: 10)
-                    Text("New Collection").font(.inter(16, weight: .heavy)).foregroundColor(.textPrimary)
-                    TextField("Collection name", text: $newCollectionName)
+                    Text(langMgr.t("dashboard.newCollection")).font(.inter(16, weight: .heavy)).foregroundColor(.textPrimary)
+                    TextField(langMgr.t("dashboard.collectionPlaceholder"), text: $newCollectionName)
                         .font(.inter(14)).foregroundColor(.textPrimary)
                         .padding(.horizontal, 14).padding(.vertical, 12)
                         .background(Color.white.opacity(0.07))
@@ -1195,7 +1198,7 @@ struct DashboardView: View {
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showCollectionNew = false }
                             newCollectionName = ""
                         } label: {
-                            Text("Cancel").font(.inter(14, weight: .semibold)).foregroundColor(.textSecondary)
+                            Text(langMgr.t("common.cancel")).font(.inter(14, weight: .semibold)).foregroundColor(.textSecondary)
                                 .frame(maxWidth: .infinity).padding(.vertical, 13)
                                 .background(Color.white.opacity(0.07)).clipShape(RoundedRectangle(cornerRadius: 14))
                         }
@@ -1214,7 +1217,7 @@ struct DashboardView: View {
                                 LocalCollectionStore.shared.save(c); vm.collections.append(c)
                             }
                         } label: {
-                            Text("Create").font(.inter(14, weight: .bold)).foregroundColor(.brandCyan)
+                            Text(langMgr.t("common.create")).font(.inter(14, weight: .bold)).foregroundColor(.brandCyan)
                                 .frame(maxWidth: .infinity).padding(.vertical, 13)
                                 .background(LinearGradient(colors: [Color.brandBlue.opacity(0.28), Color.brandNavy.opacity(0.20)], startPoint: .topLeading, endPoint: .bottomTrailing))
                                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.brandBlue.opacity(0.5), lineWidth: 1))
@@ -1233,19 +1236,19 @@ struct DashboardView: View {
         }
         if showCollectionMinOne {
             Color.black.opacity(0.65).ignoresSafeArea().zIndex(20)
-            collectionErrorCard(icon: "tray.2.fill", title: "Cannot Delete", message: "You must keep at least one collection.", accent: .brandCyan) {
+            collectionErrorCard(icon: "tray.2.fill", title: langMgr.t("dashboard.cannotDelete"), message: langMgr.t("dashboard.minOneMsg"), accent: .brandCyan) {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showCollectionMinOne = false }
             }
         }
         if showCollectionActiveError {
             Color.black.opacity(0.65).ignoresSafeArea().zIndex(20)
-            collectionErrorCard(icon: "pin.fill", title: "Cannot Delete Active", message: "Switch to a different collection first, then delete this one.", accent: .brandCyan) {
+            collectionErrorCard(icon: "pin.fill", title: langMgr.t("dashboard.cannotDeleteActive"), message: langMgr.t("dashboard.activeErrorMsg"), accent: .brandCyan) {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showCollectionActiveError = false }
             }
         }
         if showCollectionDuplicate {
             Color.black.opacity(0.65).ignoresSafeArea().zIndex(20)
-            collectionErrorCard(icon: "exclamationmark.triangle.fill", title: "Duplicate Name", message: "A collection with that name already exists.", accent: .stageText) {
+            collectionErrorCard(icon: "exclamationmark.triangle.fill", title: langMgr.t("dashboard.duplicateName"), message: langMgr.t("dashboard.duplicateMsg"), accent: .stageText) {
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showCollectionDuplicate = false }
             }
         }
@@ -1261,7 +1264,7 @@ struct DashboardView: View {
                 Text(title).font(.inter(16, weight: .heavy)).foregroundColor(.textPrimary)
                 Text(message).font(.inter(13)).foregroundColor(.textSecondary).multilineTextAlignment(.center)
                 Button { onDismiss() } label: {
-                    Text("Got it").font(.inter(14, weight: .bold)).foregroundColor(.brandCyan)
+                    Text(langMgr.t("recorder.gotIt")).font(.inter(14, weight: .bold)).foregroundColor(.brandCyan)
                         .frame(maxWidth: .infinity).padding(.vertical, 13)
                         .background(LinearGradient(colors: [Color.brandBlue.opacity(0.28), Color.brandNavy.opacity(0.20)], startPoint: .topLeading, endPoint: .bottomTrailing))
                         .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.brandBlue.opacity(0.5), lineWidth: 1))
@@ -1325,24 +1328,24 @@ struct DashboardView: View {
 
             // Dots — gray rounded bubble dropdown
             Menu {
-                Section("Process") {
+                Section(langMgr.t("dashboard.section.process")) {
                     Button {
                         processType = .text
                         processItemsSelected.removeAll()
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { showProcessItemsMode = true }
-                    } label: { Label("Process Text", systemImage: "text.alignleft") }
+                    } label: { Label(langMgr.t("dashboard.process.text"), systemImage: "text.alignleft") }
                     Button {
                         processType = .audio
                         processItemsSelected.removeAll()
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { showProcessItemsMode = true }
-                    } label: { Label("Process Audio", systemImage: "mic.fill") }
+                    } label: { Label(langMgr.t("dashboard.processAudio"), systemImage: "mic.fill") }
                 }
-                Section("Collection") {
-                    Button { showCollectionNew = true } label: { Label("New Collection", systemImage: "folder.badge.plus") }
+                Section(langMgr.t("dashboard.section.collection")) {
+                    Button { showCollectionNew = true } label: { Label(langMgr.t("dashboard.newCollection"), systemImage: "folder.badge.plus") }
                     Button {
                         renameCollectionText = vm.activeCollection?.name ?? ""
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showRenameCollectionCard = true }
-                    } label: { Label("Rename Collection", systemImage: "pencil") }
+                    } label: { Label(langMgr.t("dashboard.renameCollection"), systemImage: "pencil") }
                     Button(role: .destructive) {
                         guard vm.activeCollection != nil else {
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showCollectionActiveError = true }
@@ -1353,16 +1356,16 @@ struct DashboardView: View {
                             return
                         }
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showDeleteCollectionCard = true }
-                    } label: { Label("Delete Collection", systemImage: "trash") }
+                    } label: { Label(langMgr.t("dashboard.deleteCollectionMenu"), systemImage: "trash") }
                 }
-                Section("Utilities") {
-                    Button { showPromptDatabase = true } label: { Label("Prompt Database", systemImage: "cylinder.split.1x2") }
+                Section(langMgr.t("dashboard.section.utilities")) {
+                    Button { showPromptDatabase = true } label: { Label(langMgr.t("settings.promptDatabase.title"), systemImage: "cylinder.split.1x2") }
                     Button {
                         createListResult = nil; createListError = nil; pendingListImage = nil
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showCreateListCard = true }
                         }
-                    } label: { Label("Create Item List", systemImage: "list.bullet.rectangle") }
+                    } label: { Label(langMgr.t("prompts.createList"), systemImage: "list.bullet.rectangle") }
                 }
             } label: {
                 Text("···")
@@ -1414,7 +1417,7 @@ struct DashboardView: View {
                             .font(.system(size: 18, weight: .thin, design: .monospaced))
                             .foregroundColor(Color(hex: "#E6E6E6"))
                         HStack(spacing: 5) {
-                            Text(recorder.isPaused ? "Paused" : "Recording")
+                            Text(recorder.isPaused ? langMgr.t("dashboard.paused") : langMgr.t("dashboard.recording"))
                                 .foregroundColor(recorder.isPaused ? .textQuaternary : Color(hex: "#ef4444"))
                             Text(recorder.currentItemName)
                                 .foregroundColor(.textSecondary)
@@ -1477,7 +1480,7 @@ struct DashboardView: View {
         HStack(spacing: 6) {
             // New Item — primary blue style
             Button { recordAfterNewItem = false; showNewItem = true } label: {
-                Text("＋ New Item")
+                Text(langMgr.t("misc.newItemShort"))
                     .font(.inter(12, weight: .bold))
                     .foregroundColor(.brandCyan)
                     .frame(maxWidth: .infinity)
@@ -1497,7 +1500,7 @@ struct DashboardView: View {
                 TranscriptionManager.shared.cancelAll()
             } label: {
                 HStack(spacing: 5) {
-                    Text("Clear Task")
+                    Text(langMgr.t("dashboard.clearTask"))
                     if taskQueue.pendingCount > 0 {
                         Text("+\(taskQueue.pendingCount)")
                             .font(.inter(10, weight: .heavy))
@@ -1520,7 +1523,7 @@ struct DashboardView: View {
             Button { Task { await submitCollection() } } label: {
                 HStack(spacing: 4) {
                     if isSubmitting { ProgressView().tint(.white.opacity(0.6)).scaleEffect(0.7) }
-                    Text("Submit")
+                    Text(langMgr.t("dashboard.submit"))
                 }
                 .font(.inter(12, weight: .bold))
                 .foregroundColor(Color.white.opacity(0.6))
@@ -1551,22 +1554,22 @@ struct DashboardView: View {
                 // What's running now
                 if let name = transcriptionMgr.transcribingItemName {
                     Text(transcriptionMgr.transcribingStatus.isEmpty
-                         ? "Processing \"\(name)\""
+                         ? langMgr.t("dashboard.processingItem").replacingOccurrences(of: "%@", with: name)
                          : transcriptionMgr.transcribingStatus)
                         .lineLimit(1)
                 } else if let noteId = notesMgr.processingItemId {
                     let noteName = vm.items.first { $0.id == noteId }?.name ?? noteId
-                    Text("Generating note for \"\(noteName)\"")
+                    Text(langMgr.t("dashboard.generatingNote").replacingOccurrences(of: "%@", with: noteName))
                         .lineLimit(1)
                 } else {
-                    Text("Processing…")
+                    Text(langMgr.t("common.processing"))
                 }
 
                 Spacer()
 
                 // How many are waiting behind
                 if taskQueue.pendingCount > 0 {
-                    Text("+\(taskQueue.pendingCount) in queue")
+                    Text("+\(taskQueue.pendingCount) \(langMgr.t("misc.pendingQueue"))")
                         .font(.inter(10, weight: .heavy))
                         .foregroundColor(Color(hex: "#f59e0b"))
                         .padding(.horizontal, 6).padding(.vertical, 2)
@@ -1595,7 +1598,11 @@ struct DashboardView: View {
                 Text("\(vm.items.count)")
                     .font(.inter(13, weight: .bold))
                     .foregroundColor(Color.white.opacity(0.82))
-                Text(sortOrder == .insertion ? " items" : sortOrder == .az ? " items · A–Z ↑" : " items · Z–A ↓")
+                Text(sortOrder == .insertion
+                     ? " \(langMgr.t("dashboard.itemCount"))"
+                     : sortOrder == .az
+                       ? " \(langMgr.t("dashboard.itemCount"))\(langMgr.t("dashboard.sortAZSuffix"))"
+                       : " \(langMgr.t("dashboard.itemCount"))\(langMgr.t("dashboard.sortZASuffix"))")
                     .font(.inter(13, weight: .bold))
                     .foregroundColor(Color.white.opacity(0.5))
             }
@@ -1613,7 +1620,7 @@ struct DashboardView: View {
                         }
                     }
                 } label: {
-                    Text("⇅ Sort")
+                    Text(langMgr.t("dashboard.sortBy"))
                         .font(.inter(11, weight: .bold))
                         .foregroundColor(sortOrder == .insertion ? .brandCyan : .white)
                         .padding(.horizontal, 8).padding(.vertical, 4)
@@ -1650,10 +1657,10 @@ struct DashboardView: View {
             Image(systemName: "tray")
                 .font(.system(size: 40))
                 .foregroundColor(.textQuaternary)
-            Text("No items yet")
+            Text(langMgr.t("dashboard.noItems"))
                 .font(.inter(16, weight: .bold))
                 .foregroundColor(.textTertiary)
-            Text("Tap ＋ New Item to get started")
+            Text(langMgr.t("dashboard.noItems.hint"))
                 .font(.inter(12))
                 .foregroundColor(.textQuaternary)
                 .multilineTextAlignment(.center)
@@ -1694,7 +1701,7 @@ struct DashboardView: View {
 
         do {
             try await APIClient.shared.submitCollection(payload: payload)
-            submitMessage = "Collection '\(collName)' submitted successfully."
+            submitMessage = langMgr.t("dashboard.submitSuccess").replacingOccurrences(of: "%@", with: collName)
             submitSuccess = true
         } catch {
             submitMessage = error.localizedDescription

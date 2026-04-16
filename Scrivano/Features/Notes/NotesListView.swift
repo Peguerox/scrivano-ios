@@ -8,6 +8,7 @@ struct NotesListView: View {
     let item: Item
     @Environment(\.dismiss) var dismiss
     @ObservedObject private var notesMgr = NoteGenerationManager.shared
+    @ObservedObject private var langMgr = LanguageManager.shared
     @State private var notes: [LocalNoteEntry] = []
     @State private var selected = Set<String>()
     @State private var showPrompts = false
@@ -33,21 +34,21 @@ struct NotesListView: View {
 
             VStack(spacing: 0) {
                 // Top bar
-                SubScreenBar(title: "Notes", accentColor: .stageNotes, onBack: { dismiss() })
+                SubScreenBar(title: langMgr.t("automation.stage.notes"), accentColor: .stageNotes, onBack: { dismiss() })
                     .overlay(alignment: .trailing) {
                         Menu {
                             Button {
                                 selected.removeAll()
                                 pendingAction = .move
                             } label: {
-                                Label("Move", systemImage: "folder")
+                                Label(langMgr.t("common.move"), systemImage: "folder")
                             }
                             .disabled(notes.isEmpty)
                             Button(role: .destructive) {
                                 selected.removeAll()
                                 pendingAction = .delete
                             } label: {
-                                Label("Delete", systemImage: "trash")
+                                Label(langMgr.t("common.delete"), systemImage: "trash")
                             }
                             .disabled(notes.isEmpty)
                         } label: {
@@ -94,10 +95,10 @@ struct NotesListView: View {
                             Image(systemName: "note.text")
                                 .font(.system(size: 40))
                                 .foregroundColor(.textQuaternary)
-                            Text("No notes yet")
+                            Text(langMgr.t("notes.noNotes"))
                                 .font(.inter(16, weight: .bold))
                                 .foregroundColor(.textTertiary)
-                            Text("Process text files with a prompt to generate notes")
+                            Text(langMgr.t("notes.noNotes.hint"))
                                 .font(.inter(12))
                                 .foregroundColor(.textQuaternary)
                                 .multilineTextAlignment(.center)
@@ -116,7 +117,7 @@ struct NotesListView: View {
 
                     if inSelectionMode {
                         VStack(spacing: 6) {
-                            Text(pendingAction == .delete ? "Select notes to delete" : "Select notes to move")
+                            Text(pendingAction == .delete ? langMgr.t("notes.selectToDelete") : langMgr.t("notes.selectToMove"))
                                 .font(.inter(12, weight: .semibold))
                                 .foregroundColor(.textTertiary)
                                 .padding(.top, 10)
@@ -125,7 +126,7 @@ struct NotesListView: View {
                                 Button {
                                     selected.removeAll(); pendingAction = nil
                                 } label: {
-                                    Text("Cancel")
+                                    Text(langMgr.t("common.cancel"))
                                         .font(.inter(14, weight: .semibold))
                                         .foregroundColor(.textSecondary)
                                         .frame(maxWidth: .infinity).padding(.vertical, 13)
@@ -136,8 +137,8 @@ struct NotesListView: View {
                                 let actionColor: Color = pendingAction == .delete ? .danger : .brandBlue
                                 let actionIcon  = pendingAction == .delete ? "trash" : "folder"
                                 let actionLabel = pendingAction == .delete
-                                    ? "Delete \(selected.count)"
-                                    : "Move \(selected.count)"
+                                    ? langMgr.t("notes.deleteCount").replacingOccurrences(of: "%d", with: "\(selected.count)")
+                                    : langMgr.t("notes.moveCount").replacingOccurrences(of: "%d", with: "\(selected.count)")
 
                                 Button {
                                     if pendingAction == .delete { showDeleteConfirm = true }
@@ -155,7 +156,7 @@ struct NotesListView: View {
                                 .disabled(selected.isEmpty)
                             }
 
-                            Text("\(selected.count) note\(selected.count == 1 ? "" : "s") selected")
+                            Text(langMgr.t("notes.selectNotes").replacingOccurrences(of: "%d", with: "\(selected.count)"))
                                 .font(.inter(11)).foregroundColor(.textQuaternary)
                         }
                         .padding(.horizontal, 18).padding(.bottom, 28)
@@ -174,7 +175,7 @@ struct NotesListView: View {
                             } label: {
                                 HStack(spacing: 8) {
                                     Image(systemName: "bolt.fill").font(.system(size: 14, weight: .bold))
-                                    Text("Process Notes").font(.inter(15, weight: .heavy))
+                                    Text(langMgr.t("notes.processNotes")).font(.inter(15, weight: .heavy))
                                 }
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity).padding(.vertical, 14)
@@ -189,8 +190,8 @@ struct NotesListView: View {
                             .disabled(notes.isEmpty)
 
                             Text(selected.isEmpty
-                                 ? "Tap to select all and process"
-                                 : "\(selected.count) note\(selected.count == 1 ? "" : "s") selected")
+                                 ? langMgr.t("media.tapToSelectAll")
+                                 : langMgr.t("notes.selectNotes").replacingOccurrences(of: "%d", with: "\(selected.count)"))
                                 .font(.inter(11)).foregroundColor(.textQuaternary)
                         }
                         .padding(.horizontal, 18).padding(.top, 12).padding(.bottom, 28)
@@ -208,7 +209,7 @@ struct NotesListView: View {
                 VStack {
                     Spacer()
                     VStack(spacing: 16) {
-                        Text("Rename Note")
+                        Text(langMgr.t("notes.renameNote"))
                             .font(.inter(16, weight: .heavy))
                             .foregroundColor(.textPrimary)
                         TextField("", text: $renameText)
@@ -221,7 +222,7 @@ struct NotesListView: View {
                             .autocorrectionDisabled()
                         HStack(spacing: 10) {
                             Button { renameNote = nil } label: {
-                                Text("Cancel")
+                                Text(langMgr.t("common.cancel"))
                                     .font(.inter(14, weight: .bold)).foregroundColor(.textTertiary)
                                     .frame(maxWidth: .infinity).padding(.vertical, 13)
                                     .background(Color.white.opacity(0.05))
@@ -236,7 +237,7 @@ struct NotesListView: View {
                                 renameNote = nil
                                 reloadNotes()
                             } label: {
-                                Text("Rename")
+                                Text(langMgr.t("common.rename"))
                                     .font(.inter(14, weight: .bold)).foregroundColor(.white)
                                     .frame(maxWidth: .infinity).padding(.vertical, 13)
                                     .background(LinearGradient(colors: [Color.brandBlue, Color.brandCyan], startPoint: .leading, endPoint: .trailing))
@@ -265,9 +266,9 @@ struct NotesListView: View {
                         Image(systemName: "bolt.fill")
                             .font(.system(size: 30)).foregroundColor(.stageNotes)
                             .shadow(color: Color.stageNotes.opacity(0.7), radius: 10)
-                        Text("Process Notes")
+                        Text(langMgr.t("notes.processNotes"))
                             .font(.inter(16, weight: .heavy)).foregroundColor(.textPrimary)
-                        Text("Continue with \(selectedNotes.count) selected note\(selectedNotes.count == 1 ? "" : "s")?")
+                        Text(langMgr.t("notes.continueWith").replacingOccurrences(of: "%d", with: "\(selectedNotes.count)"))
                             .font(.inter(13)).foregroundColor(.textSecondary).multilineTextAlignment(.center)
                         ScrollView(showsIndicators: false) {
                             VStack(spacing: 6) {
@@ -278,7 +279,7 @@ struct NotesListView: View {
                             Button {
                                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showProcessConfirm = false }
                             } label: {
-                                Text("Cancel").font(.inter(14, weight: .semibold)).foregroundColor(.textSecondary)
+                                Text(langMgr.t("common.cancel")).font(.inter(14, weight: .semibold)).foregroundColor(.textSecondary)
                                     .frame(maxWidth: .infinity).padding(.vertical, 13)
                                     .background(Color.white.opacity(0.07)).clipShape(RoundedRectangle(cornerRadius: 14))
                             }
@@ -286,7 +287,7 @@ struct NotesListView: View {
                                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showProcessConfirm = false }
                                 showPrompts = true
                             } label: {
-                                Text("Continue").font(.inter(14, weight: .bold)).foregroundColor(.white)
+                                Text(langMgr.t("dashboard.record.continue")).font(.inter(14, weight: .bold)).foregroundColor(.white)
                                     .frame(maxWidth: .infinity).padding(.vertical, 13)
                                     .background(LinearGradient(
                                         colors: [Color.stageNotes.opacity(0.8), Color.stageNotes.opacity(0.6)],
@@ -314,9 +315,9 @@ struct NotesListView: View {
                         Image(systemName: "trash")
                             .font(.system(size: 30)).foregroundColor(.danger)
                             .shadow(color: Color.danger.opacity(0.7), radius: 10)
-                        Text("Delete Notes")
+                        Text(langMgr.t("notes.deleteNotes.btn"))
                             .font(.inter(16, weight: .heavy)).foregroundColor(.textPrimary)
-                        Text("Permanently delete \(selected.count) note\(selected.count == 1 ? "" : "s")?")
+                        Text(langMgr.t("notes.deleteNotes").replacingOccurrences(of: "%d", with: "\(selected.count)"))
                             .font(.inter(13)).foregroundColor(.textSecondary).multilineTextAlignment(.center)
                         ScrollView(showsIndicators: false) {
                             VStack(spacing: 6) {
@@ -331,7 +332,7 @@ struct NotesListView: View {
                             Button {
                                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showDeleteConfirm = false }
                             } label: {
-                                Text("Cancel").font(.inter(14, weight: .semibold)).foregroundColor(.textSecondary)
+                                Text(langMgr.t("common.cancel")).font(.inter(14, weight: .semibold)).foregroundColor(.textSecondary)
                                     .frame(maxWidth: .infinity).padding(.vertical, 13)
                                     .background(Color.white.opacity(0.07)).clipShape(RoundedRectangle(cornerRadius: 14))
                             }
@@ -346,7 +347,7 @@ struct NotesListView: View {
                                 }
                                 selected.removeAll(); pendingAction = nil; reloadNotes()
                             } label: {
-                                Text("Delete").font(.inter(14, weight: .bold)).foregroundColor(.white)
+                                Text(langMgr.t("common.delete")).font(.inter(14, weight: .bold)).foregroundColor(.white)
                                     .frame(maxWidth: .infinity).padding(.vertical, 13)
                                     .background(Color.danger.opacity(0.85)).clipShape(RoundedRectangle(cornerRadius: 14))
                             }
@@ -440,13 +441,16 @@ struct LocalNoteRow: View {
     var onMoved: () -> Void = {}
     var onRenameRequested: () -> Void = {}
 
+    @ObservedObject private var langMgr = LanguageManager.shared
     @State private var showMoreInfo = false
     @State private var showMoveTo = false
     @State private var showDraftPrompts = false
 
     private var wordCount: String {
         let words = note.text.split(separator: " ").count
-        return words == 1 ? "1 word" : "\(words) words"
+        return words == 1
+            ? langMgr.t("notes.wordSingular")
+            : langMgr.t("notes.wordPlural").replacingOccurrences(of: "%d", with: "\(words)")
     }
 
     var body: some View {
@@ -495,20 +499,20 @@ struct LocalNoteRow: View {
                 }.buttonStyle(.plain)
 
                 Menu {
-                    Section("Note") {
-                        Button { onView() } label: { Label("View / Edit Note", systemImage: "pencil") }
-                        Button { showDraftPrompts = true } label: { Label("Draft Note", systemImage: "note.text") }
+                    Section(langMgr.t("common.section.note")) {
+                        Button { onView() } label: { Label(langMgr.t("notes.viewEdit"), systemImage: "pencil") }
+                        Button { showDraftPrompts = true } label: { Label(langMgr.t("notes.draftNote"), systemImage: "note.text") }
                     }
-                    Section("Share") {
-                        ShareLink(item: note.text) { Label("Share…", systemImage: "square.and.arrow.up") }
+                    Section(langMgr.t("common.section.share")) {
+                        ShareLink(item: note.text) { Label(langMgr.t("common.shareEllipsis"), systemImage: "square.and.arrow.up") }
                     }
-                    Section("Manage") {
-                        Button { onRenameRequested() } label: { Label("Rename", systemImage: "pencil") }
-                        Button { showMoveTo = true } label: { Label("Move to…", systemImage: "folder") }
-                        Button(role: .destructive) { DeleteConfirmPresenter.show(itemName: note.label, onDelete: onDelete) } label: { Label("Delete", systemImage: "trash") }
+                    Section(langMgr.t("common.section.manage")) {
+                        Button { onRenameRequested() } label: { Label(langMgr.t("common.rename"), systemImage: "pencil") }
+                        Button { showMoveTo = true } label: { Label(langMgr.t("common.moveTo"), systemImage: "folder") }
+                        Button(role: .destructive) { DeleteConfirmPresenter.show(itemName: note.label, onDelete: onDelete) } label: { Label(langMgr.t("common.delete"), systemImage: "trash") }
                     }
-                    Section("Info") {
-                        Button { showMoreInfo = true } label: { Label("More Info", systemImage: "info.circle") }
+                    Section(langMgr.t("common.section.info")) {
+                        Button { showMoreInfo = true } label: { Label(langMgr.t("common.moreInfo"), systemImage: "info.circle") }
                     }
                 } label: {
                     Text("···")
@@ -545,6 +549,7 @@ struct NoteViewerEditorView: View {
     let note: LocalNoteEntry
     var onSaved: ((String) -> Void)? = nil
     @Environment(\.dismiss) var dismiss
+    @ObservedObject private var langMgr = LanguageManager.shared
     @State private var editedText: String
     @State private var showSaveCard = false
     @State private var showMarkdown = false
@@ -643,7 +648,7 @@ struct NoteViewerEditorView: View {
                         .progressViewStyle(.circular)
                         .tint(.stageNotes)
                         .scaleEffect(1.4)
-                    Text("Building PDF…")
+                    Text(langMgr.t("notes.buildingPDF"))
                         .font(.inter(15, weight: .semibold))
                         .foregroundColor(.textPrimary)
                 }
@@ -663,15 +668,15 @@ struct NoteViewerEditorView: View {
                         Image(systemName: "pencil.circle.fill")
                             .font(.system(size: 30)).foregroundColor(.stageNotes)
                             .shadow(color: Color.stageNotes.opacity(0.7), radius: 10)
-                        Text("Save Changes?").font(.inter(16, weight: .heavy)).foregroundColor(.textPrimary)
-                        Text("Do you want to save your edits to this note?")
+                        Text(langMgr.t("common.save_changes")).font(.inter(16, weight: .heavy)).foregroundColor(.textPrimary)
+                        Text(langMgr.t("notes.doYouWantSave"))
                             .font(.inter(13)).foregroundColor(.textSecondary).multilineTextAlignment(.center)
                         HStack(spacing: 10) {
                             Button {
                                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showSaveCard = false }
                                 dismiss()
                             } label: {
-                                Text("Discard").font(.inter(14, weight: .semibold)).foregroundColor(.danger)
+                                Text(langMgr.t("common.discard")).font(.inter(14, weight: .semibold)).foregroundColor(.danger)
                                     .frame(maxWidth: .infinity).padding(.vertical, 13)
                                     .background(Color.danger.opacity(0.10)).clipShape(RoundedRectangle(cornerRadius: 14))
                             }
@@ -679,7 +684,7 @@ struct NoteViewerEditorView: View {
                                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showSaveCard = false }
                                 onSaved?(editedText); dismiss()
                             } label: {
-                                Text("Save").font(.inter(14, weight: .bold)).foregroundColor(.white)
+                                Text(langMgr.t("common.save")).font(.inter(14, weight: .bold)).foregroundColor(.white)
                                     .frame(maxWidth: .infinity).padding(.vertical, 13)
                                     .background(LinearGradient(
                                         colors: [Color.stageNotes.opacity(0.8), Color.stageNotes.opacity(0.6)],
@@ -708,6 +713,7 @@ struct NoteViewerEditorView: View {
 struct NoteMoreInfoSheet: View {
     let note: LocalNoteEntry
     @Environment(\.dismiss) var dismiss
+    @ObservedObject private var langMgr = LanguageManager.shared
 
     private var wordCount: Int { note.text.split(separator: " ").count }
     private var charCount: Int { note.text.count }
@@ -721,7 +727,7 @@ struct NoteMoreInfoSheet: View {
             Color(hex: "#081221").ignoresSafeArea()
             VStack(spacing: 0) {
                 HStack {
-                    Text("More Info")
+                    Text(langMgr.t("common.moreInfo"))
                         .font(.inter(17, weight: .heavy)).foregroundColor(.textPrimary)
                     Spacer()
                     Button { dismiss() } label: {
@@ -733,11 +739,11 @@ struct NoteMoreInfoSheet: View {
                 .padding(.horizontal, 24).padding(.top, 24).padding(.bottom, 20)
 
                 VStack(spacing: 1) {
-                    infoRow("Name",       note.label)
-                    infoRow("Words",      "\(wordCount)")
-                    infoRow("Characters", "\(charCount)")
-                    infoRow("Prompt",     note.promptType.isEmpty ? "—" : note.promptType)
-                    infoRow("Created",    created)
+                    infoRow(langMgr.t("info.name"),       note.label)
+                    infoRow(langMgr.t("info.words"),      "\(wordCount)")
+                    infoRow(langMgr.t("info.characters"), "\(charCount)")
+                    infoRow(langMgr.t("info.prompt"),     note.promptType.isEmpty ? "—" : note.promptType)
+                    infoRow(langMgr.t("info.created"),    created)
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 14))
                 .padding(.horizontal, 20)
@@ -768,6 +774,7 @@ struct BulkMoveNoteSheet: View {
     let currentItemId: String
     var onMoved: () -> Void
     @Environment(\.dismiss) var dismiss
+    @ObservedObject private var langMgr = LanguageManager.shared
 
     @State private var expanded = Set<String>()
     private let allItems    = LocalItemStore.shared.all()
@@ -786,7 +793,7 @@ struct BulkMoveNoteSheet: View {
             VStack(spacing: 0) {
                 Capsule().fill(Color.white.opacity(0.2)).frame(width: 36, height: 4).padding(.top, 12)
                 HStack {
-                    Text("Move \(ids.count) note\(ids.count == 1 ? "" : "s") to…")
+                    Text(langMgr.t("notes.moveTo").replacingOccurrences(of: "%d", with: "\(ids.count)"))
                         .font(.inter(17, weight: .heavy)).foregroundColor(.textPrimary)
                     Spacer()
                     Button { dismiss() } label: {
