@@ -184,7 +184,7 @@ struct DashboardView: View {
             .onAppear { withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) { fabPulse = true } }
             .onChange(of: recorder.lastSavedItemId) { _ in vm.refreshLocalCounts() }
             .onChange(of: notesMgr.completedItemIds) { newIds in
-                vm.refreshLocalCounts()
+                vm.refreshFromLocalStores()
                 if autoUpload && !newIds.isEmpty { Task { await submitCollection() } }
             }
             saveToast
@@ -1522,7 +1522,8 @@ struct DashboardView: View {
             // Submit — gray style
             Button { Task { await submitCollection() } } label: {
                 HStack(spacing: 4) {
-                    if isSubmitting { ProgressView().tint(.white.opacity(0.6)).scaleEffect(0.7) }
+                    ProgressView().tint(.white.opacity(0.6)).scaleEffect(0.7)
+                        .opacity(isSubmitting ? 1 : 0)
                     Text(langMgr.t("dashboard.submit"))
                 }
                 .font(.inter(12, weight: .bold))

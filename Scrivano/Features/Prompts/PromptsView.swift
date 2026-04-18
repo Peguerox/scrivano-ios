@@ -779,7 +779,7 @@ struct PromptsView: View {
             let taskId: String?
             enum CodingKeys: String, CodingKey { case success; case taskId = "task_id" }
         }
-        appLog("POST /api/notes/generate — prompt: \(promptName), item: \(itemId)", level: .info)
+        appLog("POST [notes endpoint] — prompt: \(promptName), item: \(itemId)", level: .info)
         do {
             let res = try await APIClient.shared.request(
                 path: "/api/notes/generate", method: "POST",
@@ -788,7 +788,7 @@ struct PromptsView: View {
                 responseType: Res.self
             )
             guard let taskId = res.taskId else {
-                appLog("  /api/notes/generate — no task_id returned (success=\(res.success))", level: .error)
+                appLog("  [notes endpoint] — no task_id returned (success=\(res.success))", level: .error)
                 return false
             }
             appLog("  task_id: \(taskId) — polling...", level: .info)
@@ -817,12 +817,12 @@ struct PromptsView: View {
                             sendCompletionNotification(title: "Note Ready", body: "Your note has been generated.")
                             return true
                         }
-                        appLog("  /api/notes/result — status completed but note text is nil", level: .error)
+                        appLog("  [notes endpoint] — status completed but note text is nil", level: .error)
                         sendCompletionNotification(title: "Note Failed", body: "Note generation completed but returned no text.")
                         return false
                     case "failed":
                         let serverErr = result.error ?? "no error message"
-                        appLog("  /api/notes/result — status: failed — \(serverErr) (task: \(taskId))", level: .error)
+                        appLog("  [notes endpoint] — status: failed — \(serverErr) (task: \(taskId))", level: .error)
                         sendCompletionNotification(title: "Note Failed", body: serverErr)
                         return false
                     default:
@@ -834,10 +834,10 @@ struct PromptsView: View {
                 }
                 attempt += 1
             }
-            appLog("  /api/notes/result — timed out after \(attempt) attempts (task: \(taskId))", level: .error)
+                        appLog("  [notes endpoint] — timed out after \(attempt) attempts (task: \(taskId))", level: .error)
             sendCompletionNotification(title: "Note Failed", body: "Note generation timed out for prompt: \(promptName).")
         } catch {
-            appLog("  /api/notes/generate — request failed: \(error.localizedDescription)", level: .error)
+            appLog("  [notes endpoint] — request failed: \(error.localizedDescription)", level: .error)
             sendCompletionNotification(title: "Note Failed", body: "Could not start note generation: \(error.localizedDescription)")
         }
         return false

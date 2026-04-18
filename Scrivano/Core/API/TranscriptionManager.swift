@@ -305,7 +305,7 @@ final class TranscriptionManager: ObservableObject {
                         appLog("  Read OK: \(audioData.count) bytes")
 
                         transcribingStatus = "Uploading \(name)…"
-                        appLog("  → POST /api/audio/transcribe (\(audioData.count) bytes, \(duration)s)")
+                        appLog("  → POST [audio endpoint] (\(audioData.count) bytes, \(duration)s)")
 
                         var uploadResult2: TranscribeResponse? = nil
                         for uploadAttempt in 1...2 {
@@ -817,7 +817,7 @@ final class NoteGenerationManager: ObservableObject {
                             return
                         case "failed":
                             let serverErr = result.error ?? "Generation failed."
-                            appLog("  /api/notes/result — status: failed — \(serverErr) (task: \(taskId))", level: .error)
+                            appLog("  [notes endpoint] — status: failed — \(serverErr) (task: \(taskId))", level: .error)
                             state = .failed(serverErr)
                             return
                         default: break
@@ -1086,7 +1086,7 @@ final class ImageProcessingManager: ObservableObject {
         }
 
         do {
-            appLog("[IMG] POST /api/image/process — storagePath: \(storagePath)")
+            appLog("[IMG] POST [image endpoint] — storagePath: \(storagePath)")
             let res = try await api.request(
                 path: "/api/image/process",
                 method: "POST",
