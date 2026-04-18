@@ -469,6 +469,16 @@ enum AppTranslations {
             "recorder.section.repeatAudio": "Repeat Audio",
             "recorder.split.none":          "None",
             "recorder.split.hour":          "1 hour",
+            "recorder.quality.low":         "8 kHz · Smallest file size",
+            "recorder.quality.medium":      "22 kHz · Best for voice",
+            "recorder.quality.high":        "44.1 kHz · CD Quality",
+            "recorder.quality.max":         "96 kHz · High Definition",
+            "recorder.format.m4a":          "Compressed AAC — smaller files, great for voice",
+            "recorder.format.wav":          "Lossless PCM — full quality, larger files",
+            "recorder.bitDepth.wavOnly":    "Bit depth only applies to WAV format",
+            "recorder.pocket.firstDetail":  "A strong vibration confirms the button is armed. Nothing happens yet.",
+            "recorder.pocket.secondDetail": "Tap again within 6 seconds to pause or stop the recording.",
+            "recorder.pocket.inactionDetail": "If you don't tap again, the action is cancelled with a soft vibration and recording continues.",
 
             // Automation
             "automation.mediaToText.title":     "Media → Text",
@@ -958,6 +968,16 @@ enum AppTranslations {
             "recorder.section.repeatAudio": "Repetir Audio",
             "recorder.split.none":          "Ninguno",
             "recorder.split.hour":          "1 hora",
+            "recorder.quality.low":         "8 kHz · Archivo más pequeño",
+            "recorder.quality.medium":      "22 kHz · Ideal para voz",
+            "recorder.quality.high":        "44.1 kHz · Calidad CD",
+            "recorder.quality.max":         "96 kHz · Alta Definición",
+            "recorder.format.m4a":          "AAC comprimido — archivos más pequeños, ideal para voz",
+            "recorder.format.wav":          "PCM sin pérdida — máxima calidad, archivos más grandes",
+            "recorder.bitDepth.wavOnly":    "La profundidad de bits solo aplica al formato WAV",
+            "recorder.pocket.firstDetail":  "Una vibración fuerte confirma que el botón está listo. Aún no pasa nada.",
+            "recorder.pocket.secondDetail": "Toca de nuevo en 6 segundos para pausar o detener la grabación.",
+            "recorder.pocket.inactionDetail": "Si no tocas de nuevo, la acción se cancela con una vibración suave y la grabación continúa.",
 
             // Automation
             "automation.mediaToText.title":     "Media → Texto",

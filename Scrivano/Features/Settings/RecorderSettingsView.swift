@@ -12,12 +12,12 @@ struct RecorderSettingsView: View {
     @AppStorage("auto_conversion")   private var autoConversion: Bool = true // seconds
 
     private let qualityLabels = ["Low", "Medium", "High", "Max"]
-    private let qualityDescriptions = [
-        "8 kHz · Smallest file size",
-        "22 kHz · Best for voice",
-        "44.1 kHz · CD Quality",
-        "96 kHz · High Definition"
-    ]
+    private var qualityDescriptions: [String] {[
+        langMgr.t("recorder.quality.low"),
+        langMgr.t("recorder.quality.medium"),
+        langMgr.t("recorder.quality.high"),
+        langMgr.t("recorder.quality.max")
+    ]}
 
     private let formatLabels = ["M4A", "WAV"]
     private let depthLabels  = ["16 bit", "24 bit", "32 bit"]
@@ -104,8 +104,8 @@ struct RecorderSettingsView: View {
                             VStack(spacing: 10) {
                                 segmentedControl(options: formatLabels, selected: $format)
                                 Text(format == 0
-                                     ? "Compressed AAC — smaller files, great for voice"
-                                     : "Lossless PCM — full quality, larger files")
+                                     ? langMgr.t("recorder.format.m4a")
+                                     : langMgr.t("recorder.format.wav"))
                                     .font(.inter(11))
                                     .foregroundColor(.textQuaternary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -121,7 +121,7 @@ struct RecorderSettingsView: View {
                                     .opacity(format == 0 ? 0.3 : 1)
                                     .allowsHitTesting(format != 0)
                                 Text(format == 0
-                                     ? "Bit depth only applies to WAV format"
+                                     ? langMgr.t("recorder.bitDepth.wavOnly")
                                      : "\(depthLabels[bitDepth]) · \(sizeHint)")
                                     .font(.inter(11))
                                     .foregroundColor(.textQuaternary)
@@ -214,11 +214,11 @@ struct RecorderSettingsView: View {
 
             VStack(alignment: .leading, spacing: 14) {
                 pocketRow(icon: "hand.tap",      title: langMgr.t("recorder.firstTap"),
-                          detail: "A strong vibration confirms the button is armed. Nothing happens yet.")
+                          detail: langMgr.t("recorder.pocket.firstDetail"))
                 pocketRow(icon: "hand.tap.fill",  title: langMgr.t("recorder.secondTap"),
-                          detail: "Tap again within 6 seconds to pause or stop the recording.")
+                          detail: langMgr.t("recorder.pocket.secondDetail"))
                 pocketRow(icon: "timer",          title: langMgr.t("recorder.inaction"),
-                          detail: "If you don't tap again, the action is cancelled with a soft vibration and recording continues.")
+                          detail: langMgr.t("recorder.pocket.inactionDetail"))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
