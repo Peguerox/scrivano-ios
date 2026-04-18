@@ -151,14 +151,6 @@ struct CreditsView: View {
         .background(isFreePlan ? Color.brandCyan.opacity(0.06) : Color.white.opacity(0.04))
         .overlay(RoundedRectangle(cornerRadius: 16)
             .stroke(isFreePlan ? Color.brandCyan.opacity(0.30) : Color.white.opacity(0.08), lineWidth: isFreePlan ? 1.5 : 1))
-        .overlay(alignment: .topTrailing) {
-            if isFreePlan {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 18))
-                    .foregroundColor(.green)
-                    .padding(.trailing, 16).padding(.top, 13)
-            }
-        }
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .padding(.horizontal, 18)
         .padding(.top, 14)
