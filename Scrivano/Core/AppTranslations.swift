@@ -420,6 +420,20 @@ enum AppTranslations {
             // Help
             "help.title":                   "How can we help?",
             "help.tutorials":               "Find answers, watch tutorials,\nand connect with the community.",
+            "help.screenTitle":             "Help & Support",
+            "help.section.resources":       "Resources",
+            "help.section.connect":         "Connect",
+            "help.knowledgeBase":           "Knowledge Base",
+            "help.knowledgeBase.subtitle":  "Guides, tutorials and full documentation",
+            "help.quickStart":              "Quick Start Video",
+            "help.quickStart.subtitle":     "Get up and running in minutes",
+            "help.legalAgreements":         "Legal Agreements",
+            "help.legalAgreements.subtitle":"Terms of service · Privacy policy",
+            "help.website":                 "Website",
+            "help.website.subtitle":        "Visit us at app.scrivano.net",
+            "help.youtube":                 "YouTube",
+            "help.youtube.subtitle":        "Tutorials and feature walkthroughs",
+            "help.instagram":               "Instagram",
 
             // PIN
             "pin.enterContinue":            "Enter your PIN to continue",
@@ -895,6 +909,20 @@ enum AppTranslations {
             // Help
             "help.title":                   "¿Cómo podemos ayudarte?",
             "help.tutorials":               "Encuentra respuestas, mira tutoriales\ny conecta con la comunidad.",
+            "help.screenTitle":             "Centro de Ayuda",
+            "help.section.resources":       "Recursos",
+            "help.section.connect":         "Conectar",
+            "help.knowledgeBase":           "Base de Conocimiento",
+            "help.knowledgeBase.subtitle":  "Guías, tutoriales y documentación completa",
+            "help.quickStart":              "Video de Inicio Rápido",
+            "help.quickStart.subtitle":     "Empieza en minutos",
+            "help.legalAgreements":         "Acuerdos Legales",
+            "help.legalAgreements.subtitle":"Términos de servicio · Política de privacidad",
+            "help.website":                 "Sitio Web",
+            "help.website.subtitle":        "Visítanos en app.scrivano.net",
+            "help.youtube":                 "YouTube",
+            "help.youtube.subtitle":        "Tutoriales y recorridos de funciones",
+            "help.instagram":               "Instagram",
 
             // PIN
             "pin.enterContinue":            "Ingresa tu PIN para continuar",

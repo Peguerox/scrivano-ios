@@ -10,7 +10,7 @@ struct HelpView: View {
             Color.phoneBg.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                SubScreenBar(title: "Help & Support", accentColor: .brandCyan, onBack: { dismiss() })
+                SubScreenBar(title: langMgr.t("help.screenTitle"), accentColor: .brandCyan, onBack: { dismiss() })
 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 14) {
@@ -50,49 +50,49 @@ struct HelpView: View {
                         .padding(.horizontal, 14).padding(.top, 14)
 
                         // Section label
-                        sectionLabel("Resources")
+                        sectionLabel(langMgr.t("help.section.resources"))
 
                         // Help cards
                         helpCard(
                             icon: "book.fill", iconColor: .brandCyan,
-                            title: "Knowledge Base",
-                            subtitle: "Guides, tutorials and full documentation",
+                            title: langMgr.t("help.knowledgeBase"),
+                            subtitle: langMgr.t("help.knowledgeBase.subtitle"),
                             url: "https://app.scrivano.net/knowledge-base"
                         )
                         helpCard(
                             icon: "play.circle.fill", iconColor: Color(hex: "#f59e0b"),
-                            title: "Quick Start Video",
-                            subtitle: "Get up and running in minutes",
+                            title: langMgr.t("help.quickStart"),
+                            subtitle: langMgr.t("help.quickStart.subtitle"),
                             url: "https://www.youtube.com/watch?v=vvUcnRT3Qz0&t=3s"
                         )
                         helpCard(
                             icon: "doc.text.fill", iconColor: .textTertiary,
-                            title: "Legal Agreements",
-                            subtitle: "Terms of service · Privacy policy",
+                            title: langMgr.t("help.legalAgreements"),
+                            subtitle: langMgr.t("help.legalAgreements.subtitle"),
                             url: "https://app.scrivano.net/#legal"
                         )
 
                         // Section label
-                        sectionLabel("Connect")
+                        sectionLabel(langMgr.t("help.section.connect"))
 
                         helpCard(
                             icon: "globe",
                             iconColor: .brandCyan,
-                            title: "Website",
-                            subtitle: "Visit us at app.scrivano.net",
+                            title: langMgr.t("help.website"),
+                            subtitle: langMgr.t("help.website.subtitle"),
                             url: "https://app.scrivano.net/"
                         )
                         helpCard(
                             icon: "play.rectangle.fill",
                             iconColor: Color.red,
-                            title: "YouTube",
-                            subtitle: "Tutorials and feature walkthroughs",
+                            title: langMgr.t("help.youtube"),
+                            subtitle: langMgr.t("help.youtube.subtitle"),
                             url: "https://www.youtube.com/@ScrivanoSocial"
                         )
                         helpCard(
                             icon: "camera.fill",
                             iconColor: Color(hex: "#ec4899"),
-                            title: "Instagram",
+                            title: langMgr.t("help.instagram"),
                             subtitle: "@scrivanosocial",
                             url: "https://www.instagram.com/scrivanosocial/"
                         )
