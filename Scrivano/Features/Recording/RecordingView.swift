@@ -196,7 +196,7 @@ struct RecordingView: View {
                     .frame(maxHeight: .infinity)
 
                     // Waveform — 2/3 width, centered
-                    EQBandView(level: recorder.audioLevel, isActive: isActivelyRecording)
+                    EQBandView(isActive: isActivelyRecording)
                         .frame(height: 72)
                         .padding(.horizontal, UIScreen.main.bounds.width / 6)
 
@@ -852,8 +852,9 @@ struct WaveformView: View {
 // 14 static bands with independent multipliers — pro VU meter look.
 // Uses single audioLevel: Float published at 4 Hz.
 struct EQBandView: View {
-    let level: Float
     var isActive: Bool
+    @State private var level: Float = 0.08
+    private let timer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
 
     private let bandCount = 14
     private let spacing: CGFloat = 4.0
@@ -875,6 +876,7 @@ struct EQBandView: View {
                 ctx.fill(path, with: .color(color))
             }
         }
+        .onReceive(timer) { _ in level = AudioRecorderManager.shared.audioLevel }
     }
 }
 
@@ -887,7 +889,7 @@ final class AudioRecorderManager: NSObject, ObservableObject, AVAudioRecorderDel
     @Published var isPaused = false
     @Published var isMinimized = false
     @Published var elapsedSeconds: Int = 0
-    @Published var audioLevel: Float = 0.08
+    var audioLevel: Float = 0.08
     private var fileSizeTick = 0
     private var smoothedLevel: Float = 0.08
     @Published var fileSize: Int64 = 0
