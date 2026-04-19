@@ -1521,11 +1521,7 @@ struct DashboardView: View {
 
             // Submit — gray style
             Button { Task { await submitCollection() } } label: {
-                HStack(spacing: 4) {
-                    ProgressView().tint(.white.opacity(0.6)).scaleEffect(0.7)
-                        .opacity(isSubmitting ? 1 : 0)
-                    Text(langMgr.t("dashboard.submit"))
-                }
+                Text(langMgr.t("dashboard.submit"))
                 .font(.inter(12, weight: .bold))
                 .foregroundColor(Color.white.opacity(0.6))
                 .frame(maxWidth: .infinity)
