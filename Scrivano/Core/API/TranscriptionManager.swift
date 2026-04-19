@@ -1176,6 +1176,47 @@ final class ImageProcessingManager: ObservableObject {
         }
     }
 
+    /// Upload a UIImage to Supabase, send to /api/image/process with a promptId,
+    /// poll until completed and return the raw result text. Throws on any failure.
+    func processImageAndGetText(image: UIImage, promptId: String) async throws -> String {
+        guard let jpegData = image.resizedToMaxDimension(1024).jpegData(compressionQuality: 0.8)
+        else { throw ImageListError.encodingFailed }
+
+        guard let token = KeychainService.shared.getToken(),
+              let supabaseBase = supabaseURL(from: token),
+              let userId = jwtSubject(from: token)
+        else { throw ImageListError.authFailed }
+
+        let filename = "\(UUID().uuidString).jpg"
+        let storagePath = "\(userId)/\(filename)"
+        let uploadURL = URL(string: "\(supabaseBase)/storage/v1/object/imports/\(storagePath)")!
+        var uploadReq = URLRequest(url: uploadURL, timeoutInterval: 60)
+        uploadReq.httpMethod = "POST"
+        uploadReq.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        uploadReq.setValue("image/jpeg", forHTTPHeaderField: "Content-Type")
+        uploadReq.httpBody = jpegData
+        let (_, uploadResp) = try await URLSession.shared.data(for: uploadReq)
+        let uploadStatus = (uploadResp as? HTTPURLResponse)?.statusCode ?? 0
+        guard uploadStatus == 200 || uploadStatus == 201 else { throw ImageListError.uploadFailed(uploadStatus) }
+
+        struct Body: Encodable {
+            let storagePath: String; let promptId: String
+            enum CodingKeys: String, CodingKey { case storagePath; case promptId = "prompt_id" }
+        }
+        let res = try await api.request(path: "/api/image/process", method: "POST",
+                                        body: Body(storagePath: storagePath, promptId: promptId),
+                                        responseType: ImageProcessResponse.self)
+        guard let taskId = res.taskId else { throw ImageListError.noTaskId }
+
+        for _ in 0..<60 {
+            try await Task.sleep(nanoseconds: 5_000_000_000)
+            let poll = try await api.pollImageResult(taskId: taskId)
+            if poll.status == "completed", let text = poll.note { return text }
+            if poll.status == "failed" { throw ImageListError.processingFailed(poll.note ?? "unknown error") }
+        }
+        throw ImageListError.timeout
+    }
+
     /// Extracts the Supabase project base URL from the JWT `iss` claim.
     /// e.g. "https://xxxx.supabase.co/auth/v1" → "https://xxxx.supabase.co"
     private func supabaseURL(from jwt: String) -> String? {

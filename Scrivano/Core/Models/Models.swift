@@ -245,6 +245,23 @@ struct NoteGenerateResponse: Codable {
     }
 }
 
+// MARK: - Image list errors
+
+enum ImageListError: LocalizedError {
+    case encodingFailed, authFailed, uploadFailed(Int), noTaskId, timeout
+    case processingFailed(String)
+    var errorDescription: String? {
+        switch self {
+        case .encodingFailed:        return "Could not encode image."
+        case .authFailed:            return "Authentication error. Please log in again."
+        case .uploadFailed(let c):   return "Image upload failed (HTTP \(c))."
+        case .noTaskId:              return "Failed to start image processing."
+        case .timeout:               return "Timed out waiting for result."
+        case .processingFailed(let m): return "Processing failed: \(m)"
+        }
+    }
+}
+
 // MARK: - Image processing
 
 struct ImageProcessResponse: Codable {

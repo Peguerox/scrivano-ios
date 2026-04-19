@@ -1720,26 +1720,7 @@ struct DashboardView: View {
         let names: [String]
 
         if useAI {
-            // Step 1: OCR the image locally
-            guard let cgImage = image.cgImage else {
-                createListError = "Failed to read image."; return
-            }
-            let ocrText = await Task.detached(priority: .userInitiated) {
-                let request = VNRecognizeTextRequest()
-                request.recognitionLevel = .accurate
-                request.usesLanguageCorrection = true
-                let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-                try? handler.perform([request])
-                return (request.results ?? [])
-                    .compactMap { $0.topCandidates(1).first?.string }
-                    .joined(separator: "\n")
-            }.value
-
-            guard !ocrText.isEmpty else {
-                createListError = "Could not read any text from the image."; return
-            }
-
-            // Step 2: Find "Image list" prompt
+            // Step 1: Find "image list" prompt
             let prompts: [Prompt]
             do {
                 let res = try await APIClient.shared.request(path: "/api/prompts", responseType: PromptsResponse.self)
@@ -1751,37 +1732,12 @@ struct DashboardView: View {
                 return
             }
 
-            // Step 3: Send OCR text to /api/notes/generate with the Image list prompt
-            struct NoteBody: Encodable {
-                let transcript: String
-                let promptId: String
-                enum CodingKeys: String, CodingKey { case transcript; case promptId = "prompt_id" }
-            }
-            struct NoteRes: Decodable {
-                let success: Bool
-                let taskId: String?
-                enum CodingKeys: String, CodingKey { case success; case taskId = "task_id" }
-            }
+            // Step 2: Upload image → /api/image/process → poll → parse
             do {
-                let res = try await APIClient.shared.request(
-                    path: "/api/notes/generate", method: "POST",
-                    body: NoteBody(transcript: ocrText, promptId: prompt.id),
-                    responseType: NoteRes.self
+                let raw = try await ImageProcessingManager.shared.processImageAndGetText(
+                    image: image, promptId: prompt.id
                 )
-                guard let taskId = res.taskId else {
-                    createListError = "Failed to start note generation."; return
-                }
-                // Step 4: Poll for result
-                var resultText: String? = nil
-                for _ in 0..<60 {
-                    try? await Task.sleep(nanoseconds: 5_000_000_000)
-                    if let poll = try? await APIClient.shared.pollNoteResult(taskId: taskId) {
-                        if poll.status == "completed" { resultText = poll.note; break }
-                        if poll.status == "failed" { createListError = "Processing failed."; return }
-                    }
-                }
-                guard let raw = resultText, !raw.isEmpty else { createListError = "Timed out waiting for result."; return }
-                // Step 5: Parse comma-separated result
+                guard !raw.isEmpty else { createListError = "No items returned from AI."; return }
                 names = raw
                     .components(separatedBy: ",")
                     .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
