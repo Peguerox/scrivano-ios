@@ -20,13 +20,10 @@ struct CreditsView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 0) {
                         balanceCard.padding(.top, 14)
-                        freePlanRow
-                        sectionLabel("Pay as you go")
-                        paygoGroup
-                        sectionLabel("Unlimited Access")
-                        unlimitedCard
-                        sectionLabel("Bring Your Own API")
-                        apiCard
+                        freePlanRow.padding(.top, 14)
+                        paygoGroup.padding(.top, 14)
+                        unlimitedCard.padding(.top, 14)
+                        apiCard.padding(.top, 14)
                         restoreButton
                         Spacer().frame(height: 40)
                     }
@@ -153,13 +150,21 @@ struct CreditsView: View {
             .stroke(isFreePlan ? Color.brandCyan.opacity(0.30) : Color.white.opacity(0.08), lineWidth: isFreePlan ? 1.5 : 1))
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .padding(.horizontal, 18)
-        .padding(.top, 14)
     }
 
     // MARK: - Pay As You Go Group
 
     private var paygoGroup: some View {
         VStack(spacing: 0) {
+            Text("Pay as you go")
+                .font(.inter(10, weight: .heavy))
+                .foregroundColor(.textQuaternary)
+                .tracking(0.7)
+                .textCase(.uppercase)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 2)
             tierRow(productId: RCProduct.credits50,  credits: "50",  name: "Starter Pack",  price: rc.productPrices[RCProduct.credits50]  ?? "$4.99",  isBest: false, glowLevel: 0)
             Divider().background(Color.white.opacity(0.05)).padding(.leading, 76)
             tierRow(productId: RCProduct.credits125, credits: "125", name: "Standard Pack", price: rc.productPrices[RCProduct.credits125] ?? "$9.99",  isBest: false, glowLevel: 1)
@@ -264,6 +269,13 @@ struct CreditsView: View {
                 .zIndex(1)
 
             VStack(alignment: .leading, spacing: 0) {
+                Text("Unlimited Access")
+                    .font(.inter(10, weight: .heavy))
+                    .foregroundColor(.textQuaternary)
+                    .tracking(0.7)
+                    .textCase(.uppercase)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, 10)
                 HStack(spacing: 8) {
                     Text("Most Popular")
                         .font(.inter(9, weight: .heavy))
@@ -368,6 +380,13 @@ struct CreditsView: View {
                 .zIndex(1)
 
             VStack(spacing: 10) {
+                Text("Bring Your Own API")
+                    .font(.inter(10, weight: .heavy))
+                    .foregroundColor(.textQuaternary)
+                    .tracking(0.7)
+                    .textCase(.uppercase)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, 2)
                 HStack(spacing: 12) {
                     Image(systemName: "key.fill")
                         .font(.system(size: 18))
@@ -481,17 +500,4 @@ struct CreditsView: View {
     }
 
 
-    // MARK: - Section Label
-
-    private func sectionLabel(_ text: String) -> some View {
-        Text(text)
-            .font(.inter(10, weight: .heavy))
-            .foregroundColor(.textQuaternary)
-            .tracking(1)
-            .textCase(.uppercase)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 18)
-            .padding(.top, 18)
-            .padding(.bottom, 8)
-    }
 }
