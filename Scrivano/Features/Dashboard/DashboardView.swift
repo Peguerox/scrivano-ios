@@ -1867,7 +1867,7 @@ final class DashboardViewModel: ObservableObject {
         if let collId = activeCollection?.id {
             items = all.filter { $0.collectionId == collId }
         } else {
-            items = all
+            items = all.filter { $0.collectionId == nil }
         }
         refreshLocalCounts()
     }
