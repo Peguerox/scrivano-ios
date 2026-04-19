@@ -943,6 +943,20 @@ struct TranscriptViewerView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .background(Color.white)
+                } else if transcript.isMerge {
+                    ScrollView {
+                        Text(editedText)
+                            .font(.inter(14))
+                            .foregroundColor(.textPrimary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .textSelection(.enabled)
+                    }
+                    .background(Color.phoneBg)
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showMergeWarning = true }
+                    }
                 } else {
                     TextEditor(text: $editedText)
                         .font(.inter(14))
@@ -951,12 +965,6 @@ struct TranscriptViewerView: View {
                         .background(Color.phoneBg)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
-                        .allowsHitTesting(!transcript.isMerge)
-                        .onTapGesture {
-                            if transcript.isMerge {
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showMergeWarning = true }
-                            }
-                        }
                 }
             }
 
