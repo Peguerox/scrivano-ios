@@ -76,7 +76,7 @@ struct SettingsView: View {
                             NavRow(icon: "🗑", iconColor: .danger, title: langMgr.t("settings.recycleBin.title"),
                                    subtitle: trashCount > 0 ? "\(trashCount) \(trashCount == 1 ? "item" : "items")" : langMgr.t("settings.recycleBin.subtitle.empty")) { showTrash = true }
                         }
-                        .padding(.top, 3)
+                        .padding(.top, 14)
 
                         // System section
                         settingsGroup(title: langMgr.t("settings.section.system")) {
@@ -97,7 +97,7 @@ struct SettingsView: View {
                             Divider().background(Color.white.opacity(0.05)).padding(.leading, 68)
                             NavRow(icon: "🌐", iconColor: .brandCyan, title: langMgr.t("settings.language.title"), subtitle: langMgr.t("settings.language.subtitle")) { showLanguage = true }
                         }
-                        .padding(.top, 3)
+                        .padding(.top, 14)
 
                         // Account section
                         settingsGroup(title: langMgr.t("settings.section.account")) {
@@ -105,9 +105,9 @@ struct SettingsView: View {
                             Divider().background(Color.white.opacity(0.05)).padding(.leading, 68)
                             NavRow(icon: "⚠️", iconColor: .danger, title: langMgr.t("settings.deleteAccount.title"), subtitle: langMgr.t("settings.deleteAccount.subtitle"), isDanger: true) { showDeleteAccount = true }
                         }
-                        .padding(.top, 3)
+                        .padding(.top, 14)
 
-                        Spacer().frame(height: 16)
+                        Spacer().frame(height: 30)
                     }
                     }
                     .refreshable { await auth.refreshUser() }
