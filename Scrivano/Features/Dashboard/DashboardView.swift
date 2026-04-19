@@ -1783,7 +1783,7 @@ struct DashboardView: View {
                 guard let raw = resultText, !raw.isEmpty else { createListError = "Timed out waiting for result."; return }
                 // Step 5: Parse comma-separated result
                 names = raw
-                    .components(separatedBy: CharacterSet(charactersIn: ",\n"))
+                    .components(separatedBy: ",")
                     .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
                     .filter { !$0.isEmpty }
             } catch {
