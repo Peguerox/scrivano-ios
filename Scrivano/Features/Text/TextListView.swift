@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import MarkdownUI
 
 struct TextFile: Identifiable, Codable {
     let id: String
@@ -31,6 +32,7 @@ struct TextListView: View {
 
     // Import
     @State private var showDocImporter = false
+    @State private var showPasteText = false
     @State private var isImporting = false
     @State private var importError: String? = nil
 
@@ -67,6 +69,9 @@ struct TextListView: View {
                         Menu {
                             Button { showDocImporter = true } label: {
                                 Label(langMgr.t("dashboard.importDocument"), systemImage: "doc.badge.plus")
+                            }
+                            Button { showPasteText = true } label: {
+                                Label(langMgr.t("text.pasteText"), systemImage: "doc.on.clipboard")
                             }
                             Button {
                                 selected.removeAll()
@@ -557,6 +562,9 @@ struct TextListView: View {
         ) { result in
             Task { await handleDocumentImport(result: result) }
         }
+        .sheet(isPresented: $showPasteText) {
+            PasteTextSheet(item: item) { rebuildAndReload() }
+        }
         .fullScreenCover(isPresented: $showPrompts) {
             let texts = selectedTranscripts.map { $0.text }
             let ids   = selectedTranscripts.map { $0.id }
@@ -886,6 +894,8 @@ struct TranscriptViewerView: View {
     @ObservedObject private var langMgr = LanguageManager.shared
     @State private var editedText: String
     @State private var showSaveCard = false
+    @State private var showMarkdown = false
+    @State private var showMergeWarning = false
 
     init(transcript: TranscriptSummary, onSaved: ((String) -> Void)? = nil) {
         self.transcript = transcript
@@ -900,7 +910,7 @@ struct TranscriptViewerView: View {
             Color.phoneBg.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                SubScreenBar(title: transcript.label, accentColor: .stageText, onBack: {
+                SubScreenBar(title: transcript.label, accentColor: transcript.isMerge ? .brandCyan : .stageText, onBack: {
                     if hasChanges {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showSaveCard = true }
                     } else {
@@ -908,16 +918,87 @@ struct TranscriptViewerView: View {
                     }
                 }, trailingIcon: nil)
                 .overlay(alignment: .bottom) {
-                    Rectangle().fill(Color.stageText.opacity(0.4)).frame(height: 1)
+                    Rectangle().fill((transcript.isMerge ? Color.brandCyan : Color.stageText).opacity(0.4)).frame(height: 1)
+                }
+                .overlay(alignment: .trailing) {
+                    Button { withAnimation(.easeInOut(duration: 0.2)) { showMarkdown.toggle() } } label: {
+                        Image(systemName: showMarkdown ? "doc.richtext.fill" : "doc.richtext")
+                            .font(.system(size: 15))
+                            .foregroundColor(showMarkdown ? .stageText : .textSecondary)
+                            .frame(width: 36, height: 36)
+                            .background(showMarkdown ? Color.stageText.opacity(0.15) : Color.white.opacity(0.07))
+                            .overlay(Circle().stroke(Color.white.opacity(0.1), lineWidth: 1))
+                            .clipShape(Circle())
+                    }
+                    .padding(.trailing, 18)
                 }
 
-                TextEditor(text: $editedText)
-                    .font(.inter(14))
-                    .foregroundColor(.textPrimary)
-                    .scrollContentBackground(.hidden)
-                    .background(Color.phoneBg)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
+                if showMarkdown {
+                    ScrollView {
+                        Markdown(editedText)
+                            .markdownTheme(.gitHub)
+                            .environment(\.colorScheme, .light)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 16)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .background(Color.white)
+                } else {
+                    TextEditor(text: $editedText)
+                        .font(.inter(14))
+                        .foregroundColor(.textPrimary)
+                        .scrollContentBackground(.hidden)
+                        .background(Color.phoneBg)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .allowsHitTesting(!transcript.isMerge)
+                        .onTapGesture {
+                            if transcript.isMerge {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showMergeWarning = true }
+                            }
+                        }
+                }
+            }
+
+            // Merge warning card
+            if showMergeWarning {
+                Color.black.opacity(0.65).ignoresSafeArea().zIndex(10)
+                VStack {
+                    Spacer()
+                    VStack(spacing: 16) {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 30))
+                            .foregroundColor(.brandCyan)
+                            .shadow(color: Color.brandCyan.opacity(0.7), radius: 10)
+                        Text(langMgr.t("text.mergeReadOnly"))
+                            .font(.inter(16, weight: .heavy))
+                            .foregroundColor(.textPrimary)
+                        Text(langMgr.t("text.mergeReadOnly.detail"))
+                            .font(.inter(13))
+                            .foregroundColor(.textSecondary)
+                            .multilineTextAlignment(.center)
+                        Button {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showMergeWarning = false }
+                        } label: {
+                            Text(langMgr.t("common.ok"))
+                                .font(.inter(14, weight: .bold))
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 13)
+                                .background(Color.brandCyan.opacity(0.25))
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                    }
+                    .padding(24)
+                    .background(Color(hex: "#081221"))
+                    .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.brandCyan.opacity(0.35), lineWidth: 1.5))
+                    .clipShape(RoundedRectangle(cornerRadius: 22))
+                    .shadow(color: Color.brandCyan.opacity(0.15), radius: 20)
+                    .padding(.horizontal, 24)
+                    Spacer()
+                }
+                .transition(.scale(scale: 0.92).combined(with: .opacity))
+                .zIndex(11)
             }
 
             // Save / Discard card
@@ -984,6 +1065,72 @@ struct TranscriptViewerView: View {
             }
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: showSaveCard)
+        .animation(.spring(response: 0.35, dampingFraction: 0.8), value: showMergeWarning)
+        .navigationBarHidden(true)
+    }
+}
+
+// MARK: - Paste Text Sheet
+
+struct PasteTextSheet: View {
+    let item: LocalStoredItem
+    var onSaved: () -> Void
+    @Environment(\.dismiss) var dismiss
+    @ObservedObject private var langMgr = LanguageManager.shared
+    @State private var pastedText = ""
+
+    var body: some View {
+        ZStack {
+            Color.phoneBg.ignoresSafeArea()
+            VStack(spacing: 0) {
+                HStack {
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.textSecondary)
+                            .frame(width: 36, height: 36)
+                            .background(Color.white.opacity(0.07))
+                            .clipShape(Circle())
+                    }
+                    Spacer()
+                    Text(langMgr.t("text.pasteText"))
+                        .font(.inter(16, weight: .heavy))
+                        .foregroundColor(.textPrimary)
+                    Spacer()
+                    Button {
+                        guard !pastedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+                        let idx = LocalTranscriptStore.shared.count(for: item.id)
+                        LocalTranscriptStore.shared.add(LocalTranscriptEntry(
+                            id: UUID().uuidString,
+                            itemId: item.id,
+                            label: "transcript-\(item.name)-\(String(format: "%02d", idx + 1)).txt",
+                            text: pastedText.trimmingCharacters(in: .whitespacesAndNewlines),
+                            durationSeconds: nil,
+                            createdAt: Date()
+                        ))
+                        onSaved()
+                        dismiss()
+                    } label: {
+                        Text(langMgr.t("common.save"))
+                            .font(.inter(13, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 14).padding(.vertical, 7)
+                            .background(pastedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.stageText.opacity(0.3) : Color.stageText)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                    .disabled(pastedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                .padding(.horizontal, 18).padding(.vertical, 14)
+                .overlay(alignment: .bottom) { Rectangle().fill(Color.white.opacity(0.06)).frame(height: 1) }
+
+                TextEditor(text: $pastedText)
+                    .font(.inter(14))
+                    .foregroundColor(.textPrimary)
+                    .scrollContentBackground(.hidden)
+                    .background(Color.phoneBg)
+                    .padding(.horizontal, 14).padding(.vertical, 8)
+            }
+        }
         .navigationBarHidden(true)
     }
 }

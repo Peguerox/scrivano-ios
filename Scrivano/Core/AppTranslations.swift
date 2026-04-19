@@ -331,6 +331,9 @@ enum AppTranslations {
             "text.renameText":              "Rename Text",
             "text.deleteFiles.btn":         "Delete Files",
             "text.doYouWantSave":           "Do you want to save your edits to this file?",
+            "text.pasteText":               "Paste Text",
+            "text.mergeReadOnly":           "Merge File — Read Only",
+            "text.mergeReadOnly.detail":    "This file is auto-generated from your transcripts. Edit the individual transcripts instead.",
 
             // Notes
             "notes.selectToDelete":         "Select notes to delete",
@@ -830,6 +833,9 @@ enum AppTranslations {
             "text.renameText":              "Renombrar Texto",
             "text.deleteFiles.btn":         "Eliminar Archivos",
             "text.doYouWantSave":           "¿Deseas guardar los cambios en este archivo?",
+            "text.pasteText":               "Pegar Texto",
+            "text.mergeReadOnly":           "Archivo Combinado — Solo Lectura",
+            "text.mergeReadOnly.detail":    "Este archivo se genera automáticamente desde tus transcripciones. Edita las transcripciones individuales en su lugar.",
 
             // Notes
             "notes.selectToDelete":         "Selecciona notas para eliminar",
