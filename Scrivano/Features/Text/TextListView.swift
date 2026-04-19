@@ -1073,7 +1073,7 @@ struct TranscriptViewerView: View {
 // MARK: - Paste Text Sheet
 
 struct PasteTextSheet: View {
-    let item: LocalStoredItem
+    let item: Item
     var onSaved: () -> Void
     @Environment(\.dismiss) var dismiss
     @ObservedObject private var langMgr = LanguageManager.shared
