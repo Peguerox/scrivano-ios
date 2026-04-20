@@ -43,15 +43,15 @@ struct ScrivanoApp: App {
             "recorderQuality":   1,    // Medium
             "recorderFormat":    1,    // WAV
             "recorderBitDepth":  0,    // 16 bit
-            "splittingInterval": 1080, // 18:00 — under Vercel 4.5 MB upload limit
+            "splittingInterval": 1070, // 17:50 — safe buffer under Vercel 4.5 MB upload limit
             "auto_transcription": true,
             "auto_conversion":    true
         ])
         // One-time migration: force correct defaults for devices that had old values stored
-        if !UserDefaults.standard.bool(forKey: "recorderDefaultsV1Migrated") {
+        if !UserDefaults.standard.bool(forKey: "recorderDefaultsV2Migrated") {
             UserDefaults.standard.set(1,    forKey: "recorderFormat")
-            UserDefaults.standard.set(1080, forKey: "splittingInterval")
-            UserDefaults.standard.set(true, forKey: "recorderDefaultsV1Migrated")
+            UserDefaults.standard.set(1070, forKey: "splittingInterval")
+            UserDefaults.standard.set(true, forKey: "recorderDefaultsV2Migrated")
         }
     }
 

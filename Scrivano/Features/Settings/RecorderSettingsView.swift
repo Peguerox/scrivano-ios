@@ -8,7 +8,7 @@ struct RecorderSettingsView: View {
     @AppStorage("recorderQuality")  private var quality: Int = 1    // 0=Low 1=Med 2=High 3=Max
     @AppStorage("recorderFormat")   private var format: Int = 1     // 0=M4A 1=WAV
     @AppStorage("recorderBitDepth") private var bitDepth: Int = 0   // 0=16 1=24 2=32
-    @AppStorage("splittingInterval")  private var splitInterval: Int = 1080
+    @AppStorage("splittingInterval")  private var splitInterval: Int = 1070
     @AppStorage("auto_conversion")   private var autoConversion: Bool = true // seconds
 
     private let qualityLabels = ["Low", "Medium", "High", "Max"]
