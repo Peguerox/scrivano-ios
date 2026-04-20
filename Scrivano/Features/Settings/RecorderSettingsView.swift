@@ -64,7 +64,7 @@ struct RecorderSettingsView: View {
         ("5 min",                          "300s",   300),
         ("10 min",                         "600s",   600),
         ("15 min",                         "900s",   900),
-        ("18 min",                         "1080s",  1080),
+        ("18 min",                         "1070s",  1070),
         ("30 min",                         "1800s",  1800),
         (langMgr.t("recorder.split.hour"), "3600s",  3600)
     ]}

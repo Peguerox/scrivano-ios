@@ -158,6 +158,10 @@ final class TranscriptionManager: ObservableObject {
                         sourceURL: workingEntry.fileURL, maxDuration: effectiveMax)
 
                     if chunkURLs.count > 1 {
+                        // Capture original index BEFORE any deletion — used for chunk naming
+                        let allRecordingsBefore = LocalRecordingStore.shared.recordings(for: item.id)
+                        let origIndex = (allRecordingsBefore.firstIndex(where: { $0.id == workingEntry.id }) ?? 0) + 1
+
                         var newEntries: [LocalRecordingEntry] = []
                         for (i, url) in chunkURLs.enumerated() {
                             // Load actual duration from each chunk file — don't trust stored/calculated values
@@ -167,22 +171,28 @@ final class TranscriptionManager: ObservableObject {
                                 let d = CMTimeGetSeconds(cmDur)
                                 if d > 0 { chunkDur = d }
                             }
+                            let chunkLabel = "Audio-\(item.name)-\(String(format: "%02d", origIndex))-split-\(String(format: "%02d", i + 1))"
                             let newEntry = LocalRecordingEntry(
                                 id: UUID().uuidString,
                                 itemId: item.id,
                                 relativePath: LocalRecordingStore.relativePath(of: url),
                                 createdAt: workingEntry.createdAt.addingTimeInterval(Double(i)),
                                 durationSeconds: chunkDur,
-                                label: url.lastPathComponent
+                                label: chunkLabel
                             )
                             LocalRecordingStore.shared.add(newEntry)
                             newEntries.append(newEntry)
-                            appLog("  Chunk \(i+1)/\(chunkURLs.count): \(url.lastPathComponent) (\(Int(chunkDur))s)", level: .success)
+                            appLog("  Chunk \(i+1)/\(chunkURLs.count): \(chunkLabel) (\(Int(chunkDur))s)", level: .success)
                         }
-                        // Remove original entry and file — chunks are the source of truth now
-                        LocalRecordingStore.shared.delete(id: workingEntry.id)
-                        LocalRecordingStore.shared.deleteFile(at: workingEntry.fileURL)
-                        appLog("  Original removed — \(newEntries.count) chunks registered", level: .success)
+                        // Safety: only delete original once ALL chunk files are confirmed on disk
+                        let allChunksOnDisk = chunkURLs.allSatisfy { FileManager.default.fileExists(atPath: $0.path) }
+                        if allChunksOnDisk {
+                            LocalRecordingStore.shared.delete(id: workingEntry.id)
+                            LocalRecordingStore.shared.deleteFile(at: workingEntry.fileURL)
+                            appLog("  Original removed — \(newEntries.count) chunks confirmed on disk", level: .success)
+                        } else {
+                            appLog("  WARNING: not all chunks confirmed on disk — original preserved", level: .warning)
+                        }
                         entriesToProcess = newEntries
                     }
                 } catch {
@@ -197,9 +207,15 @@ final class TranscriptionManager: ObservableObject {
             for entryToTranscribe in entriesToProcess {
                 guard !Task.isCancelled else { break }
                 let currentRecordings = LocalRecordingStore.shared.recordings(for: item.id)
-                let index = (currentRecordings.firstIndex(where: { $0.id == entryToTranscribe.id }) ?? 0) + 1
                 let ext = entryToTranscribe.fileURL.pathExtension.isEmpty ? "m4a" : entryToTranscribe.fileURL.pathExtension
-                let displayName = "Audio-\(item.name)-\(String(format: "%02d", index)).\(ext)"
+                let displayName: String
+                if entryToTranscribe.label.contains("-split-") {
+                    // Split chunk — label already has the correct name (Audio-name-01-split-01)
+                    displayName = "\(entryToTranscribe.label).\(ext)"
+                } else {
+                    let index = (currentRecordings.firstIndex(where: { $0.id == entryToTranscribe.id }) ?? 0) + 1
+                    displayName = "Audio-\(item.name)-\(String(format: "%02d", index)).\(ext)"
+                }
                 appLog("Auto-trigger: \(displayName)")
                 self.transcribingItemName = item.name
                 let result = AudioProcessor.validate(entry: entryToTranscribe, displayName: displayName)
