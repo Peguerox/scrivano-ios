@@ -47,12 +47,6 @@ struct ScrivanoApp: App {
             "auto_transcription": true,
             "auto_conversion":    true
         ])
-        // One-time migration: force correct defaults for devices that had old values stored
-        if !UserDefaults.standard.bool(forKey: "recorderDefaultsV2Migrated") {
-            UserDefaults.standard.set(1,    forKey: "recorderFormat")
-            UserDefaults.standard.set(1070, forKey: "splittingInterval")
-            UserDefaults.standard.set(true, forKey: "recorderDefaultsV2Migrated")
-        }
     }
 
     var body: some Scene {
