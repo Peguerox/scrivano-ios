@@ -209,9 +209,9 @@ final class TranscriptionManager: ObservableObject {
                 let currentRecordings = LocalRecordingStore.shared.recordings(for: item.id)
                 let ext = entryToTranscribe.fileURL.pathExtension.isEmpty ? "m4a" : entryToTranscribe.fileURL.pathExtension
                 let displayName: String
-                if entryToTranscribe.label.contains("-split-") {
+                if entryToTranscribe.label?.contains("-split-") == true {
                     // Split chunk — label already has the correct name (Audio-name-01-split-01)
-                    displayName = "\(entryToTranscribe.label).\(ext)"
+                    displayName = "\(entryToTranscribe.label ?? "Audio").\(ext)"
                 } else {
                     let index = (currentRecordings.firstIndex(where: { $0.id == entryToTranscribe.id }) ?? 0) + 1
                     displayName = "Audio-\(item.name)-\(String(format: "%02d", index)).\(ext)"
