@@ -853,6 +853,7 @@ struct WaveformView: View {
 // Uses single audioLevel: Float published at 4 Hz.
 struct EQBandView: View {
     var isActive: Bool
+    @ObservedObject private var eqLevel = EQLevelModel.shared
 
     private let bandCount = 14
     private let spacing: CGFloat = 4.0
@@ -860,24 +861,29 @@ struct EQBandView: View {
                                              0.75, 0.82, 0.90, 0.78, 0.65, 0.50, 0.40]
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 0.25, paused: !isActive)) { _ in
-            Canvas { ctx, size in
-                let level = AudioRecorderManager.shared.audioLevel
-                let barWidth = (size.width - spacing * CGFloat(bandCount - 1)) / CGFloat(bandCount)
-                for i in 0..<bandCount {
-                    let bandLevel = CGFloat(min(level * bandMultipliers[i], 1.0))
-                    let h = max(4, bandLevel * size.height)
-                    let x = CGFloat(i) * (barWidth + spacing)
-                    let rect = CGRect(x: x, y: size.height - h, width: barWidth, height: h)
-                    let path = Path(roundedRect: rect, cornerRadius: barWidth / 2)
-                    let color: Color = isActive
-                        ? Color(red: 1.0, green: Double(0.85 * (1 - bandLevel)), blue: 0).opacity(0.75 + Double(bandLevel) * 0.25)
-                        : Color(hex: "#38d9f5").opacity(0.15 + Double(bandLevel) * 0.20)
-                    ctx.fill(path, with: .color(color))
-                }
+        Canvas { ctx, size in
+            let level = eqLevel.level
+            let barWidth = (size.width - spacing * CGFloat(bandCount - 1)) / CGFloat(bandCount)
+            for i in 0..<bandCount {
+                let bandLevel = CGFloat(min(level * bandMultipliers[i], 1.0))
+                let h = max(4, bandLevel * size.height)
+                let x = CGFloat(i) * (barWidth + spacing)
+                let rect = CGRect(x: x, y: size.height - h, width: barWidth, height: h)
+                let path = Path(roundedRect: rect, cornerRadius: barWidth / 2)
+                let color: Color = isActive
+                    ? Color(red: 1.0, green: Double(0.85 * (1 - bandLevel)), blue: 0).opacity(0.75 + Double(bandLevel) * 0.25)
+                    : Color(hex: "#38d9f5").opacity(0.15 + Double(bandLevel) * 0.20)
+                ctx.fill(path, with: .color(color))
             }
         }
     }
+}
+
+// MARK: - EQ Level Model (isolated so DashboardView never re-renders from audio level changes)
+final class EQLevelModel: ObservableObject {
+    static let shared = EQLevelModel()
+    @Published var level: Float = 0.08
+    private init() {}
 }
 
 // MARK: - AudioRecorderManager
@@ -1153,6 +1159,7 @@ final class AudioRecorderManager: NSObject, ObservableObject, AVAudioRecorderDel
         elapsedSeconds = 0
         fileSize = 0
         audioLevel = 0.08
+        EQLevelModel.shared.level = 0.08
         start()
     }
 
@@ -1241,6 +1248,7 @@ final class AudioRecorderManager: NSObject, ObservableObject, AVAudioRecorderDel
         fileSize = 0
         smoothedLevel = 0.08
         audioLevel = 0.08
+        EQLevelModel.shared.level = 0.08
         start()
     }
 
@@ -1287,6 +1295,7 @@ final class AudioRecorderManager: NSObject, ObservableObject, AVAudioRecorderDel
                 let smoothed = max(curved, self.smoothedLevel * 0.72)
                 self.smoothedLevel = smoothed
                 self.audioLevel = smoothed
+                EQLevelModel.shared.level = smoothed
                 // File size — only every ~1s (every 4 ticks at 0.25s)
                 self.fileSizeTick += 1
                 if self.fileSizeTick >= 4 {
