@@ -181,6 +181,9 @@ struct BackupView: View {
             allowsMultipleSelection: false
         ) { result in
             guard let url = try? result.get().first else { return }
+            // Security-scoped URL — must start access before touching the file
+            let accessing = url.startAccessingSecurityScopedResource()
+            defer { if accessing { url.stopAccessingSecurityScopedResource() } }
             // Copy to temp so we keep access after the picker closes
             let tmp = FileManager.default.temporaryDirectory
                 .appendingPathComponent(url.lastPathComponent)
