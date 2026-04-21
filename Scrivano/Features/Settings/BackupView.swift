@@ -199,7 +199,14 @@ struct BackupView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .scrivanoOpenBackupFile)) { note in
             guard let url = note.object as? URL else { return }
-            pendingRestoreURL = url
+            // Copy to temp to ensure access regardless of source location
+            let accessing = url.startAccessingSecurityScopedResource()
+            let tmp = FileManager.default.temporaryDirectory
+                .appendingPathComponent(url.lastPathComponent)
+            try? FileManager.default.removeItem(at: tmp)
+            try? FileManager.default.copyItem(at: url, to: tmp)
+            if accessing { url.stopAccessingSecurityScopedResource() }
+            pendingRestoreURL = FileManager.default.fileExists(atPath: tmp.path) ? tmp : url
             restoreError = nil
             restorePassword = ""
             showRestoreSheet = true
