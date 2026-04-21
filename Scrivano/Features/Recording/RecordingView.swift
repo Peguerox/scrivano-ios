@@ -56,6 +56,7 @@ struct RecordingView: View {
         case 300:  return "5 min"
         case 600:  return "10 min"
         case 900:  return "15 min"
+        case 1070: return "18 min"
         case 1080: return "18 min"
         case 1800: return "30 min"
         case 3600: return "1 hour"
