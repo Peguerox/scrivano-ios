@@ -853,8 +853,6 @@ struct WaveformView: View {
 // Uses single audioLevel: Float published at 4 Hz.
 struct EQBandView: View {
     var isActive: Bool
-    @State private var level: Float = 0.08
-    private let timer = Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()
 
     private let bandCount = 14
     private let spacing: CGFloat = 4.0
@@ -862,21 +860,23 @@ struct EQBandView: View {
                                              0.75, 0.82, 0.90, 0.78, 0.65, 0.50, 0.40]
 
     var body: some View {
-        Canvas { ctx, size in
-            let barWidth = (size.width - spacing * CGFloat(bandCount - 1)) / CGFloat(bandCount)
-            for i in 0..<bandCount {
-                let bandLevel = CGFloat(min(level * bandMultipliers[i], 1.0))
-                let h = max(4, bandLevel * size.height)
-                let x = CGFloat(i) * (barWidth + spacing)
-                let rect = CGRect(x: x, y: size.height - h, width: barWidth, height: h)
-                let path = Path(roundedRect: rect, cornerRadius: barWidth / 2)
-                let color: Color = isActive
-                    ? Color(red: 1.0, green: Double(0.85 * (1 - bandLevel)), blue: 0).opacity(0.75 + Double(bandLevel) * 0.25)
-                    : Color(hex: "#38d9f5").opacity(0.15 + Double(bandLevel) * 0.20)
-                ctx.fill(path, with: .color(color))
+        TimelineView(.animation(minimumInterval: 0.25, paused: !isActive)) { _ in
+            Canvas { ctx, size in
+                let level = AudioRecorderManager.shared.audioLevel
+                let barWidth = (size.width - spacing * CGFloat(bandCount - 1)) / CGFloat(bandCount)
+                for i in 0..<bandCount {
+                    let bandLevel = CGFloat(min(level * bandMultipliers[i], 1.0))
+                    let h = max(4, bandLevel * size.height)
+                    let x = CGFloat(i) * (barWidth + spacing)
+                    let rect = CGRect(x: x, y: size.height - h, width: barWidth, height: h)
+                    let path = Path(roundedRect: rect, cornerRadius: barWidth / 2)
+                    let color: Color = isActive
+                        ? Color(red: 1.0, green: Double(0.85 * (1 - bandLevel)), blue: 0).opacity(0.75 + Double(bandLevel) * 0.25)
+                        : Color(hex: "#38d9f5").opacity(0.15 + Double(bandLevel) * 0.20)
+                    ctx.fill(path, with: .color(color))
+                }
             }
         }
-        .onReceive(timer) { _ in level = AudioRecorderManager.shared.audioLevel }
     }
 }
 
