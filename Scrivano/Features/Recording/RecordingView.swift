@@ -851,31 +851,33 @@ struct WaveformView: View {
 
 // MARK: - Option C (active): EQ Band VU Meter
 // 14 static bands with independent multipliers — pro VU meter look.
-// Uses single audioLevel: Float published at 4 Hz.
 struct EQBandView: View {
     var isActive: Bool
     @ObservedObject private var eqLevel = EQLevelModel.shared
 
-    private let bandCount = 14
-    private let spacing: CGFloat = 4.0
-    private let bandMultipliers: [Float] = [0.55, 0.70, 0.85, 1.0, 0.95, 0.88, 0.80,
-                                             0.75, 0.82, 0.90, 0.78, 0.65, 0.50, 0.40]
+    private let bandMultipliers: [Float] = [
+        0.45, 0.58, 0.70, 0.80, 0.90, 0.98, 1.0, 0.97,
+        0.92, 0.85, 0.76, 0.65, 0.54, 0.44, 0.36, 0.30,
+        0.38, 0.48, 0.60, 0.72, 0.82, 0.70, 0.55, 0.42
+    ]
 
     var body: some View {
-        Canvas { ctx, size in
-            let level = eqLevel.level
-            let barWidth = (size.width - spacing * CGFloat(bandCount - 1)) / CGFloat(bandCount)
-            for i in 0..<bandCount {
-                let bandLevel = CGFloat(min(level * bandMultipliers[i], 1.0))
-                let h = max(4, bandLevel * size.height)
-                let x = CGFloat(i) * (barWidth + spacing)
-                let rect = CGRect(x: x, y: size.height - h, width: barWidth, height: h)
-                let path = Path(roundedRect: rect, cornerRadius: barWidth / 2)
-                let color: Color = isActive
-                    ? Color(red: 1.0, green: Double(0.85 * (1 - bandLevel)), blue: 0).opacity(0.75 + Double(bandLevel) * 0.25)
-                    : Color(hex: "#38d9f5").opacity(0.15 + Double(bandLevel) * 0.20)
-                ctx.fill(path, with: .color(color))
+        GeometryReader { geo in
+            HStack(alignment: .bottom, spacing: 2.5) {
+                ForEach(Array(bandMultipliers.enumerated()), id: \.offset) { i, mult in
+                    let bandLevel = CGFloat(min(eqLevel.level * mult, 1.0))
+                    let h = max(3, bandLevel * geo.size.height)
+                    let color: Color = isActive
+                        ? Color(red: 1.0, green: Double(0.85 * (1 - bandLevel)), blue: 0)
+                            .opacity(0.75 + Double(bandLevel) * 0.25)
+                        : Color(hex: "#38d9f5").opacity(0.15 + Double(bandLevel) * 0.20)
+                    RoundedRectangle(cornerRadius: 1.5)
+                        .fill(color)
+                        .frame(width: 2.5, height: h)
+                        .animation(.easeOut(duration: 0.18), value: eqLevel.level)
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
         }
     }
 }
