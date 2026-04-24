@@ -80,6 +80,8 @@ struct ScrivanoApp: App {
             } else if phase == .active {
                 // Back in foreground — release the background task if we held one.
                 lifecycle.endBackgroundTask()
+                // Resume any note tasks that were in-flight when the app was killed.
+                NoteGenerationManager.shared.resumePendingNotes()
             }
         }
         .onChange(of: taskQueue.isProcessing) { processing in

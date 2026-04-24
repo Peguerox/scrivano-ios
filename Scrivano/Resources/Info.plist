@@ -24,8 +24,6 @@
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Scrivano needs microphone access to record audio for transcription.</string>
-	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Scrivano uses speech recognition to transcribe your recordings.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Scrivano needs camera access to capture images for processing.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

@@ -123,7 +123,8 @@ final class LocalCollectionStore {
 }
 
 /// Local item — stored on-device only. Never fetched from server.
-struct Item: Codable, Identifiable {
+struct Item: Codable, Identifiable, Equatable {
+    static func == (lhs: Item, rhs: Item) -> Bool { lhs.id == rhs.id }
     let id: String
     let name: String
     let collection: String?
@@ -420,7 +421,7 @@ struct LocalRecordingEntry: Codable, Identifiable {
     let itemId: String
     var relativePath: String   // relative to Documents directory
     let createdAt: Date
-    let durationSeconds: Double
+    var durationSeconds: Double
     var label: String? = nil   // custom display name override (e.g. after split)
 
     var fileURL: URL {
@@ -1002,6 +1003,67 @@ final class PendingTaskStore {
     private func load() {
         guard let data = try? Data(contentsOf: storeURL),
               let decoded = try? JSONDecoder().decode([PendingTaskEntry].self, from: data)
+        else { return }
+        entries = decoded
+    }
+
+    private func persist() {
+        guard let data = try? JSONEncoder().encode(entries) else { return }
+        queue.async { [url = storeURL] in try? data.write(to: url, options: .atomic) }
+    }
+}
+
+// MARK: - Pending Note Task Store
+
+struct PendingNoteTaskEntry: Codable {
+    let taskId: String
+    let itemId: String
+    let itemName: String
+    let promptId: String
+    let promptName: String
+    let submittedAt: Date
+}
+
+final class PendingNoteTaskStore {
+    static let shared = PendingNoteTaskStore()
+    private let storeURL: URL
+    private let queue = DispatchQueue(label: "com.scrivano.pendingnotes", qos: .utility)
+    private(set) var entries: [PendingNoteTaskEntry] = []
+
+    private init() {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        storeURL = docs.appendingPathComponent("pending_note_tasks.json")
+        load()
+        pruneStale()
+    }
+
+    func add(_ entry: PendingNoteTaskEntry) {
+        entries.removeAll { $0.taskId == entry.taskId }
+        entries.append(entry)
+        persist()
+    }
+
+    func remove(taskId: String) {
+        entries.removeAll { $0.taskId == taskId }
+        persist()
+    }
+
+    func clearAll() {
+        entries.removeAll()
+        persist()
+    }
+
+    func all() -> [PendingNoteTaskEntry] { entries }
+
+    private func pruneStale() {
+        let cutoff = Date().addingTimeInterval(-86400)
+        entries.removeAll { $0.submittedAt < cutoff }
+        persist()
+    }
+
+    private func load() {
+        guard let data = try? Data(contentsOf: storeURL),
+              let decoded = try? JSONDecoder().decode([PendingNoteTaskEntry].self, from: data)
         else { return }
         entries = decoded
     }

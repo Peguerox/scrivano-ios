@@ -507,22 +507,31 @@ struct DashboardView: View {
     private var contentWithNavigation: some View {
         animatedContent
             .navigationBarHidden(true)
-            .navigationDestination(isPresented: $vm.navigateToMedia) {
-                if let item = vm.navigationItem {
+            .navigationDestination(isPresented: Binding(
+                get: { vm.mediaNavigationItem != nil },
+                set: { if !$0 { vm.mediaNavigationItem = nil } }
+            )) {
+                if let item = vm.mediaNavigationItem {
                     MediaListView(item: item,
                                   triggerAudioImport: vm.triggerMediaAudioImport,
                                   triggerImageImport: vm.triggerMediaImageImport)
                         .onDisappear { vm.triggerMediaAudioImport = false; vm.triggerMediaImageImport = false }
                 }
             }
-            .navigationDestination(isPresented: $vm.navigateToText) {
-                if let item = vm.navigationItem {
+            .navigationDestination(isPresented: Binding(
+                get: { vm.textNavigationItem != nil },
+                set: { if !$0 { vm.textNavigationItem = nil } }
+            )) {
+                if let item = vm.textNavigationItem {
                     TextListView(item: item, triggerDocImport: vm.triggerTextDocImport)
                         .onDisappear { vm.triggerTextDocImport = false }
                 }
             }
-            .navigationDestination(isPresented: $vm.navigateToNotes) {
-                if let item = vm.navigationItem { NotesListView(item: item) }
+            .navigationDestination(isPresented: Binding(
+                get: { vm.notesNavigationItem != nil },
+                set: { if !$0 { vm.notesNavigationItem = nil } }
+            )) {
+                if let item = vm.notesNavigationItem { NotesListView(item: item) }
             }
     }
 
@@ -530,9 +539,9 @@ struct DashboardView: View {
         NavigationStack {
             contentWithNavigation
         }
-        .onChange(of: vm.navigateToMedia) { open in if !open { vm.refreshFromLocalStores() } }
-        .onChange(of: vm.navigateToText)  { open in if !open { vm.refreshFromLocalStores() } }
-        .onChange(of: vm.navigateToNotes) { open in if !open { vm.refreshFromLocalStores() } }
+        .onChange(of: vm.mediaNavigationItem) { item in if item == nil { vm.refreshFromLocalStores() } }
+        .onChange(of: vm.textNavigationItem)  { item in if item == nil { vm.refreshFromLocalStores() } }
+        .onChange(of: vm.notesNavigationItem) { item in if item == nil { vm.refreshFromLocalStores() } }
         .onChange(of: transcriptionMgr.lastSavedItemId) { _ in vm.refreshFromLocalStores() }
         .onChange(of: transcriptionMgr.transcriptSaveCounter) { _ in vm.refreshLocalCounts() }
         .onChange(of: vm.activeCollection?.id) { _ in
@@ -984,9 +993,11 @@ struct DashboardView: View {
 
     private func deleteActiveCollection() {
         guard let active = vm.activeCollection else { return }
+        // Trash every item in the collection (and their recordings/transcripts/notes)
+        // so they are truly removed and don't silently move to My Collection.
+        for item in vm.items { vm.deleteItem(item) }
         TrashStore.shared.trashCollection(active)
         LocalCollectionStore.shared.delete(active.id)
-        LocalItemStore.shared.clearCollection(active.id)   // unlink items so they don't become orphans
         vm.collections.removeAll { $0.id == active.id }
         vm.activeCollection = vm.collections.first
         if let next = vm.activeCollection {
@@ -1586,6 +1597,33 @@ struct DashboardView: View {
             .transition(.move(edge: .top).combined(with: .opacity))
             .animation(.easeInOut(duration: 0.25), value: taskQueue.isProcessing)
         }
+        if let failedName = notesMgr.failedItemName {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundColor(Color(hex: "#ef4444"))
+                    .font(.system(size: 11))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Note failed: \(failedName)")
+                        .font(.inter(11, weight: .bold))
+                        .foregroundColor(Color(hex: "#ef4444"))
+                    if let reason = notesMgr.failedReason {
+                        Text(reason)
+                            .font(.inter(10, weight: .regular))
+                            .foregroundColor(Color(hex: "#ef4444").opacity(0.8))
+                            .lineLimit(1)
+                    }
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 6)
+            .background(Color(hex: "#ef4444").opacity(0.08))
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(Color(hex: "#ef4444").opacity(0.15)).frame(height: 1)
+            }
+            .transition(.move(edge: .top).combined(with: .opacity))
+            .animation(.easeInOut(duration: 0.3), value: notesMgr.failedItemName)
+        }
     }
 
     private var sortRow: some View {
@@ -1794,10 +1832,9 @@ final class DashboardViewModel: ObservableObject {
     @Published var localNoteCounts: [String: Int] = [:]
 
     // Navigation
-    @Published var navigateToMedia = false
-    @Published var navigateToText = false
-    @Published var navigateToNotes = false
-    @Published var navigationItem: Item?
+    @Published var mediaNavigationItem: Item? = nil
+    @Published var textNavigationItem: Item? = nil
+    @Published var notesNavigationItem: Item? = nil
     @Published var triggerMediaAudioImport = false
     @Published var triggerMediaImageImport = false
     @Published var triggerTextDocImport = false
@@ -1870,11 +1907,10 @@ final class DashboardViewModel: ObservableObject {
     }
 
     func navigateTo(stage: DashboardViewModel.Stage, item: Item) {
-        navigationItem = item
         switch stage {
-        case .media:  navigateToMedia = true
-        case .text:   navigateToText = true
-        case .notes:  navigateToNotes = true
+        case .media:  mediaNavigationItem = item
+        case .text:   textNavigationItem = item
+        case .notes:  notesNavigationItem = item
         }
     }
 

@@ -64,13 +64,15 @@ final class BackupManager: ObservableObject {
         let items = LocalItemStore.shared.all().filter { item in
             item.collectionId == nil || knownCollectionIds.contains(item.collectionId!)
         }
-        let transcripts = LocalTranscriptStore.shared.entries
-        let notes       = LocalNoteStore.shared.entries
-        let recsMeta    = LocalRecordingStore.shared.entries
+        let itemIds = Set(items.map { $0.id })
+        let transcripts = LocalTranscriptStore.shared.entries.filter { itemIds.contains($0.itemId) }
+        let notes       = LocalNoteStore.shared.entries.filter { itemIds.contains($0.itemId) }
+        let recsMeta    = LocalRecordingStore.shared.entries.filter { itemIds.contains($0.itemId) }
 
         progress = "Creating backup…"
         let audioPaths = recsMeta.map { $0.relativePath }
         let pkg = BackupPackage(
+            version: 4,
             createdAt: Date(),
             appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0",
             collections: collections,
@@ -86,35 +88,51 @@ final class BackupManager: ObservableObject {
         encoder.dateEncodingStrategy = .iso8601
         guard let jsonData = try? encoder.encode(pkg) else { throw BackupError.encodingFailed }
 
-        // Run heavy I/O and CPU work off the main thread so the spinner stays visible
+        // V4: stream audio files one at a time to avoid loading everything into memory.
+        // Layout: [4 magic]["SCV4"][8 encMetaLen][encryptedMeta][per-audio: [4 pathLen][path][8 encAudioLen][encAudio]]
+        let backupManager = self
         let dest = try await Task.detached(priority: .userInitiated) {
-            // Build binary archive: [UInt32 jsonLen][json][repeated: UInt32 pathLen][pathUTF8][UInt64 dataLen][rawAudio]
-            var archive = Data()
+            // 1. Encrypt JSON metadata only (small — safe to hold in memory)
+            var jsonArchive = Data()
             var jsonLen = UInt32(jsonData.count).littleEndian
-            archive.append(Data(bytes: &jsonLen, count: 4))
-            archive.append(jsonData)
-
-            if includeAudio {
-                for rec in recsMeta {
-                    guard let audioData = try? Data(contentsOf: rec.fileURL) else { continue }
-                    let pathBytes = Data(rec.relativePath.utf8)
-                    var pathLen = UInt32(pathBytes.count).littleEndian
-                    var dataLen = UInt64(audioData.count).littleEndian
-                    archive.append(Data(bytes: &pathLen, count: 4))
-                    archive.append(pathBytes)
-                    archive.append(Data(bytes: &dataLen, count: 8))
-                    archive.append(audioData)
-                }
-            }
-
-            guard let compressed = try? (archive as NSData).compressed(using: .zlib) as Data
+            jsonArchive.append(Data(bytes: &jsonLen, count: 4))
+            jsonArchive.append(jsonData)
+            guard let compressed = try? (jsonArchive as NSData).compressed(using: .zlib) as Data
             else { throw BackupError.encodingFailed }
-            let encrypted = try BackupManager.encryptData(compressed, password: password)
+            let encryptedMeta = try BackupManager.encryptData(compressed, password: password)
 
+            // 2. Open output file and write header
             let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd"
             let name = "scrivano-\(df.string(from: Date())).scrivano"
             let dest = FileManager.default.temporaryDirectory.appendingPathComponent(name)
-            try encrypted.write(to: dest, options: .atomic)
+            FileManager.default.createFile(atPath: dest.path, contents: nil)
+            let handle = try FileHandle(forWritingTo: dest)
+            defer { try? handle.close() }
+
+            try handle.write(contentsOf: Data("SCV4".utf8))
+            var metaLen = UInt64(encryptedMeta.count).littleEndian
+            try handle.write(contentsOf: Data(bytes: &metaLen, count: 8))
+            try handle.write(contentsOf: encryptedMeta)
+
+            // 3. Stream each audio file — compress, encrypt, write, release
+            if includeAudio {
+                let total = recsMeta.count
+                for (index, rec) in recsMeta.enumerated() {
+                    let msg = "Backing up audio \(index + 1)/\(total)…"
+                    await MainActor.run { [weak backupManager] in backupManager?.progress = msg }
+
+                    guard let audioData = try? Data(contentsOf: rec.fileURL) else { continue }
+                    let pathBytes = Data(rec.relativePath.utf8)
+                    let encryptedAudio = try BackupManager.encryptData(audioData, password: password)
+                    var pathLen = UInt32(pathBytes.count).littleEndian
+                    var audioLen = UInt64(encryptedAudio.count).littleEndian
+                    try handle.write(contentsOf: Data(bytes: &pathLen, count: 4))
+                    try handle.write(contentsOf: pathBytes)
+                    try handle.write(contentsOf: Data(bytes: &audioLen, count: 8))
+                    try handle.write(contentsOf: encryptedAudio)
+                }
+            }
+
             return dest
         }.value
 
@@ -129,6 +147,13 @@ final class BackupManager: ObservableObject {
         progress = "Decrypting…"
         defer { isWorking = false; progress = "" }
 
+        // Detect v4 by magic header — v3 and earlier start with a random AES-GCM nonce
+        let header = (try? FileHandle(forReadingFrom: url))?.readData(ofLength: 4) ?? Data()
+        if header == Data("SCV4".utf8) {
+            return try await restoreV4(from: url, password: password)
+        }
+
+        // ── V3 and earlier path ──────────────────────────────────────────
         let encrypted = try Data(contentsOf: url)
         let compressed: Data
         do {
@@ -136,8 +161,6 @@ final class BackupManager: ObservableObject {
         } catch {
             throw BackupError.wrongPassword
         }
-        // Try each decompressor in order — no magic-byte guessing.
-        // Each returns nil on wrong-format data so falling through is safe.
         let archive: Data
         if let d = try? (compressed as NSData).decompressed(using: .zlib) as Data {
             archive = d
@@ -149,7 +172,6 @@ final class BackupManager: ObservableObject {
             throw BackupError.invalidFile
         }
 
-        // Parse archive: [UInt32 jsonLen][json][audio segments...]
         guard archive.count >= 4 else { throw BackupError.invalidFile }
         let jsonLen = Int(Self.readLE(UInt32.self, from: archive, at: archive.startIndex))
         guard archive.count >= 4 + jsonLen else { throw BackupError.invalidFile }
@@ -160,10 +182,8 @@ final class BackupManager: ObservableObject {
         guard let pkg = try? decoder.decode(BackupPackage.self, from: jsonData)
         else { throw BackupError.invalidFile }
 
-        // Load audio into a path→data map
         var audioMap: [String: Data] = [:]
         if pkg.version >= 2 {
-            // Binary segments follow the JSON block
             var cursor = archive.startIndex + 4 + jsonLen
             while cursor + 4 <= archive.endIndex {
                 let pathLen = Int(Self.readLE(UInt32.self, from: archive, at: cursor))
@@ -179,115 +199,208 @@ final class BackupManager: ObservableObject {
                 cursor += dataLen
             }
         } else {
-            // v1: audio was embedded as base64 in the JSON
             for entry in pkg.audioFiles ?? [] {
                 audioMap[entry.relativePath] = entry.data
             }
         }
 
-        progress = "Restoring collections…"
+        return try await applyRestoredPackage(pkg: pkg, audioMap: audioMap)
+    }
 
-        // ── Collections ─────────────────────────────────────────────────
+    // MARK: - V4 restore (streaming — no full-file load into memory)
+
+    private func restoreV4(from url: URL, password: String) async throws -> Int {
+        // Phase 1: read + decrypt metadata off the main thread
+        progress = "Decrypting backup…"
+        let (pkg, audioOffset) = try await Task.detached(priority: .userInitiated) { () throws -> (BackupPackage, UInt64) in
+            let handle = try FileHandle(forReadingFrom: url)
+            defer { try? handle.close() }
+
+            try handle.seek(toOffset: 4) // skip magic
+
+            guard let metaLenData = try? handle.read(upToCount: 8), metaLenData.count == 8
+            else { throw BackupError.invalidFile }
+            let metaLen = Int(BackupManager.readLE(UInt64.self, from: metaLenData, at: metaLenData.startIndex))
+            guard let encryptedMeta = try? handle.read(upToCount: metaLen), encryptedMeta.count == metaLen
+            else { throw BackupError.invalidFile }
+
+            let compressed: Data
+            do { compressed = try BackupManager.decryptData(encryptedMeta, password: password) }
+            catch { throw BackupError.wrongPassword }
+
+            guard let archive = try? (compressed as NSData).decompressed(using: .zlib) as Data
+            else { throw BackupError.invalidFile }
+
+            guard archive.count >= 4 else { throw BackupError.invalidFile }
+            let jsonLen = Int(BackupManager.readLE(UInt32.self, from: archive, at: archive.startIndex))
+            guard archive.count >= 4 + jsonLen else { throw BackupError.invalidFile }
+            let jsonData = archive[archive.startIndex + 4 ..< archive.startIndex + 4 + jsonLen]
+
+            let decoder = JSONDecoder(); decoder.dateDecodingStrategy = .iso8601
+            guard let pkg = try? decoder.decode(BackupPackage.self, from: jsonData)
+            else { throw BackupError.invalidFile }
+
+            let audioOffset = UInt64(4 + 8 + metaLen) // magic + metaLen field + meta blob
+            return (pkg, audioOffset)
+        }.value
+
+        // Phase 2: restore metadata on main actor (store writes require main actor)
+        let (_, itemIdMap) = try await applyMetadata(pkg: pkg)
+
+        // Phase 3: stream audio files off the main thread, post progress back to main actor
+        let totalAudio = pkg.audioFilePaths.count
+        progress = totalAudio > 0 ? "Restoring audio 0/\(totalAudio)…" : "Restoring audio files…"
+
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let itemIdMapCopy = itemIdMap
+        let recsMeta = pkg.recordingsMeta
+
+        let restoredEntries: [LocalRecordingEntry] = try await Task.detached(priority: .userInitiated) { () throws -> [LocalRecordingEntry] in
+            let handle = try FileHandle(forReadingFrom: url)
+            defer { try? handle.close() }
+            try handle.seek(toOffset: audioOffset)
+
+            var entries: [LocalRecordingEntry] = []
+            var count = 0
+
+            while true {
+                guard let pathLenData = try? handle.read(upToCount: 4), pathLenData.count == 4 else { break }
+                let pathLen = Int(BackupManager.readLE(UInt32.self, from: pathLenData, at: pathLenData.startIndex))
+                guard let pathData = try? handle.read(upToCount: pathLen), pathData.count == pathLen else { break }
+                guard let relativePath = String(data: pathData, encoding: .utf8) else { break }
+
+                guard let audioLenData = try? handle.read(upToCount: 8), audioLenData.count == 8 else { break }
+                let audioLen = Int(BackupManager.readLE(UInt64.self, from: audioLenData, at: audioLenData.startIndex))
+                guard let encryptedAudio = try? handle.read(upToCount: audioLen), encryptedAudio.count == audioLen else { break }
+
+                guard let audioData = try? BackupManager.decryptData(encryptedAudio, password: password) else { continue }
+
+                let parts = relativePath.components(separatedBy: "/")
+                guard parts.count >= 3, parts[0] == "recordings" else { continue }
+                let oldItemId = parts[1]
+                guard let newItemId = itemIdMapCopy[oldItemId] else { continue }
+                let filename = parts[2...].joined(separator: "/")
+
+                let dir = docs.appendingPathComponent("recordings/\(newItemId)")
+                try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                try? audioData.write(to: dir.appendingPathComponent(filename), options: .atomic)
+
+                if let meta = recsMeta.first(where: { $0.itemId == oldItemId && $0.relativePath == relativePath }) {
+                    entries.append(LocalRecordingEntry(
+                        id: UUID().uuidString,
+                        itemId: newItemId,
+                        relativePath: "recordings/\(newItemId)/\(filename)",
+                        createdAt: meta.createdAt,
+                        durationSeconds: meta.durationSeconds,
+                        label: meta.label
+                    ))
+                }
+
+                count += 1
+                if totalAudio > 0 {
+                    let msg = "Restoring audio \(count)/\(totalAudio)…"
+                    await MainActor.run { [weak self] in self?.progress = msg }
+                }
+            }
+            return entries
+        }.value
+
+        // Phase 4: persist recording entries + finalize on main actor
+        for entry in restoredEntries {
+            LocalRecordingStore.shared.add(entry)
+        }
+
+        progress = "Finalizing…"
+        for item in pkg.items {
+            if let newId = itemIdMap[item.id] {
+                LocalTranscriptStore.shared.rebuildMerge(for: newId, itemName: item.name)
+            }
+        }
+
+        NotificationCenter.default.post(name: .scrivanoBackupRestored, object: nil)
+        return pkg.collections.count
+    }
+
+    // MARK: - Shared restore helpers
+
+    /// Restores collections, items, transcripts and notes from a package. Returns (collectionIdMap, itemIdMap).
+    @discardableResult
+    private func applyMetadata(pkg: BackupPackage) async throws -> ([String: String], [String: String]) {
+        progress = "Restoring collections…"
         var collectionIdMap: [String: String] = [:]
         var usedNames = Set(LocalCollectionStore.shared.all().map { $0.name })
-
         for col in pkg.collections {
             let newId = UUID().uuidString
             collectionIdMap[col.id] = newId
             var name = col.name
             if usedNames.contains(name) {
-                var n = 1
-                while usedNames.contains("\(col.name) \(n)") { n += 1 }
+                var n = 1; while usedNames.contains("\(col.name) \(n)") { n += 1 }
                 name = "\(col.name) \(n)"
             }
             usedNames.insert(name)
             LocalCollectionStore.shared.save(ScrivanoCollection(id: newId, name: name))
         }
 
-        // ── Items ────────────────────────────────────────────────────────
         progress = "Restoring items…"
         var itemIdMap: [String: String] = [:]
-
         for item in pkg.items {
             let newId = UUID().uuidString
             itemIdMap[item.id] = newId
             let newColId = item.collectionId.flatMap { collectionIdMap[$0] }
-            let newColName: String?
-            if let cid = newColId {
-                newColName = LocalCollectionStore.shared.all().first(where: { $0.id == cid })?.name
-            } else {
-                newColName = nil
-            }
+            let newColName = newColId.flatMap { cid in LocalCollectionStore.shared.all().first(where: { $0.id == cid })?.name }
             LocalItemStore.shared.save(LocalStoredItem(
-                id: newId,
-                name: item.name,
-                collection: newColName,
-                collectionId: newColId,
-                createdAt: item.createdAt
+                id: newId, name: item.name, collection: newColName,
+                collectionId: newColId, createdAt: item.createdAt
             ))
         }
 
-        // ── Transcripts (skip auto-generated merges) ─────────────────────
         progress = "Restoring transcripts…"
         for t in pkg.transcripts where !t.isMerge {
             let newItemId = itemIdMap[t.itemId] ?? t.itemId
             LocalTranscriptStore.shared.add(LocalTranscriptEntry(
-                id: UUID().uuidString,
-                itemId: newItemId,
-                label: t.label,
-                text: t.text,
-                durationSeconds: t.durationSeconds,
-                createdAt: t.createdAt
+                id: UUID().uuidString, itemId: newItemId, label: t.label,
+                text: t.text, durationSeconds: t.durationSeconds, createdAt: t.createdAt
             ))
         }
 
-        // ── Notes ────────────────────────────────────────────────────────
         progress = "Restoring notes…"
         for n in pkg.notes {
             let newItemId = itemIdMap[n.itemId] ?? n.itemId
             LocalNoteStore.shared.add(LocalNoteEntry(
-                id: UUID().uuidString,
-                itemId: newItemId,
-                label: n.label,
-                text: n.text,
-                promptType: n.promptType,
-                createdAt: n.createdAt
+                id: UUID().uuidString, itemId: newItemId, label: n.label,
+                text: n.text, promptType: n.promptType, createdAt: n.createdAt
             ))
         }
 
-        // ── Audio files ──────────────────────────────────────────────────
+        return (collectionIdMap, itemIdMap)
+    }
+
+    /// Used by the v3 restore path — applies a fully-loaded audioMap after metadata is restored.
+    private func applyRestoredPackage(pkg: BackupPackage, audioMap: [String: Data]) async throws -> Int {
+        let (_, itemIdMap) = try await applyMetadata(pkg: pkg)
+
         progress = "Restoring audio files…"
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-
         for (relativePath, audioData) in audioMap {
-            // relativePath shape: recordings/{oldItemId}/filename
             let parts = relativePath.components(separatedBy: "/")
             guard parts.count >= 3, parts[0] == "recordings" else { continue }
             let oldItemId = parts[1]
             guard let newItemId = itemIdMap[oldItemId] else { continue }
             let filename = parts[2...].joined(separator: "/")
-
             let dir = docs.appendingPathComponent("recordings/\(newItemId)")
             try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            let dest = dir.appendingPathComponent(filename)
-            try? audioData.write(to: dest, options: .atomic)
-
-            // Match to recording metadata entry
+            try? audioData.write(to: dir.appendingPathComponent(filename), options: .atomic)
             if let meta = pkg.recordingsMeta.first(where: {
                 $0.itemId == oldItemId && $0.relativePath == relativePath
             }) {
                 LocalRecordingStore.shared.add(LocalRecordingEntry(
-                    id: UUID().uuidString,
-                    itemId: newItemId,
+                    id: UUID().uuidString, itemId: newItemId,
                     relativePath: "recordings/\(newItemId)/\(filename)",
-                    createdAt: meta.createdAt,
-                    durationSeconds: meta.durationSeconds,
-                    label: meta.label
+                    createdAt: meta.createdAt, durationSeconds: meta.durationSeconds, label: meta.label
                 ))
             }
         }
 
-        // ── Rebuild merge transcripts ────────────────────────────────────
         progress = "Finalizing…"
         for item in pkg.items {
             if let newId = itemIdMap[item.id] {
@@ -324,7 +437,7 @@ final class BackupManager: ObservableObject {
 
     /// Reads a little-endian integer from `data` at the given index without
     /// assuming pointer alignment — Data sub-slices are not guaranteed to be aligned.
-    nonisolated private static func readLE<T: FixedWidthInteger>(_ type: T.Type, from data: Data, at index: Data.Index) -> T {
+    nonisolated static func readLE<T: FixedWidthInteger>(_ type: T.Type, from data: Data, at index: Data.Index) -> T {
         var value = T.zero
         withUnsafeMutableBytes(of: &value) { dest in
             _ = data.copyBytes(to: dest, from: index ..< index + MemoryLayout<T>.size)

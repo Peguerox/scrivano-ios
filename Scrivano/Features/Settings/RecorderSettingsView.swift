@@ -206,11 +206,11 @@ struct RecorderSettingsView: View {
         VStack(spacing: 20) {
             Image(systemName: "hand.tap.fill")
                 .font(.system(size: 30, weight: .light))
-                .foregroundColor(Color.white.opacity(0.30))
+                .foregroundColor(Color.white.opacity(0.75))
 
             Text(langMgr.t("dashboard.pocketMode"))
                 .font(.inter(16, weight: .heavy))
-                .foregroundColor(Color.white.opacity(0.70))
+                .foregroundColor(Color.white)
 
             VStack(alignment: .leading, spacing: 14) {
                 pocketRow(icon: "hand.tap",      title: langMgr.t("recorder.firstTap"),
@@ -227,17 +227,17 @@ struct RecorderSettingsView: View {
             } label: {
                 Text(langMgr.t("recorder.gotIt"))
                     .font(.inter(14, weight: .heavy))
-                    .foregroundColor(Color.white.opacity(0.60))
+                    .foregroundColor(Color.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 13)
-                    .background(Color.white.opacity(0.06))
-                    .overlay(RoundedRectangle(cornerRadius: 13).stroke(Color.white.opacity(0.12), lineWidth: 1))
+                    .background(Color.white.opacity(0.12))
+                    .overlay(RoundedRectangle(cornerRadius: 13).stroke(Color.white.opacity(0.30), lineWidth: 1))
                     .clipShape(RoundedRectangle(cornerRadius: 13))
             }
         }
         .padding(24)
         .background(Color.black)
-        .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.white.opacity(0.15), lineWidth: 1.5))
+        .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.white.opacity(0.35), lineWidth: 1.5))
         .clipShape(RoundedRectangle(cornerRadius: 22))
         .shadow(color: .black.opacity(0.6), radius: 24)
     }
@@ -246,16 +246,16 @@ struct RecorderSettingsView: View {
         HStack(alignment: .top, spacing: 14) {
             Image(systemName: icon)
                 .font(.system(size: 14, weight: .medium))
-                .foregroundColor(Color.white.opacity(0.30))
+                .foregroundColor(Color.white.opacity(0.70))
                 .frame(width: 20)
                 .padding(.top, 1)
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
                     .font(.inter(13, weight: .bold))
-                    .foregroundColor(Color.white.opacity(0.55))
+                    .foregroundColor(Color.white.opacity(0.90))
                 Text(detail)
                     .font(.inter(12))
-                    .foregroundColor(Color.white.opacity(0.28))
+                    .foregroundColor(Color.white.opacity(0.55))
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

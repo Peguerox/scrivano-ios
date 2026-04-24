@@ -34,6 +34,8 @@ struct RecordingView: View {
     @State private var pauseArmTask: Task<Void, Never>? = nil
     @State private var stopArmTask:  Task<Void, Never>? = nil
 
+    // Pocket mode timer indicator (pulsingSlot rendered by PulsingDot)
+
     init(item: Item,
          onRename: ((String) -> Void)? = nil,
          onRecordingSaved: (() -> Void)? = nil) {
@@ -44,6 +46,28 @@ struct RecordingView: View {
     }
 
     private var isActivelyRecording: Bool { recorder.isRecording && !recorder.isPaused }
+
+    // Pocket mode timer: 5 fixed slots, each dot = 5 min, each square = one completed dot-phase.
+    // Cycle length = 75 min (25+20+15+10+5). Returns (squares, filledDots, pulsingSlot 0-4).
+    // Uses total session time (not per-segment elapsedSeconds) so splits don't reset the dots.
+    private var pocketTimerState: (squares: Int, filledDots: Int, pulsingSlot: Int) {
+        let totalSeconds: Int
+        if let start = recorder.sessionStartDate {
+            totalSeconds = Int(Date().timeIntervalSince(start))
+        } else {
+            totalSeconds = recorder.elapsedSeconds
+        }
+        let phaseEnds = [1500, 2700, 3600, 4200, 4500] // seconds
+        let t = totalSeconds % 4500
+        var squares = 0
+        var timeInPhase = t
+        for i in 0..<5 {
+            if t >= phaseEnds[i] { squares = i + 1 }
+            else { timeInPhase = t - (i == 0 ? 0 : phaseEnds[i - 1]); break }
+        }
+        let filledDots = timeInPhase / 300
+        return (squares, filledDots, squares + filledDots)
+    }
 
     private var kHzLabel: String {
         let quality = UserDefaults.standard.integer(forKey: kQuality)
@@ -431,6 +455,38 @@ struct RecordingView: View {
                                     .animation(.easeInOut(duration: 0.15), value: pauseArmed)
                             }
                             Spacer()
+
+                            // ── Pocket timer indicator ────────────────
+                            let ts = pocketTimerState
+                            HStack(spacing: 6) {
+                                ForEach(0..<5, id: \.self) { slot in
+                                    if slot < ts.squares {
+                                        RoundedRectangle(cornerRadius: 2)
+                                            .fill(Color.white.opacity(0.70))
+                                            .frame(width: 6, height: 6)
+                                    } else if slot < ts.squares + ts.filledDots {
+                                        Circle()
+                                            .fill(Color.white.opacity(0.70))
+                                            .frame(width: 6, height: 6)
+                                    } else if slot == ts.pulsingSlot {
+                                        if isActivelyRecording {
+                                            PulsingDot()
+                                                .id(ts.pulsingSlot)
+                                        } else {
+                                            Circle()
+                                                .fill(Color.white.opacity(0.20))
+                                                .frame(width: 6, height: 6)
+                                        }
+                                    } else {
+                                        Circle()
+                                            .fill(Color.white.opacity(0.08))
+                                            .frame(width: 6, height: 6)
+                                    }
+                                }
+                            }
+
+                            Spacer()
+
                             // Stop — double-tap required
                             Button {
                                 if stopArmed {
@@ -788,6 +844,23 @@ struct RenameRecordingSheet: View {
     }
 }
 
+// MARK: - Pulsing dot (pocket mode timer indicator)
+private struct PulsingDot: View {
+    @State private var on = false
+    var body: some View {
+        Circle()
+            .fill(Color.white.opacity(on ? 0.75 : 0.20))
+            .frame(width: 6, height: 6)
+            .onAppear {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                        on = true
+                    }
+                }
+            }
+    }
+}
+
 // MARK: - AirPlay button
 struct AirPlayButton: UIViewRepresentable {
     func makeUIView(context: Context) -> AVRoutePickerView {
@@ -896,6 +969,9 @@ final class AudioRecorderManager: NSObject, ObservableObject, AVAudioRecorderDel
     @Published var isPaused = false
     @Published var isMinimized = false
     @Published var elapsedSeconds: Int = 0
+    /// Tracks total recording time across splits for the pocket mode timer — not reset on auto-split.
+    var sessionStartDate: Date? = nil
+    let splitHapticGenerator = UIImpactFeedbackGenerator(style: .heavy)
     var audioLevel: Float = 0.08
     private var fileSizeTick = 0
     private var smoothedLevel: Float = 0.08
@@ -911,7 +987,7 @@ final class AudioRecorderManager: NSObject, ObservableObject, AVAudioRecorderDel
     private var recorder: AVAudioRecorder?
     private var timer: Timer?
     private(set) var outputURL: URL?
-    private var currentItemId: String = ""
+    private(set) var currentItemId: String = ""
 
     // MARK: - Session observers
     private var interruptionObserver: NSObjectProtocol?
@@ -1079,6 +1155,8 @@ final class AudioRecorderManager: NSObject, ObservableObject, AVAudioRecorderDel
         self.recorder = rec
         self.isRecording = true
         self.isPaused = false
+        self.elapsedSeconds = 0   // reset so short recordings don't inherit previous session's value
+        if self.sessionStartDate == nil { self.sessionStartDate = Date() }
         self.startTimer()
     }
 
@@ -1131,6 +1209,14 @@ final class AudioRecorderManager: NSObject, ObservableObject, AVAudioRecorderDel
         guard isRecording, let url = outputURL, !currentItemId.isEmpty else { return }
         let duration = Double(elapsedSeconds)
         let itemId   = currentItemId
+
+        // Haptic feedback in pocket mode — double heavy tap so it's felt through fabric
+        if UserDefaults.standard.bool(forKey: "pocket_mode") {
+            splitHapticGenerator.impactOccurred()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                self.splitHapticGenerator.impactOccurred()
+            }
+        }
 
         // Finalize current file
         let oldRec = recorder
@@ -1222,6 +1308,7 @@ final class AudioRecorderManager: NSObject, ObservableObject, AVAudioRecorderDel
         isRecording = false
         isPaused = false
         isMinimized = false
+        sessionStartDate = nil
         // Keep screen on if transcription is still running after recording stops
         UIApplication.shared.isIdleTimerDisabled = TaskQueueManager.shared.isProcessing
         // Finalize the file synchronously so any subsequent read (e.g. autoTrigger) gets a complete file.
@@ -1284,6 +1371,10 @@ final class AudioRecorderManager: NSObject, ObservableObject, AVAudioRecorderDel
                 // Auto-split when interval is reached
                 let splitInterval = UserDefaults.standard.integer(forKey: kSplitInterval)
                 if splitInterval > 0 && self.elapsedSeconds > 0 && self.elapsedSeconds >= splitInterval {
+                    // Pre-warm haptic generator one tick early so it fires instantly on split
+                    if UserDefaults.standard.bool(forKey: "pocket_mode") {
+                        self.splitHapticGenerator.prepare()
+                    }
                     self.performAutoSplit()
                     return
                 }

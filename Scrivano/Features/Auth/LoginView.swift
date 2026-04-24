@@ -10,6 +10,7 @@ struct LoginView: View {
     @State private var showForgot = false
     @State private var showVerify = false
     @State private var socialError: String?
+    @State private var socialErrorIsInfo: Bool = false
     @State private var agreedToTerms = true
 
     private let socialAuth = SocialAuthManager.shared
@@ -231,9 +232,9 @@ struct LoginView: View {
                             }
                             .padding(.vertical, 4)
 
-                            // Social errors
+                            // Social errors / info
                             if let err = socialError {
-                                Text(err).font(.inter(12)).foregroundColor(.danger)
+                                Text(err).font(.inter(12)).foregroundColor(socialErrorIsInfo ? .brandCyan : .danger)
                             }
 
                             // Google + Apple side by side
@@ -274,7 +275,15 @@ struct LoginView: View {
                                             auth.completeLogin(user: user)
                                         } catch {
                                             let code = (error as NSError).code
-                                            if code != 1001 && code != -5 { socialError = error.localizedDescription }
+                                            if code == 1001 || code == -5 {
+                                                // User cancelled — no message needed
+                                            } else if code == 1000 {
+                                                socialErrorIsInfo = true
+                                                socialError = "Apple ID verified! Tap Sign in with Apple once more to continue."
+                                            } else {
+                                                socialErrorIsInfo = false
+                                                socialError = error.localizedDescription
+                                            }
                                         }
                                     }
                                 } label: {

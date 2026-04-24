@@ -723,16 +723,16 @@ struct PromptsView: View {
             TaskQueueManager.shared.enqueue {
                 guard !Task.isCancelled else { return }
                 NoteGenerationManager.shared.begin(itemId: itemId, transcriptIds: tIds)
-                var success = true
+                var failReason: String? = nil
                 for prompt in promptsSnapshot {
-                    guard !Task.isCancelled else { success = false; break }
-                    let ok = await runNoteGeneration(
+                    guard !Task.isCancelled else { failReason = "task was cancelled"; break }
+                    let (ok, reason) = await runNoteGeneration(
                         text: combined, promptId: prompt.id,
                         itemId: itemId, promptName: prompt.name
                     )
-                    if !ok { success = false; break }
+                    if !ok { failReason = reason; break }
                 }
-                NoteGenerationManager.shared.finish(itemId: itemId, success: success)
+                NoteGenerationManager.shared.finish(itemId: itemId, success: failReason == nil, reason: failReason)
             }
 
         case .applyToItems(let itemGroups):
@@ -748,16 +748,16 @@ struct PromptsView: View {
                 TaskQueueManager.shared.enqueue {
                     guard !Task.isCancelled else { return }
                     NoteGenerationManager.shared.begin(itemId: groupRef.itemId, transcriptIds: groupRef.transcriptIds)
-                    var success = true
+                    var failReason: String? = nil
                     for prompt in promptsSnapshot {
-                        guard !Task.isCancelled else { success = false; break }
-                        let ok = await runNoteGeneration(
+                        guard !Task.isCancelled else { failReason = "task was cancelled"; break }
+                        let (ok, reason) = await runNoteGeneration(
                             text: combined, promptId: prompt.id,
                             itemId: groupRef.itemId, promptName: prompt.name
                         )
-                        if !ok { success = false; break }
+                        if !ok { failReason = reason; break }
                     }
-                    NoteGenerationManager.shared.finish(itemId: groupRef.itemId, success: success)
+                    NoteGenerationManager.shared.finish(itemId: groupRef.itemId, success: failReason == nil, reason: failReason)
                 }
             }
 
@@ -768,7 +768,7 @@ struct PromptsView: View {
     }
 
     /// Standalone note generation — does not touch any view @State, safe to run after dismiss.
-    private func runNoteGeneration(text: String, promptId: String, itemId: String, promptName: String) async -> Bool {
+    private func runNoteGeneration(text: String, promptId: String, itemId: String, promptName: String) async -> (Bool, String?) {
         struct Body: Encodable {
             let transcript: String
             let promptId: String
@@ -789,14 +789,26 @@ struct PromptsView: View {
             )
             guard let taskId = res.taskId else {
                 appLog("  [notes endpoint] — no task_id returned (success=\(res.success))", level: .error)
-                return false
+                return (false, "server did not return a task ID")
             }
             appLog("  task_id: \(taskId) — polling...", level: .info)
+            // Persist task ID — survives app kill, picked up by resumePendingNotes() on relaunch
+            let resolvedItemName = LocalItemStore.shared.all().first(where: { $0.id == itemId })?.name ?? itemId
+            PendingNoteTaskStore.shared.add(PendingNoteTaskEntry(
+                taskId: taskId, itemId: itemId, itemName: resolvedItemName,
+                promptId: promptId, promptName: promptName, submittedAt: Date()
+            ))
             var attempt = 0
             while attempt < 60 {
-                guard !Task.isCancelled else { return false }
-                do { try await Task.sleep(nanoseconds: 5_000_000_000) } catch { return false }
-                guard !Task.isCancelled else { return false }
+                guard !Task.isCancelled else {
+                    PendingNoteTaskStore.shared.remove(taskId: taskId)
+                    return (false, "task was cancelled")
+                }
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                guard !Task.isCancelled else {
+                    PendingNoteTaskStore.shared.remove(taskId: taskId)
+                    return (false, "task was cancelled")
+                }
                 do {
                     let result = try await APIClient.shared.pollNoteResult(taskId: taskId)
                     switch result.status {
@@ -805,9 +817,9 @@ struct PromptsView: View {
                         if let paid = result.credit, let free = result.freeCredit {
                             await AuthManager.shared.updateCredits(paid: paid, free: free)
                         }
+                        PendingNoteTaskStore.shared.remove(taskId: taskId)
                         if let noteText = result.note {
-                            let itemName = LocalItemStore.shared.all().first(where: { $0.id == itemId })?.name ?? itemId
-                            let label = "Note-\(itemName)-\(promptName)"
+                            let label = "Note-\(resolvedItemName)-\(promptName)"
                             LocalNoteStore.shared.addOrReplace(LocalNoteEntry(
                                 id: UUID().uuidString, itemId: itemId,
                                 label: label, text: noteText,
@@ -815,32 +827,34 @@ struct PromptsView: View {
                             ))
                             appLog("  Note generated OK — \(label)", level: .success)
                             sendCompletionNotification(title: "Note Ready", body: "Your note has been generated.")
-                            return true
+                            return (true, nil)
                         }
                         appLog("  [notes endpoint] — status completed but note text is nil", level: .error)
-                        sendCompletionNotification(title: "Note Failed", body: "Note generation completed but returned no text.")
-                        return false
+                        return (false, "server returned no note text")
                     case "failed":
                         let serverErr = result.error ?? "no error message"
                         appLog("  [notes endpoint] — status: failed — \(serverErr) (task: \(taskId))", level: .error)
-                        sendCompletionNotification(title: "Note Failed", body: serverErr)
-                        return false
+                        PendingNoteTaskStore.shared.remove(taskId: taskId)
+                        return (false, serverErr)
                     default:
                         break
                     }
                 } catch {
-                    guard !Task.isCancelled else { return false }
+                    guard !Task.isCancelled else {
+                        PendingNoteTaskStore.shared.remove(taskId: taskId)
+                        return (false, "task was cancelled")
+                    }
                     appLog("  Poll attempt \(attempt + 1) error: \(error.localizedDescription)", level: .warning)
                 }
                 attempt += 1
             }
-                        appLog("  [notes endpoint] — timed out after \(attempt) attempts (task: \(taskId))", level: .error)
-            sendCompletionNotification(title: "Note Failed", body: "Note generation timed out for prompt: \(promptName).")
+            appLog("  [notes endpoint] — timed out after \(attempt) attempts (task: \(taskId))", level: .error)
+            PendingNoteTaskStore.shared.remove(taskId: taskId)
+            return (false, "timed out waiting for note — prompt '\(promptName)'")
         } catch {
             appLog("  [notes endpoint] — request failed: \(error.localizedDescription)", level: .error)
-            sendCompletionNotification(title: "Note Failed", body: "Could not start note generation: \(error.localizedDescription)")
+            return (false, error.localizedDescription)
         }
-        return false
     }
 }
 

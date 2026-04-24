@@ -89,10 +89,11 @@ final class BackgroundTaskManager {
 
     // MARK: - Scheduling
 
-    /// Call when the app goes to background and there are pending transcription tasks.
+    /// Call when the app goes to background and there are pending transcription or note tasks.
     func scheduleIfNeeded() {
-        let pending = PendingTaskStore.shared.all()
-        guard !pending.isEmpty else { return }
+        let hasPendingTranscriptions = !PendingTaskStore.shared.all().isEmpty
+        let hasPendingNotes = !PendingNoteTaskStore.shared.all().isEmpty
+        guard hasPendingTranscriptions || hasPendingNotes else { return }
 
         BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.taskIdentifier)
 
@@ -102,7 +103,7 @@ final class BackgroundTaskManager {
 
         do {
             try BGTaskScheduler.shared.submit(request)
-            appLog("BGTask scheduled — \(pending.count) pending transcription(s)", level: .info)
+            appLog("BGTask scheduled — \(PendingTaskStore.shared.all().count) transcription(s), \(PendingNoteTaskStore.shared.all().count) note(s)", level: .info)
         } catch {
             appLog("BGTask schedule failed: \(error.localizedDescription)", level: .warning)
         }
@@ -114,7 +115,11 @@ final class BackgroundTaskManager {
         scheduleIfNeeded()  // reschedule in case we don't finish this run
 
         let work = Task {
-            await resumePendingTranscriptions()
+            // Run both poll loops concurrently — they target different server endpoints
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask { await self.resumePendingTranscriptions() }
+                group.addTask { await self.resumePendingNotePolling() }
+            }
             task.setTaskCompleted(success: true)
         }
 
@@ -171,6 +176,70 @@ final class BackgroundTaskManager {
                 } catch {
                     consecutiveErrors += 1
                     appLog("BGTask poll error (\(consecutiveErrors)): \(error.localizedDescription)", level: .warning)
+                    if consecutiveErrors >= 5 { break pollLoop }
+                }
+                attempt += 1
+            }
+        }
+    }
+
+    // MARK: - Note poll loop (BGTask context)
+
+    /// Polls every pending note task until completed, failed, or time runs out.
+    func resumePendingNotePolling() async {
+        let pending = PendingNoteTaskStore.shared.all()
+        guard !pending.isEmpty else { return }
+
+        appLog("BGTask: resuming \(pending.count) pending note(s)", level: .info)
+        let api = APIClient.shared
+
+        for entry in pending {
+            guard !Task.isCancelled else { break }
+
+            var attempt = 0
+            var consecutiveErrors = 0
+
+            pollLoop: while attempt < 72 {  // max ~6 min (72 × 5s)
+                guard !Task.isCancelled else { break pollLoop }
+                do { try await Task.sleep(nanoseconds: 5_000_000_000) } catch { break pollLoop }
+                guard !Task.isCancelled else { break pollLoop }
+
+                do {
+                    let result = try await api.pollNoteResult(taskId: entry.taskId)
+                    consecutiveErrors = 0
+                    appLog("BGTask note poll #\(attempt + 1) [\(entry.itemName)/\(entry.promptName)]: \(result.status)")
+
+                    switch result.status {
+                    case "completed":
+                        if let noteText = result.note {
+                            await MainActor.run {
+                                let label = "Note-\(entry.itemName)-\(entry.promptName)"
+                                LocalNoteStore.shared.addOrReplace(LocalNoteEntry(
+                                    id: UUID().uuidString, itemId: entry.itemId,
+                                    label: label, text: noteText,
+                                    promptType: entry.promptName, createdAt: Date()
+                                ))
+                                PendingNoteTaskStore.shared.remove(taskId: entry.taskId)
+                            }
+                            sendNotification(title: "Note Ready",
+                                             body: "'\(entry.itemName)' note has been generated.")
+                            appLog("BGTask: saved note for '\(entry.itemName)'", level: .success)
+                        } else {
+                            PendingNoteTaskStore.shared.remove(taskId: entry.taskId)
+                        }
+                        break pollLoop
+                    case "failed":
+                        PendingNoteTaskStore.shared.remove(taskId: entry.taskId)
+                        sendNotification(title: "Note Failed",
+                                         body: "'\(entry.itemName)' — note generation failed.")
+                        appLog("BGTask: note failed for '\(entry.itemName)'", level: .error)
+                        break pollLoop
+                    default:
+                        break
+                    }
+                } catch {
+                    consecutiveErrors += 1
+                    appLog("BGTask note poll error (\(consecutiveErrors)): \(error.localizedDescription)", level: .warning)
                     if consecutiveErrors >= 5 { break pollLoop }
                 }
                 attempt += 1

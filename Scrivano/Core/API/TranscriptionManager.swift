@@ -137,6 +137,13 @@ final class TranscriptionManager: ObservableObject {
                     if d > 0 { actualDuration = d }
                 }
             }
+            // Heal corrupted durationSeconds so the upload header and display are correct
+            if actualDuration != workingEntry.durationSeconds && actualDuration > 0 {
+                var healed = workingEntry
+                healed.durationSeconds = actualDuration
+                await MainActor.run { LocalRecordingStore.shared.update(healed) }
+                workingEntry = healed
+            }
 
             let needsSplit = actualDuration >= AudioProcessor.maxDurationSeconds
                           || fileSize > AudioProcessor.maxFileSizeBytes
@@ -444,13 +451,14 @@ final class TranscriptionManager: ObservableObject {
                                 $0.id == result.recordingId ||
                                 transcribedRecordingIds.contains($0.id) || failedRecordingIds.contains($0.id)
                             }
-                            let notRecording = !AudioRecorderManager.shared.isRecording && !AudioRecorderManager.shared.isPaused
-                            if allDone && notRecording {
+                            let rec = AudioRecorderManager.shared
+                            let sameItemRecording = (rec.isRecording || rec.isPaused) && rec.currentItemId == item.id
+                            if allDone && !sameItemRecording {
                                 let capturedId = item.id; let capturedName = item.name
                                 NoteGenerationManager.shared.markQueued(itemId: capturedId, transcriptIds: [])
                                 TaskQueueManager.shared.enqueue { await NoteGenerationManager.shared.runAutoNote(for: capturedId, itemName: capturedName) }
                             } else {
-                                appLog("  Auto-note deferred — \(allRecs.filter { $0.id != result.recordingId && !transcribedRecordingIds.contains($0.id) && !failedRecordingIds.contains($0.id) }.count) recording(s) not yet done or recording active")
+                                appLog("  Auto-note deferred — \(allRecs.filter { $0.id != result.recordingId && !transcribedRecordingIds.contains($0.id) && !failedRecordingIds.contains($0.id) }.count) recording(s) not yet done or same-item recording active")
                             }
                         }
                     }
@@ -613,13 +621,14 @@ final class TranscriptionManager: ObservableObject {
                                 $0.id == result.recordingId ||
                                 transcribedRecordingIds.contains($0.id) || failedRecordingIds.contains($0.id)
                             }
-                            let notRecording = !AudioRecorderManager.shared.isRecording && !AudioRecorderManager.shared.isPaused
-                            if allDone && notRecording {
+                            let rec = AudioRecorderManager.shared
+                            let sameItemRecording = (rec.isRecording || rec.isPaused) && rec.currentItemId == item.id
+                            if allDone && !sameItemRecording {
                                 let id = item.id; let name = item.name
                                 NoteGenerationManager.shared.markQueued(itemId: id, transcriptIds: [])
                                 TaskQueueManager.shared.enqueue { await NoteGenerationManager.shared.runAutoNote(for: id, itemName: name) }
                             } else {
-                                appLog("  Auto-note deferred — \(allRecs.filter { $0.id != result.recordingId && !transcribedRecordingIds.contains($0.id) && !failedRecordingIds.contains($0.id) }.count) recording(s) not yet done or recording active")
+                                appLog("  Auto-note deferred — \(allRecs.filter { $0.id != result.recordingId && !transcribedRecordingIds.contains($0.id) && !failedRecordingIds.contains($0.id) }.count) recording(s) not yet done or same-item recording active")
                             }
                         }
                     } else {
@@ -746,6 +755,9 @@ final class NoteGenerationManager: ObservableObject {
     /// Items/transcripts that are scheduled in the queue but not yet running.
     @Published var queuedItemIds: Set<String> = []
     @Published var queuedTranscriptIds: Set<String> = []
+    /// Set when note generation fails — cleared after a few seconds. Used to show error in dashboard.
+    @Published var failedItemName: String? = nil
+    @Published var failedReason: String? = nil
 
     /// Call once for every item that is being added to TaskQueueManager before the tasks start.
     func markQueued(itemId: String, transcriptIds: [String]) {
@@ -763,13 +775,21 @@ final class NoteGenerationManager: ObservableObject {
         processingTranscriptIds = Set(transcriptIds)
     }
 
-    func finish(itemId: String, success: Bool) {
+    func finish(itemId: String, success: Bool, reason: String? = nil) {
         let ids = processingTranscriptIds
         processingItemId = nil
         processingTranscriptIds = []
         if success {
             completedItemIds.insert(itemId)
             ids.forEach { completedTranscriptIds.insert($0) }
+        } else {
+            let name = LocalItemStore.shared.all().first(where: { $0.id == itemId })?.name ?? itemId
+            failedItemName = name
+            failedReason = reason
+            Task {
+                try? await Task.sleep(nanoseconds: 8_000_000_000)
+                await MainActor.run { self.failedItemName = nil; self.failedReason = nil }
+            }
         }
     }
 
@@ -870,6 +890,66 @@ final class NoteGenerationManager: ObservableObject {
         processingTranscriptIds = []
         queuedItemIds = []
         queuedTranscriptIds = []
+        PendingNoteTaskStore.shared.clearAll()
+    }
+
+    // MARK: - Resume pending notes (called on app foreground / relaunch)
+
+    /// Re-queues any note tasks that were in-flight when the app was killed.
+    /// Each saved task ID is polled individually through TaskQueueManager so the serial order is preserved.
+    func resumePendingNotes() {
+        let pending = PendingNoteTaskStore.shared.all()
+        guard !pending.isEmpty else { return }
+        appLog("Resuming \(pending.count) pending note task(s) from store")
+        for entry in pending {
+            TaskQueueManager.shared.enqueue {
+                var attempt = 0
+                pollLoop: while attempt < 60 {
+                    guard !Task.isCancelled else {
+                        PendingNoteTaskStore.shared.remove(taskId: entry.taskId)
+                        break pollLoop
+                    }
+                    try? await Task.sleep(nanoseconds: 5_000_000_000)
+                    guard !Task.isCancelled else {
+                        PendingNoteTaskStore.shared.remove(taskId: entry.taskId)
+                        break pollLoop
+                    }
+                    do {
+                        let result = try await APIClient.shared.pollNoteResult(taskId: entry.taskId)
+                        switch result.status {
+                        case "completed":
+                            if let paid = result.credit, let free = result.freeCredit {
+                                await AuthManager.shared.updateCredits(paid: paid, free: free)
+                            }
+                            PendingNoteTaskStore.shared.remove(taskId: entry.taskId)
+                            if let noteText = result.note {
+                                let label = "Note-\(entry.itemName)-\(entry.promptName)"
+                                LocalNoteStore.shared.addOrReplace(LocalNoteEntry(
+                                    id: UUID().uuidString, itemId: entry.itemId,
+                                    label: label, text: noteText,
+                                    promptType: entry.promptName, createdAt: Date()
+                                ))
+                                sendCompletionNotification(title: "Note Ready", body: "'\(entry.itemName)' note has been generated.")
+                            }
+                            break pollLoop
+                        case "failed":
+                            PendingNoteTaskStore.shared.remove(taskId: entry.taskId)
+                            sendCompletionNotification(title: "Note Failed", body: "'\(entry.itemName)' — note generation failed.")
+                            break pollLoop
+                        default: break
+                        }
+                    } catch {
+                        guard !Task.isCancelled else {
+                            PendingNoteTaskStore.shared.remove(taskId: entry.taskId)
+                            break pollLoop
+                        }
+                    }
+                    attempt += 1
+                }
+                // Timed out — remove so we don't retry forever
+                PendingNoteTaskStore.shared.remove(taskId: entry.taskId)
+            }
+        }
     }
 
     // MARK: - Automatic Note (triggered after transcript save)
@@ -903,21 +983,28 @@ final class NoteGenerationManager: ObservableObject {
         }
 
         await MainActor.run { begin(itemId: itemId, transcriptIds: [merge.id]) }
-        var success = true
+        var failReason: String? = nil
         for pair in pairs {
-            let ok = await runNoteGenerationEntry(
+            let (ok, reason) = await runNoteGenerationEntry(
                 text: merge.text, promptId: pair.id,
                 itemId: itemId, promptName: pair.name, itemName: itemName
             )
-            if !ok { success = false; break }
+            if !ok {
+                failReason = reason
+                sendCompletionNotification(
+                    title: "Note Generation Failed",
+                    body: "'\(itemName)' — \(reason ?? "unknown error"). Notes may be incomplete."
+                )
+                break
+            }
         }
-        await MainActor.run { finish(itemId: itemId, success: success) }
+        await MainActor.run { finish(itemId: itemId, success: failReason == nil, reason: failReason) }
     }
 
     private func runNoteGenerationEntry(
         text: String, promptId: String,
         itemId: String, promptName: String, itemName: String
-    ) async -> Bool {
+    ) async -> (Bool, String?) {
         struct Body: Encodable {
             let transcript: String
             let promptId: String
@@ -934,12 +1021,23 @@ final class NoteGenerationManager: ObservableObject {
                 body: Body(transcript: text, promptId: promptId),
                 responseType: Res.self
             )
-            guard let taskId = res.taskId else { return false }
+            guard let taskId = res.taskId else { return (false, "server did not return a task ID") }
+            // Persist task ID — survives app kill, picked up by resumePendingNotes() on relaunch
+            PendingNoteTaskStore.shared.add(PendingNoteTaskEntry(
+                taskId: taskId, itemId: itemId, itemName: itemName,
+                promptId: promptId, promptName: promptName, submittedAt: Date()
+            ))
             var attempt = 0
             while attempt < 60 {
-                guard !Task.isCancelled else { return false }
-                do { try await Task.sleep(nanoseconds: 5_000_000_000) } catch { return false }
-                guard !Task.isCancelled else { return false }
+                guard !Task.isCancelled else {
+                    PendingNoteTaskStore.shared.remove(taskId: taskId)
+                    return (false, "task was cancelled")
+                }
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                guard !Task.isCancelled else {
+                    PendingNoteTaskStore.shared.remove(taskId: taskId)
+                    return (false, "task was cancelled")
+                }
                 do {
                     let result = try await api.pollNoteResult(taskId: taskId)
                     switch result.status {
@@ -948,6 +1046,7 @@ final class NoteGenerationManager: ObservableObject {
                             await AuthManager.shared.updateCredits(paid: paid, free: free)
                         }
                         appLog("[CREDITS] Charged: \(String(format: "%.4f", result.creditCharge ?? 0)) | Balance: paid=\(String(format: "%.4f", result.credit ?? 0))  free=\(String(format: "%.4f", result.freeCredit ?? 0))", level: .info)
+                        PendingNoteTaskStore.shared.remove(taskId: taskId)
                         if let noteText = result.note {
                             let label = "Note-\(itemName)-\(promptName)"
                             LocalNoteStore.shared.addOrReplace(LocalNoteEntry(
@@ -956,19 +1055,27 @@ final class NoteGenerationManager: ObservableObject {
                                 promptType: promptName, createdAt: Date()
                             ))
                             sendCompletionNotification(title: "Note Ready", body: "'\(itemName)' note has been generated.")
-                            return true
+                            return (true, nil)
                         }
-                        return false
-                    case "failed": return false
+                        return (false, "server returned no note text")
+                    case "failed":
+                        PendingNoteTaskStore.shared.remove(taskId: taskId)
+                        return (false, "server reported failure for prompt '\(promptName)'")
                     default: break
                     }
                 } catch {
-                    guard !Task.isCancelled else { return false }
+                    guard !Task.isCancelled else {
+                        PendingNoteTaskStore.shared.remove(taskId: taskId)
+                        return (false, "task was cancelled")
+                    }
                 }
                 attempt += 1
             }
-        } catch {}
-        return false
+            PendingNoteTaskStore.shared.remove(taskId: taskId)
+            return (false, "timed out waiting for note — prompt '\(promptName)'")
+        } catch {
+            return (false, error.localizedDescription)
+        }
     }
 }
 
