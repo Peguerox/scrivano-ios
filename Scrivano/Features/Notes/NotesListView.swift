@@ -1,5 +1,4 @@
 import SwiftUI
-import MarkdownUI
 import UIKit
 
 // MARK: - NotesListView
@@ -554,7 +553,6 @@ struct NoteViewerEditorView: View {
     @State private var showSaveCard = false
     @State private var showMarkdown = false
     @State private var isGeneratingPDF = false
-    @State private var markdownScrollView: UIScrollView?
 
     init(note: LocalNoteEntry, onSaved: ((String) -> Void)? = nil) {
         self.note = note
@@ -566,11 +564,9 @@ struct NoteViewerEditorView: View {
 
     @MainActor
     private func generatePDF() {
-        guard let sv = markdownScrollView else { return }
         isGeneratingPDF = true
-        // Small delay so the "Building PDF…" overlay renders before we block the main thread
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            let url = PDFExporter.makePDF(from: sv, title: note.label)
+        let html = MarkdownWebView.buildPrintHTML(editedText)
+        PDFExporter.makePDF(fromHTML: html, title: note.label) { url in
             isGeneratingPDF = false
             guard let url else { return }
             guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
@@ -621,18 +617,7 @@ struct NoteViewerEditorView: View {
                 }
 
                 if showMarkdown {
-                    ScrollView {
-                        Markdown(editedText)
-                            .markdownTheme(.gitHub)
-                            .environment(\.colorScheme, .light)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 16)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(ScrollViewFinder { sv in
-                                markdownScrollView = sv
-                            })
-                    }
-                    .background(Color.white)
+                    MarkdownWebView(markdown: editedText, theme: .light)
                 } else {
                     TextEditor(text: $editedText)
                         .font(.inter(14)).foregroundColor(.textPrimary)
@@ -874,29 +859,4 @@ struct BulkMoveNoteSheet: View {
     }
 }
 
-// MARK: - ScrollView finder (walks the UIKit hierarchy to capture the backing UIScrollView)
-
-private struct ScrollViewFinder: UIViewRepresentable {
-    let onFound: (UIScrollView) -> Void
-
-    func makeUIView(context: Context) -> UIView {
-        let v = UIView(frame: .zero)
-        v.backgroundColor = .clear
-        DispatchQueue.main.async { self.find(from: v) }
-        return v
-    }
-
-    func updateUIView(_ uiView: UIView, context: Context) {}
-
-    private func find(from view: UIView) {
-        var current: UIView? = view.superview
-        while let v = current {
-            if let sv = v as? UIScrollView {
-                onFound(sv)
-                return
-            }
-            current = v.superview
-        }
-    }
-}
 

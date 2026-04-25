@@ -1,78 +1,85 @@
 import UIKit
+import WebKit
 
 final class PDFExporter {
 
-    static let pageWidth:  CGFloat = 595   // A4 width  in points
-    static let pageHeight: CGFloat = 842   // A4 height in points
+    // MARK: - HTML → paginated PDF (primary path)
 
-    /// Snapshots the full content of a UIScrollView (including off-screen content)
-    /// and writes it to a paginated A4 PDF file, returning the file URL on success.
-    static func makePDF(from scrollView: UIScrollView, title: String) -> URL? {
-        guard let contentView = scrollView.subviews.first else { return nil }
-        let contentSize = scrollView.contentSize
-        guard contentSize.width > 1, contentSize.height > 1 else { return nil }
+    /// Renders HTML in an off-screen WKWebView and exports a proper A4 PDF
+    /// using UIPrintPageRenderer — supports real pagination, images, tables, fonts.
+    static func makePDF(fromHTML html: String, title: String, completion: @escaping (URL?) -> Void) {
+        DispatchQueue.main.async {
+            let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 595, height: 842))
+            webView.isOpaque = false
+            webView.backgroundColor = .white
+            let delegate = PrintDelegate(title: title, completion: completion)
+            webView.navigationDelegate = delegate
+            delegate.retain()                          // keep alive until done
+            webView.loadHTMLString(html, baseURL: nil)
+            delegate.webView = webView                 // prevent dealloc
+        }
+    }
 
-        // Render the full content to a UIImage at screen scale
-        let imgRenderer = UIGraphicsImageRenderer(size: contentSize)
-        let image = imgRenderer.image { ctx in
-            UIColor.white.setFill()
-            ctx.fill(CGRect(origin: .zero, size: contentSize))
-            contentView.layer.render(in: ctx.cgContext)
+    // MARK: - Print delegate
+
+    private final class PrintDelegate: NSObject, WKNavigationDelegate {
+        var webView: WKWebView?
+        let title: String
+        let completion: (URL?) -> Void
+        private static var pool = Set<PrintDelegate>()
+
+        init(title: String, completion: @escaping (URL?) -> Void) {
+            self.title = title
+            self.completion = completion
         }
 
-        // Scale factor to fit content width into A4 width
-        let scale       = pageWidth / contentSize.width
-        let scaledTotal = contentSize.height * scale
-        let imgScale    = image.scale
+        func retain()  { PrintDelegate.pool.insert(self) }
+        func release() { PrintDelegate.pool.remove(self) }
 
-        let pageRect = CGRect(x: 0, y: 0, width: pageWidth, height: pageHeight)
-        let pdfData  = NSMutableData()
-        UIGraphicsBeginPDFContextToData(pdfData, pageRect, [
-            kCGPDFContextTitle as String: title
-        ])
-
-        var yScaled: CGFloat = 0   // position in scaled (A4-width) coordinates
-        while yScaled < scaledTotal {
-            UIGraphicsBeginPDFPage()
-            UIColor.white.setFill()
-            UIRectFill(pageRect)
-
-            // How many scaled points fit on this page
-            let sliceScaledHeight = min(pageHeight, scaledTotal - yScaled)
-
-            // Corresponding source rect in the original (unscaled) image pixels
-            let srcY      = (yScaled  / scale) * imgScale
-            let srcHeight = (sliceScaledHeight / scale) * imgScale
-            let srcWidth  = contentSize.width * imgScale
-
-            if let cgFull = image.cgImage,
-               let cgSlice = cgFull.cropping(to: CGRect(
-                   x: 0, y: srcY,
-                   width: srcWidth, height: srcHeight
-               )) {
-                let sliceImg = UIImage(cgImage: cgSlice,
-                                       scale: imgScale,
-                                       orientation: image.imageOrientation)
-                sliceImg.draw(in: CGRect(x: 0, y: 0,
-                                         width: pageWidth,
-                                         height: sliceScaledHeight))
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            // Small delay to let JS finish rendering the markdown
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                self?.render(webView)
             }
-
-            yScaled += pageHeight
         }
 
-        UIGraphicsEndPDFContext()
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            completion(nil); release()
+        }
 
-        let safe = title.replacingOccurrences(of: "/", with: "-")
-        let url  = FileManager.default.temporaryDirectory
-            .appendingPathComponent(safe)
-            .appendingPathExtension("pdf")
-        do {
-            try pdfData.write(to: url)
-            return url
-        } catch {
-            print("[PDFExporter] write error: \(error)")
-            return nil
+        private func render(_ webView: WKWebView) {
+            let paperRect   = CGRect(x: 0, y: 0, width: 595, height: 842)   // A4
+            let printRect   = CGRect(x: 28, y: 28, width: 539, height: 786) // ~10mm margins
+
+            let renderer = UIPrintPageRenderer()
+            renderer.addPrintFormatter(webView.viewPrintFormatter(), startingAtPageAt: 0)
+            renderer.setValue(NSValue(cgRect: paperRect), forKey: "paperRect")
+            renderer.setValue(NSValue(cgRect: printRect), forKey: "printableRect")
+
+            let pdfData = NSMutableData()
+            UIGraphicsBeginPDFContextToData(pdfData, paperRect, [
+                kCGPDFContextTitle as String: title
+            ])
+            renderer.prepare(forDrawingPages: NSMakeRange(0, renderer.numberOfPages))
+            let bounds = UIGraphicsGetPDFContextBounds()
+            for i in 0 ..< renderer.numberOfPages {
+                UIGraphicsBeginPDFPage()
+                renderer.drawPage(at: i, in: bounds)
+            }
+            UIGraphicsEndPDFContext()
+
+            let safe = title.replacingOccurrences(of: "/", with: "-")
+            let url  = FileManager.default.temporaryDirectory
+                .appendingPathComponent(safe)
+                .appendingPathExtension("pdf")
+            do {
+                try pdfData.write(to: url)
+                DispatchQueue.main.async { self.completion(url) }
+            } catch {
+                print("[PDFExporter] write error: \(error)")
+                DispatchQueue.main.async { self.completion(nil) }
+            }
+            release()
         }
     }
 }
