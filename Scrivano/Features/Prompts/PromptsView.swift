@@ -223,7 +223,9 @@ struct PromptsView: View {
         // Only show prompts owned by the current user or official Scrivano prompts
         var list = prompts.filter { prompt in
             let author = prompt.categories["author"] ?? ""
-            return author == userEmail || isScrivano(author)
+            if isScrivano(author) { return true }
+            let authors = author.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            return authors.contains(userEmail)
         }
         if !search.isEmpty {
             list = list.filter { matchesSearch($0) }
@@ -240,8 +242,11 @@ struct PromptsView: View {
             list = list.filter { prompt in
                 let author = prompt.categories["author"] ?? ""
                 return selectedAuthors.contains { selection in
-                    if selection == "My Prompts" { return author == userEmail }
                     if selection == "Scrivano"   { return isScrivano(author) }
+                    if selection == "My Prompts" {
+                        let authors = author.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+                        return authors.contains(userEmail)
+                    }
                     return false
                 }
             }
@@ -617,7 +622,10 @@ struct PromptsView: View {
         do {
             let res = try await APIClient.shared.request(path: "/api/prompts", responseType: PromptsResponse.self)
             if res.success { prompts = res.data }
-        } catch { self.error = error.localizedDescription }
+        } catch {
+            if error is CancellationError || (error as NSError).code == NSURLErrorCancelled { return }
+            self.error = error.localizedDescription
+        }
     }
 
     private func apply(prompt: Prompt) async {
