@@ -587,6 +587,7 @@ struct NoteViewerEditorView: View {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showSaveCard = true }
                     } else { dismiss() }
                 }, trailingIcon: nil)
+                .padding(.trailing, showMarkdown ? 44 : 0)
                 .overlay(alignment: .bottom) {
                     Rectangle().fill(Color.stageNotes.opacity(0.4)).frame(height: 1)
                 }

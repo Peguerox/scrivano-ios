@@ -212,6 +212,8 @@ struct SubScreenBar: View {
             Text(title)
                 .font(.inter(16, weight: .heavy))
                 .foregroundColor(.textPrimary)
+                .lineLimit(1)
+                .truncationMode(.tail)
                 .frame(maxWidth: .infinity)
 
             if let icon = trailingIcon {
