@@ -37,24 +37,7 @@ struct MarkdownWebView: UIViewRepresentable {
     }
 
     static func buildHTML(_ md: String, theme: MarkdownTheme) -> String {
-        // If content looks like HTML already, inject it directly — skip the markdown parser
-        let trimmed = md.trimmingCharacters(in: .whitespacesAndNewlines)
-        let isHTML = trimmed.hasPrefix("<")
-
         let css = theme == .dark ? darkCSS : lightCSS
-
-        if isHTML {
-            return """
-            <!DOCTYPE html>
-            <html>
-            <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-            <style>\(css)</style>
-            </head>
-            <body>\(trimmed)</body>
-            </html>
-            """
-        }
 
         // Escape markdown for safe embedding as a JS string literal
         let jsonStr = md
@@ -150,6 +133,9 @@ struct MarkdownWebView: UIViewRepresentable {
               }
               html+='</tbody></table></div>';continue;
             }
+
+            // Raw HTML line (e.g. <img>, <div>, etc.) — pass through without escaping
+            if(trim.charAt(0)==='<'){closeList();html+=trim;i++;continue;}
 
             // HR
             if(trim==='---'||trim==='***'||trim==='___'){closeList();html+='<hr>';i++;continue;}
