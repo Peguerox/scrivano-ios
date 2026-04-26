@@ -618,6 +618,7 @@ struct PromptsView: View {
 
     private func loadPrompts() async {
         isLoading = true
+        error = nil
         defer { isLoading = false }
         do {
             let res = try await APIClient.shared.request(path: "/api/prompts", responseType: PromptsResponse.self)
