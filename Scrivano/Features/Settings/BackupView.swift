@@ -405,6 +405,7 @@ struct BackupView: View {
     private func doRestore() async {
         guard let url = pendingRestoreURL else { return }
         restoreError = nil
+        showRestoreSheet = false   // dismiss sheet so progress overlay is visible
         do {
             let count = try await BackupManager.shared.restoreBackup(from: url, password: restorePassword)
             showRestoreSheet = false
