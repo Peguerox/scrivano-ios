@@ -508,6 +508,16 @@ final class LocalRecordingStore {
         }
     }
 
+    /// Removes entries whose file no longer exists or whose item is no longer in LocalItemStore.
+    func purgeOrphaned() {
+        let validItemIds = Set(LocalItemStore.shared.all().map { $0.id })
+        let before = entries.count
+        entries = entries.filter {
+            FileManager.default.fileExists(atPath: $0.fileURL.path) && validItemIds.contains($0.itemId)
+        }
+        if entries.count != before { persist() }
+    }
+
     static func relativePath(of url: URL) -> String {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].path
         let full = url.path

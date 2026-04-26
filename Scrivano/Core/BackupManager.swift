@@ -58,6 +58,9 @@ final class BackupManager: ObservableObject {
         progress = "Gathering data…"
         defer { isWorking = false; progress = "" }
 
+        // Clean up orphaned recording entries before snapshotting
+        LocalRecordingStore.shared.purgeOrphaned()
+
         // Snapshot all in-memory stores (main actor)
         let collections = LocalCollectionStore.shared.all()
         let knownCollectionIds = Set(collections.map { $0.id })
