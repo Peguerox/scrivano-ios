@@ -449,6 +449,11 @@ final class LocalRecordingStore {
         persist()
     }
 
+    func addBatch(_ newEntries: [LocalRecordingEntry]) {
+        entries.append(contentsOf: newEntries)
+        persist()
+    }
+
     func update(_ entry: LocalRecordingEntry) {
         if let idx = entries.firstIndex(where: { $0.id == entry.id }) {
             entries[idx] = entry
@@ -640,6 +645,7 @@ final class LocalTranscriptStore {
     }
 
     func add(_ entry: LocalTranscriptEntry) { entries.append(entry); persist() }
+    func addBatch(_ newEntries: [LocalTranscriptEntry]) { entries.append(contentsOf: newEntries); persist() }
 
     /// Replaces an existing transcript with the same label+itemId, or appends if none exists.
     func addOrReplace(_ entry: LocalTranscriptEntry) {
@@ -759,6 +765,7 @@ final class LocalNoteStore {
     }
 
     func add(_ entry: LocalNoteEntry) { entries.append(entry); persist() }
+    func addBatch(_ newEntries: [LocalNoteEntry]) { entries.append(contentsOf: newEntries); persist() }
 
     /// Replaces an existing note with the same label+itemId, or appends if none exists.
     func addOrReplace(_ entry: LocalNoteEntry) {

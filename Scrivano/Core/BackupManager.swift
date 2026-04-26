@@ -67,7 +67,9 @@ final class BackupManager: ObservableObject {
         let itemIds = Set(items.map { $0.id })
         let transcripts = LocalTranscriptStore.shared.entries.filter { itemIds.contains($0.itemId) }
         let notes       = LocalNoteStore.shared.entries.filter { itemIds.contains($0.itemId) }
-        let recsMeta    = LocalRecordingStore.shared.entries.filter { itemIds.contains($0.itemId) }
+        let recsMeta    = LocalRecordingStore.shared.entries.filter {
+            itemIds.contains($0.itemId) && FileManager.default.fileExists(atPath: $0.fileURL.path)
+        }
 
         progress = "Creating backup…"
         let audioPaths = recsMeta.map { $0.relativePath }
@@ -306,9 +308,7 @@ final class BackupManager: ObservableObject {
         }.value
 
         // Phase 4: persist recording entries + finalize on main actor
-        for entry in restoredEntries {
-            LocalRecordingStore.shared.add(entry)
-        }
+        LocalRecordingStore.shared.addBatch(restoredEntries)
 
         progress = "Finalizing…"
         for item in pkg.items {
@@ -355,22 +355,21 @@ final class BackupManager: ObservableObject {
         }
 
         progress = "Restoring transcripts…"
-        for t in pkg.transcripts where !t.isMerge {
+        let transcriptBatch: [LocalTranscriptEntry] = pkg.transcripts.compactMap { t in
+            guard !t.isMerge else { return nil }
             let newItemId = itemIdMap[t.itemId] ?? t.itemId
-            LocalTranscriptStore.shared.add(LocalTranscriptEntry(
-                id: UUID().uuidString, itemId: newItemId, label: t.label,
-                text: t.text, durationSeconds: t.durationSeconds, createdAt: t.createdAt
-            ))
+            return LocalTranscriptEntry(id: UUID().uuidString, itemId: newItemId, label: t.label,
+                                        text: t.text, durationSeconds: t.durationSeconds, createdAt: t.createdAt)
         }
+        LocalTranscriptStore.shared.addBatch(transcriptBatch)
 
         progress = "Restoring notes…"
-        for n in pkg.notes {
+        let notesBatch: [LocalNoteEntry] = pkg.notes.map { n in
             let newItemId = itemIdMap[n.itemId] ?? n.itemId
-            LocalNoteStore.shared.add(LocalNoteEntry(
-                id: UUID().uuidString, itemId: newItemId, label: n.label,
-                text: n.text, promptType: n.promptType, createdAt: n.createdAt
-            ))
+            return LocalNoteEntry(id: UUID().uuidString, itemId: newItemId, label: n.label,
+                                  text: n.text, promptType: n.promptType, createdAt: n.createdAt)
         }
+        LocalNoteStore.shared.addBatch(notesBatch)
 
         return (collectionIdMap, itemIdMap)
     }
