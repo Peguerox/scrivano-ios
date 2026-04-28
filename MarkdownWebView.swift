@@ -37,6 +37,14 @@ struct MarkdownWebView: UIViewRepresentable {
     }
 
     static func buildHTML(_ md: String, theme: MarkdownTheme) -> String {
+        let trimmed = md.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lower = trimmed.lowercased()
+
+        // Full HTML document — use it directly as the page, no parsing needed
+        if lower.hasPrefix("<!doctype") || lower.hasPrefix("<html") {
+            return trimmed
+        }
+
         let css = theme == .dark ? darkCSS : lightCSS
 
         // Escape markdown for safe embedding as a JS string literal
