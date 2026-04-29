@@ -698,6 +698,7 @@ struct DashboardView: View {
                             }
                             let renamed = ScrivanoCollection(id: active.id, name: trimmed)
                             LocalCollectionStore.shared.save(renamed)
+                            LocalItemStore.shared.renameCollection(active.id, to: trimmed)
                             vm.activeCollection = renamed
                             if let idx = vm.collections.firstIndex(where: { $0.id == active.id }) {
                                 vm.collections[idx] = renamed
@@ -1357,6 +1358,7 @@ struct DashboardView: View {
                         renameCollectionText = vm.activeCollection?.name ?? ""
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showRenameCollectionCard = true }
                     } label: { Label(langMgr.t("dashboard.renameCollection"), systemImage: "pencil") }
+                    .disabled(vm.activeCollection == nil)
                     Button(role: .destructive) {
                         guard vm.activeCollection != nil else {
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showCollectionActiveError = true }

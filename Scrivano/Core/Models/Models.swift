@@ -578,6 +578,16 @@ final class LocalItemStore {
 
     func clearAll() { items.removeAll(); persist() }
 
+    /// Updates the stored collection name on all items belonging to the renamed collection.
+    func renameCollection(_ collectionId: String, to newName: String) {
+        var changed = false
+        for idx in items.indices where items[idx].collectionId == collectionId {
+            items[idx].collection = newName
+            changed = true
+        }
+        if changed { persist() }
+    }
+
     /// Removes the collection assignment from all items that belonged to the deleted collection.
     func clearCollection(_ collectionId: String) {
         var changed = false

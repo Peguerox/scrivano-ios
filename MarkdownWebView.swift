@@ -37,12 +37,34 @@ struct MarkdownWebView: UIViewRepresentable {
     }
 
     static func buildHTML(_ md: String, theme: MarkdownTheme) -> String {
-        let trimmed = md.trimmingCharacters(in: .whitespacesAndNewlines)
+        var trimmed = md.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Strip markdown code fences — AI often wraps HTML in ```html ... ```
+        if trimmed.hasPrefix("```") {
+            let lines = trimmed.components(separatedBy: "\n")
+            let inner = lines.dropFirst().joined(separator: "\n")
+            let stripped = inner.hasSuffix("```")
+                ? String(inner.dropLast(3)).trimmingCharacters(in: .whitespacesAndNewlines)
+                : inner.trimmingCharacters(in: .whitespacesAndNewlines)
+            trimmed = stripped
+        }
+
         let lower = trimmed.lowercased()
 
         // Full HTML document — use it directly as the page, no parsing needed
         if lower.hasPrefix("<!doctype") || lower.hasPrefix("<html") {
             return trimmed
+        }
+
+        // AI sometimes prepends text before the HTML block — scan for the doc start
+        for prefix in ["<!doctype html", "<html"] {
+            if let range = lower.range(of: prefix) {
+                let offset = lower.distance(from: lower.startIndex, to: range.lowerBound)
+                if offset < 300 { // only if HTML starts within the first ~300 chars
+                    let startIdx = trimmed.index(trimmed.startIndex, offsetBy: offset)
+                    return String(trimmed[startIdx...])
+                }
+            }
         }
 
         let css = theme == .dark ? darkCSS : lightCSS
