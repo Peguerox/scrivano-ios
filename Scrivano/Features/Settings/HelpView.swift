@@ -63,7 +63,7 @@ struct HelpView: View {
                             icon: "play.circle.fill", iconColor: Color(hex: "#f59e0b"),
                             title: langMgr.t("help.quickStart"),
                             subtitle: langMgr.t("help.quickStart.subtitle"),
-                            url: "https://www.youtube.com/watch?v=vvUcnRT3Qz0&t=3s"
+                            url: "https://youtube.com/shorts/BSp70_wfooc?feature=share"
                         )
                         helpCard(
                             icon: "doc.text.fill", iconColor: .textTertiary,
@@ -87,7 +87,7 @@ struct HelpView: View {
                             iconColor: Color.red,
                             title: langMgr.t("help.youtube"),
                             subtitle: langMgr.t("help.youtube.subtitle"),
-                            url: "https://www.youtube.com/@ScrivanoSocial"
+                            url: "https://www.youtube.com/@ScrivanoTube"
                         )
                         helpCard(
                             icon: "camera.fill",
