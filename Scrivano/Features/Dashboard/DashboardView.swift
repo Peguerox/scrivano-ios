@@ -97,6 +97,9 @@ struct DashboardView: View {
             .onReceive(NotificationCenter.default.publisher(for: .scrivanoBackupRestored)) { _ in
                 vm.refreshFromLocalStores()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .pendingImportsDidFinish)) { _ in
+                vm.refreshFromLocalStores()
+            }
     }
 
     private var withSheets: some View {

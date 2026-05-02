@@ -1,6 +1,10 @@
 import Foundation
 import AVFoundation
 
+extension Notification.Name {
+    static let pendingImportsDidFinish = Notification.Name("PendingImportProcessor.didFinish")
+}
+
 final class PendingImportProcessor {
     static let shared = PendingImportProcessor()
     private init() {}
@@ -36,6 +40,10 @@ final class PendingImportProcessor {
             // Re-mirror stores so extension sees any new collections/items
             AppGroup.mirrorCollections()
             AppGroup.mirrorItems()
+            // Notify the dashboard to refresh its item list
+            await MainActor.run {
+                NotificationCenter.default.post(name: .pendingImportsDidFinish, object: nil)
+            }
         }
     }
 
