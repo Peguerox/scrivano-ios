@@ -26,10 +26,13 @@ class ShareViewController: UIViewController {
         ]
 
         for (typeId, isAudio) in candidates where provider.hasItemConformingToTypeIdentifier(typeId) {
+            let suggestedName = provider.suggestedName
             provider.loadFileRepresentation(forTypeIdentifier: typeId) { [weak self] url, _ in
                 guard let url else { DispatchQueue.main.async { self?.cancel() }; return }
-                let originalName = url.lastPathComponent
                 let ext = url.pathExtension.isEmpty ? (isAudio ? "m4a" : "pdf") : url.pathExtension
+                // Prefer suggestedName (provider display name), fall back to actual URL filename
+                let originalName = suggestedName.map { $0.hasSuffix(".\(ext)") ? $0 : "\($0).\(ext)" }
+                    ?? url.lastPathComponent
                 let tmp = FileManager.default.temporaryDirectory
                     .appendingPathComponent(UUID().uuidString + "." + ext)
                 try? FileManager.default.copyItem(at: url, to: tmp)
