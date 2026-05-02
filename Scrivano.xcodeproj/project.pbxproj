@@ -14,6 +14,9 @@
 		3DDB9201EF1620E403A19133 /* MediaListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 19E4226696BC227E8507A928 /* MediaListView.swift */; };
 		3ED482B75507F9380DFCFF5B /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB942C17ECC38870DA121384 /* KeychainService.swift */; };
 		435DE4562FA69AA900BAAF83 /* ScrivanoShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 435DE44C2FA69AA900BAAF83 /* ScrivanoShare.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		435DE4622FA6A6C400BAAF83 /* PendingImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 435DE4602FA6A6C400BAAF83 /* PendingImport.swift */; };
+		435DE4632FA6A6C400BAAF83 /* PendingImportProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 435DE4612FA6A6C400BAAF83 /* PendingImportProcessor.swift */; };
+		435DE4642FA6A6C400BAAF83 /* AppGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 435DE45F2FA6A6C400BAAF83 /* AppGroup.swift */; };
 		439835D52F89163800B23817 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 439835D42F89163800B23817 /* RevenueCat */; };
 		439835D82F89167500B23817 /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 439835D72F89167500B23817 /* StoreKit.framework */; };
 		439835DA2F89185000B23817 /* RevenueCatManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 439835D92F89185000B23817 /* RevenueCatManager.swift */; };
@@ -97,6 +100,9 @@
 		352AFF83E7A6FA701F540953 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		42DB24EBC0D8FD24E722D0F2 /* NotesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotesListView.swift; sourceTree = "<group>"; };
 		435DE44C2FA69AA900BAAF83 /* ScrivanoShare.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ScrivanoShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		435DE45F2FA6A6C400BAAF83 /* AppGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppGroup.swift; sourceTree = "<group>"; };
+		435DE4602FA6A6C400BAAF83 /* PendingImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingImport.swift; sourceTree = "<group>"; };
+		435DE4612FA6A6C400BAAF83 /* PendingImportProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingImportProcessor.swift; sourceTree = "<group>"; };
 		439835D72F89167500B23817 /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		439835D92F89185000B23817 /* RevenueCatManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RevenueCatManager.swift; sourceTree = "<group>"; };
 		439835DB2F8C02B400B23817 /* MarkdownConverter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkdownConverter.swift; sourceTree = "<group>"; };
@@ -291,6 +297,9 @@
 		5D13AF33F763DDED55F65D0B = {
 			isa = PBXGroup;
 			children = (
+				435DE45F2FA6A6C400BAAF83 /* AppGroup.swift */,
+				435DE4602FA6A6C400BAAF83 /* PendingImport.swift */,
+				435DE4612FA6A6C400BAAF83 /* PendingImportProcessor.swift */,
 				439835EA2F8CADF400B23817 /* PDFExporter.swift */,
 				439835E22F8C461900B23817 /* MarkdownTheme.swift */,
 				439835DB2F8C02B400B23817 /* MarkdownConverter.swift */,
@@ -554,6 +563,9 @@
 				5C738AACAA822D8A6488E3E1 /* TextViewerView.swift in Sources */,
 				EDADD3885184A95FC95C4252 /* TranscriptionManager.swift in Sources */,
 				F4EF985C8EF327D82873A0EF /* VerifyCodeView.swift in Sources */,
+				435DE4622FA6A6C400BAAF83 /* PendingImport.swift in Sources */,
+				435DE4632FA6A6C400BAAF83 /* PendingImportProcessor.swift in Sources */,
+				435DE4642FA6A6C400BAAF83 /* AppGroup.swift in Sources */,
 				A1A1B2B2C3C3D4D4E5E5F6F6 /* LanguageManager.swift in Sources */,
 				C1C1D2D2E3E3F4F4A5A5B6B6 /* AppTranslations.swift in Sources */,
 				E1E1F2F2A3A3B4B4C5C5D6D6 /* LanguagePickerView.swift in Sources */,

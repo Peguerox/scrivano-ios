@@ -28,20 +28,22 @@ class ShareViewController: UIViewController {
         for (typeId, isAudio) in candidates where provider.hasItemConformingToTypeIdentifier(typeId) {
             provider.loadFileRepresentation(forTypeIdentifier: typeId) { [weak self] url, _ in
                 guard let url else { DispatchQueue.main.async { self?.cancel() }; return }
+                let originalName = url.lastPathComponent
                 let ext = url.pathExtension.isEmpty ? (isAudio ? "m4a" : "pdf") : url.pathExtension
                 let tmp = FileManager.default.temporaryDirectory
                     .appendingPathComponent(UUID().uuidString + "." + ext)
                 try? FileManager.default.copyItem(at: url, to: tmp)
-                DispatchQueue.main.async { self?.show(fileURL: tmp, isAudio: isAudio) }
+                DispatchQueue.main.async { self?.show(fileURL: tmp, originalName: originalName, isAudio: isAudio) }
             }
             return
         }
         cancel()
     }
 
-    private func show(fileURL: URL, isAudio: Bool) {
+    private func show(fileURL: URL, originalName: String, isAudio: Bool) {
         let view = ShareView(
             fileURL: fileURL,
+            originalName: originalName,
             isAudio: isAudio,
             onDone:   { [weak self] in self?.extensionContext?.completeRequest(returningItems: []) },
             onCancel: { [weak self] in self?.cancel() }

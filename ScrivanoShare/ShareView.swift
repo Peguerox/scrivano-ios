@@ -10,7 +10,7 @@ private struct SItem: Codable, Identifiable {
     var collection: String?; var collectionId: String?; var createdAt: String?
 }
 private struct PendingEntry: Codable {
-    let id, fileRelativePath, fileExtension: String
+    let id, fileRelativePath, fileExtension, originalFilename: String
     let isAudio: Bool
     let collectionId, collectionName, itemId, itemName: String
     let importedAt: Date
@@ -36,6 +36,7 @@ private extension Color {
 // MARK: - ShareView
 struct ShareView: View {
     let fileURL: URL
+    let originalName: String
     let isAudio: Bool
     let onDone: () -> Void
     let onCancel: () -> Void
@@ -85,7 +86,7 @@ struct ShareView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 ShareHeader(onCancel: onCancel)
-                FileInfoCard(fileURL: fileURL, isAudio: isAudio)
+                FileInfoCard(filename: originalName, isAudio: isAudio, ext: fileURL.pathExtension.lowercased())
                 Spacer().frame(height: 10)
 
                 SectionLabel("Collection")
@@ -194,7 +195,8 @@ struct ShareView: View {
         guard (try? FileManager.default.copyItem(at: fileURL, to: dest)) != nil else { return false }
 
         let entry = PendingEntry(id: importId, fileRelativePath: "pending_imports/\(filename)",
-                                 fileExtension: ext, isAudio: isAudio,
+                                 fileExtension: ext, originalFilename: originalName,
+                                 isAudio: isAudio,
                                  collectionId: col.id, collectionName: col.name,
                                  itemId: item.id, itemName: item.name, importedAt: Date())
 
@@ -232,8 +234,7 @@ private struct ShareHeader: View {
 
 // MARK: - FileInfoCard
 private struct FileInfoCard: View {
-    let fileURL: URL; let isAudio: Bool
-    private var ext: String { fileURL.pathExtension.lowercased() }
+    let filename: String; let isAudio: Bool; let ext: String
     private var icon: String { isAudio ? "mic.fill" : (ext == "pdf" ? "doc.fill" : "doc.text.fill") }
     private var color: Color { isAudio ? SC.pink : (ext == "pdf" ? SC.red : SC.cyan) }
     var body: some View {
@@ -244,7 +245,7 @@ private struct FileInfoCard: View {
                     .frame(width: 40, height: 40)
                 Image(systemName: icon).font(.system(size: 16)).foregroundColor(color)
             }
-            Text(fileURL.lastPathComponent)
+            Text(filename)
                 .font(.system(size: 13, weight: .semibold)).foregroundColor(.white)
                 .lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
         }

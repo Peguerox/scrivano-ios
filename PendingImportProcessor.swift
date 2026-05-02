@@ -40,28 +40,20 @@ final class PendingImportProcessor {
     }
 
     private func processEntry(_ entry: PendingImport, fileURL: URL) async -> Bool {
-        // Find or create collection — match by ID first, then by name as fallback
+        // Find or create collection
         let collection: ScrivanoCollection
         if let existing = LocalCollectionStore.shared.collections.first(where: { $0.id == entry.collectionId }) {
             collection = existing
-        } else if let byName = LocalCollectionStore.shared.collections.first(where: {
-            $0.name.lowercased() == entry.collectionName.lowercased()
-        }) {
-            collection = byName
         } else {
             let new = ScrivanoCollection(id: entry.collectionId, name: entry.collectionName)
             LocalCollectionStore.shared.save(new)
             collection = new
         }
 
-        // Find or create item — match by ID first, then by name+collection as fallback
+        // Find or create item
         let item: LocalStoredItem
         if let existing = LocalItemStore.shared.items.first(where: { $0.id == entry.itemId }) {
             item = existing
-        } else if let byName = LocalItemStore.shared.items.first(where: {
-            $0.name.lowercased() == entry.itemName.lowercased() && $0.collectionId == collection.id
-        }) {
-            item = byName
         } else {
             let new = LocalStoredItem(
                 id: entry.itemId,
@@ -97,7 +89,7 @@ final class PendingImportProcessor {
             relativePath: LocalRecordingStore.relativePath(of: dest),
             createdAt: Date(),
             durationSeconds: duration,
-            label: entry.originalFilename
+            label: fileURL.lastPathComponent
         )
         LocalRecordingStore.shared.add(recording)
         try? FileManager.default.removeItem(at: fileURL)
