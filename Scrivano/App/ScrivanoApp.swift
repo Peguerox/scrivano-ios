@@ -82,6 +82,8 @@ struct ScrivanoApp: App {
                 lifecycle.endBackgroundTask()
                 // Resume any note tasks that were in-flight when the app was killed.
                 NoteGenerationManager.shared.resumePendingNotes()
+                // Process any files imported via the Share Extension.
+                PendingImportProcessor.shared.process()
             }
         }
         .onChange(of: taskQueue.isProcessing) { processing in

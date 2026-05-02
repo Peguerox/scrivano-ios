@@ -25,6 +25,9 @@ final class AuthManager: ObservableObject {
         if let user = keychain.getUser(), keychain.getToken() != nil {
             self.currentUser = user
             self.isLoggedIn = true
+            AppGroup.setLoggedIn(true)
+            AppGroup.mirrorCollections()
+            AppGroup.mirrorItems()
             Task { await RevenueCatManager.shared.login(userId: user.email) }
         }
     }
@@ -201,6 +204,9 @@ final class AuthManager: ObservableObject {
         keychain.saveLastUserId(user.id)
         currentUser = user
         isLoggedIn = true
+        AppGroup.setLoggedIn(true)
+        AppGroup.mirrorCollections()
+        AppGroup.mirrorItems()
         Task { await RevenueCatManager.shared.login(userId: user.email) }
         Task { await refreshUser() }
 
@@ -236,6 +242,7 @@ final class AuthManager: ObservableObject {
         isLoggedIn = false
         errorMessage = nil
         unverifiedEmail = nil
+        AppGroup.setLoggedIn(false)
         Task { await RevenueCatManager.shared.logout() }
     }
 
@@ -246,6 +253,7 @@ final class AuthManager: ObservableObject {
         isLoggedIn = false
         errorMessage = nil
         unverifiedEmail = nil
+        AppGroup.setLoggedIn(false)
         Task { await RevenueCatManager.shared.logout() }
     }
 

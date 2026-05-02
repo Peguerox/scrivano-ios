@@ -102,16 +102,18 @@ final class LocalCollectionStore {
             collections.append(collection)
         }
         persist()
+        AppGroup.mirrorCollections()
     }
 
     func delete(_ id: String) {
         collections.removeAll { $0.id == id }
         persist()
+        AppGroup.mirrorCollections()
     }
 
     func all() -> [ScrivanoCollection] { collections }
 
-    func clearAll() { collections.removeAll(); persist() }
+    func clearAll() { collections.removeAll(); persist(); AppGroup.mirrorCollections() }
 
     private func load() {
         guard let data = try? Data(contentsOf: storeURL),
@@ -571,16 +573,18 @@ final class LocalItemStore {
         if let idx = items.firstIndex(where: { $0.id == item.id }) { items[idx] = item }
         else { items.insert(item, at: 0) }
         persist()
+        AppGroup.mirrorItems()
     }
 
     func delete(_ id: String) {
         items.removeAll { $0.id == id }
         persist()
+        AppGroup.mirrorItems()
     }
 
     func all() -> [LocalStoredItem] { items }
 
-    func clearAll() { items.removeAll(); persist() }
+    func clearAll() { items.removeAll(); persist(); AppGroup.mirrorItems() }
 
     /// Updates the stored collection name on all items belonging to the renamed collection.
     func renameCollection(_ collectionId: String, to newName: String) {
@@ -589,7 +593,7 @@ final class LocalItemStore {
             items[idx].collection = newName
             changed = true
         }
-        if changed { persist() }
+        if changed { persist(); AppGroup.mirrorItems() }
     }
 
     /// Removes the collection assignment from all items that belonged to the deleted collection.
@@ -600,7 +604,7 @@ final class LocalItemStore {
             items[idx].collection = nil
             changed = true
         }
-        if changed { persist() }
+        if changed { persist(); AppGroup.mirrorItems() }
     }
 
     private func load() {
