@@ -416,7 +416,13 @@ struct SettingsView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(user?.firstName ?? "User")
+                    Text({
+                        let fullName = [user?.firstName ?? "", user?.lastName ?? ""]
+                            .map { $0.trimmingCharacters(in: .whitespaces) }
+                            .filter { !$0.isEmpty }
+                            .joined(separator: " ")
+                        return fullName.isEmpty ? "User" : fullName
+                    }())
                         .font(.inter(15, weight: .bold))
                         .foregroundColor(.textPrimary)
                     Text(user?.email ?? "")

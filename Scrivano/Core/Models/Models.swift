@@ -5,6 +5,7 @@ struct User: Codable {
     let id: String
     let email: String
     var firstName: String
+    var lastName: String
     var plan: String
     var credit: Double
     var freeCredit: Double
@@ -12,11 +13,12 @@ struct User: Codable {
     enum CodingKeys: String, CodingKey {
         case id, email, plan, credit, name
         case firstName = "first_name"
+        case lastName  = "last_name"
         case freeCredit = "free_credit"
     }
 
-    init(id: String, email: String, firstName: String, plan: String, credit: Double, freeCredit: Double) {
-        self.id = id; self.email = email; self.firstName = firstName
+    init(id: String, email: String, firstName: String, lastName: String = "", plan: String, credit: Double, freeCredit: Double) {
+        self.id = id; self.email = email; self.firstName = firstName; self.lastName = lastName
         self.plan = plan; self.credit = credit; self.freeCredit = freeCredit
     }
 
@@ -29,6 +31,7 @@ struct User: Codable {
         plan       = (try? c.decode(String.self, forKey: .plan)) ?? "free"
         credit     = (try? c.decode(Double.self, forKey: .credit)) ?? 0
         freeCredit = (try? c.decode(Double.self, forKey: .freeCredit)) ?? 0
+        lastName   = (try? c.decode(String.self, forKey: .lastName)) ?? ""
         if let fn = try? c.decode(String.self, forKey: .firstName), !fn.isEmpty {
             firstName = fn
         } else {
@@ -41,6 +44,7 @@ struct User: Codable {
         try c.encode(id,         forKey: .id)
         try c.encode(email,      forKey: .email)
         try c.encode(firstName,  forKey: .firstName)
+        try c.encode(lastName,   forKey: .lastName)
         try c.encode(plan,       forKey: .plan)
         try c.encode(credit,     forKey: .credit)
         try c.encode(freeCredit, forKey: .freeCredit)

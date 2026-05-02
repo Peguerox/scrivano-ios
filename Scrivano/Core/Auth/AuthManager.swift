@@ -257,12 +257,16 @@ final class AuthManager: ObservableObject {
             let freeCredit: Double?
             let currentPlan: String?
             let hasOpenAIKey: Bool?
+            let firstName: String?
+            let lastName: String?
             enum CodingKeys: String, CodingKey {
                 case success
                 case userCredit   = "user_credit"
                 case freeCredit   = "free_credit"
                 case currentPlan  = "current_plan"
                 case hasOpenAIKey = "has_openai_key"
+                case firstName    = "first_name"
+                case lastName     = "last_name"
             }
         }
         do {
@@ -279,6 +283,8 @@ final class AuthManager: ObservableObject {
             if let paid = res.userCredit { user.credit = paid }
             if let free = res.freeCredit { user.freeCredit = free }
             if let plan = res.currentPlan { user.plan = plan }
+            if let fn = res.firstName, !fn.isEmpty { user.firstName = fn }
+            if let ln = res.lastName,  !ln.isEmpty { user.lastName  = ln }
             updateUser(user)
             if let keySet = res.hasOpenAIKey { hasOpenAIKey = keySet }
             appLog("[AUTH] refreshUser: paid=\(String(format: "%.4f", user.credit)) free=\(String(format: "%.4f", user.freeCredit))", level: .success)
