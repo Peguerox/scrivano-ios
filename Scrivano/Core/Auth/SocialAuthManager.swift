@@ -129,6 +129,7 @@ final class SocialAuthManager: NSObject, ObservableObject {
             id:          userJson?["id"] as? String ?? "",
             email:       userJson?["email"] as? String ?? "",
             firstName:   userJson?["first_name"] as? String ?? "",
+            lastName:    userJson?["last_name"] as? String ?? "",
             plan:        userJson?["plan"] as? String ?? "free",
             credit:      userJson?["credit"] as? Double ?? 0,
             freeCredit:  userJson?["free_credit"] as? Double ?? 0
