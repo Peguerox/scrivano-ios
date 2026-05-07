@@ -444,6 +444,7 @@ struct LocalNoteRow: View {
     @State private var showMoreInfo = false
     @State private var showMoveTo = false
     @State private var showDraftPrompts = false
+    @State private var showShareOptions = false
 
     private var wordCount: String {
         let words = note.text.split(separator: " ").count
@@ -503,7 +504,9 @@ struct LocalNoteRow: View {
                         Button { showDraftPrompts = true } label: { Label(langMgr.t("notes.draftNote"), systemImage: "note.text") }
                     }
                     Section(langMgr.t("common.section.share")) {
-                        ShareLink(item: note.text) { Label(langMgr.t("common.shareEllipsis"), systemImage: "square.and.arrow.up") }
+                        Button { showShareOptions = true } label: {
+                            Label(langMgr.t("common.shareEllipsis"), systemImage: "square.and.arrow.up")
+                        }
                     }
                     Section(langMgr.t("common.section.manage")) {
                         Button { onRenameRequested() } label: { Label(langMgr.t("common.rename"), systemImage: "pencil") }
@@ -539,6 +542,31 @@ struct LocalNoteRow: View {
                 transcriptIds: [note.id]
             ))
         }
+        .confirmationDialog(langMgr.t("common.share.note"), isPresented: $showShareOptions, titleVisibility: .visible) {
+            Button(langMgr.t("common.share.asPDF")) { generateAndSharePDF() }
+            Button(langMgr.t("common.share.asRawText")) { shareNoteRawText() }
+            Button(langMgr.t("common.cancel"), role: .cancel) {}
+        }
+    }
+
+    private func generateAndSharePDF() {
+        let html = MarkdownWebView.buildPrintHTML(note.text)
+        PDFExporter.makePDF(fromHTML: html, title: note.label) { url in
+            guard let url else { return }
+            guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                  var top = scene.windows.first?.rootViewController else { return }
+            while let presented = top.presentedViewController { top = presented }
+            let vc = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+            top.present(vc, animated: true)
+        }
+    }
+
+    private func shareNoteRawText() {
+        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              var top = scene.windows.first?.rootViewController else { return }
+        while let presented = top.presentedViewController { top = presented }
+        let vc = UIActivityViewController(activityItems: [note.text], applicationActivities: nil)
+        top.present(vc, animated: true)
     }
 }
 
@@ -551,8 +579,9 @@ struct NoteViewerEditorView: View {
     @ObservedObject private var langMgr = LanguageManager.shared
     @State private var editedText: String
     @State private var showSaveCard = false
-    @State private var showMarkdown = false
+    @State private var showMarkdown = true
     @State private var isGeneratingPDF = false
+    @State private var showViewerShareOptions = false
 
     init(note: LocalNoteEntry, onSaved: ((String) -> Void)? = nil) {
         self.note = note
@@ -594,7 +623,7 @@ struct NoteViewerEditorView: View {
                 .overlay(alignment: .trailing) {
                     HStack(spacing: 8) {
                         if showMarkdown {
-                            Button { generatePDF() } label: {
+                            Button { showViewerShareOptions = true } label: {
                                 Image(systemName: "square.and.arrow.up")
                                     .font(.system(size: 14))
                                     .foregroundColor(.stageNotes)
@@ -691,6 +720,19 @@ struct NoteViewerEditorView: View {
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: showSaveCard)
         .navigationBarHidden(true)
+        .confirmationDialog(langMgr.t("common.share.note"), isPresented: $showViewerShareOptions, titleVisibility: .visible) {
+            Button(langMgr.t("common.share.asPDF")) { generatePDF() }
+            Button(langMgr.t("common.share.asRawText")) { shareViewerRawText() }
+            Button(langMgr.t("common.cancel"), role: .cancel) {}
+        }
+    }
+
+    private func shareViewerRawText() {
+        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              var top = scene.windows.first?.rootViewController else { return }
+        while let presented = top.presentedViewController { top = presented }
+        let vc = UIActivityViewController(activityItems: [editedText], applicationActivities: nil)
+        top.present(vc, animated: true)
     }
 }
 

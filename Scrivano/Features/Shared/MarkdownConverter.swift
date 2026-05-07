@@ -160,6 +160,25 @@ enum MarkdownConverter {
     private static func inline(_ text: String) -> String {
         var s = text.htmlEscaped
 
+        // Restore safe inline HTML tags that were escaped by htmlEscaped
+        s = s.replacingOccurrences(of: "&lt;u&gt;",        with: "<u>")
+        s = s.replacingOccurrences(of: "&lt;/u&gt;",       with: "</u>")
+        s = s.replacingOccurrences(of: "&lt;mark&gt;",     with: "<mark>")
+        s = s.replacingOccurrences(of: "&lt;/mark&gt;",    with: "</mark>")
+        s = s.replacingOccurrences(of: "&lt;b&gt;",        with: "<b>")
+        s = s.replacingOccurrences(of: "&lt;/b&gt;",       with: "</b>")
+        s = s.replacingOccurrences(of: "&lt;strong&gt;",   with: "<strong>")
+        s = s.replacingOccurrences(of: "&lt;/strong&gt;",  with: "</strong>")
+        s = s.replacingOccurrences(of: "&lt;em&gt;",       with: "<em>")
+        s = s.replacingOccurrences(of: "&lt;/em&gt;",      with: "</em>")
+        s = s.replacingOccurrences(of: "&lt;br&gt;",       with: "<br>")
+        s = s.replacingOccurrences(of: "&lt;br /&gt;",     with: "<br>")
+        s = s.replacingOccurrences(of: "&lt;/span&gt;",    with: "</span>")
+        s = s.replacingOccurrences(
+            of: #"&lt;span style=&quot;([^&"]+)&quot;&gt;"#,
+            with: "<span style=\"$1\">",
+            options: .regularExpression)
+
         // Images — before links so ![...](url) isn't eaten by link regex
         s = s.replacingOccurrences(of: #"!\[([^\]]*)\]\(([^\)]+)\)"#,
                                    with: "<img src=\"$2\" alt=\"$1\">",

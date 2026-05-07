@@ -89,6 +89,7 @@ struct PromptsView: View {
 
     // MARK: - Favorites
     @AppStorage("favoritePromptIds") private var favoriteIdsRaw: String = ""
+    @AppStorage("defaultFavoritesSeeded") private var defaultFavoritesSeeded: Bool = false
 
     @AppStorage("auto_note_prompts_encoded") private var autoNotePromptsEncoded: String = ""
 
@@ -622,11 +623,41 @@ struct PromptsView: View {
         defer { isLoading = false }
         do {
             let res = try await APIClient.shared.request(path: "/api/prompts", responseType: PromptsResponse.self)
-            if res.success { prompts = res.data }
+            if res.success {
+                prompts = res.data
+                seedDefaultFavoritesIfNeeded(from: res.data)
+            }
         } catch {
-            if error is CancellationError || (error as NSError).code == NSURLErrorCancelled { return }
+            let nsErr = error as NSError
+            let isCancelled = error is CancellationError
+                || nsErr.code == NSURLErrorCancelled
+                || (nsErr.domain == NSURLErrorDomain && nsErr.code == -999)
+                || error.localizedDescription.lowercased().contains("cancel")
+            if isCancelled {
+                // Retry in a fresh task that won't be cancelled by the refreshable gesture
+                Task {
+                    await MainActor.run { self.isLoading = true }
+                    do {
+                        let res = try await APIClient.shared.request(path: "/api/prompts", responseType: PromptsResponse.self)
+                        await MainActor.run { if res.success { self.prompts = res.data } }
+                    } catch {}
+                    await MainActor.run { self.isLoading = false }
+                }
+                return
+            }
             self.error = error.localizedDescription
         }
+    }
+
+    private func seedDefaultFavoritesIfNeeded(from allPrompts: [Prompt]) {
+        guard !defaultFavoritesSeeded else { return }
+        defaultFavoritesSeeded = true
+        let defaultNames = ["executive summary", "executive summary pdf"]
+        let matches = allPrompts.filter { defaultNames.contains($0.name.lowercased()) }
+        guard !matches.isEmpty else { return }
+        var ids = favoriteIds
+        matches.forEach { ids.insert($0.id) }
+        favoriteIdsRaw = ids.joined(separator: ",")
     }
 
     private func apply(prompt: Prompt) async {

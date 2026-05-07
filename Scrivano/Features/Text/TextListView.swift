@@ -1,6 +1,5 @@
 import SwiftUI
 import UniformTypeIdentifiers
-import MarkdownUI
 
 struct TextFile: Identifiable, Codable {
     let id: String
@@ -746,6 +745,7 @@ struct LocalTextRow: View {
     @State private var showMoveTo = false
     @State private var showDraftPrompts = false
     @State private var hourglassFlipped = false
+    @State private var showShareOptions = false
 
     private var wordCount: String {
         let words = transcript.text.split(separator: " ").count
@@ -841,7 +841,9 @@ struct LocalTextRow: View {
                         Button { showDraftPrompts = true } label: { Label(langMgr.t("notes.draftNote"), systemImage: "note.text") }
                     }
                     Section(langMgr.t("common.section.share")) {
-                        ShareLink(item: transcript.text) { Label(langMgr.t("common.shareEllipsis"), systemImage: "square.and.arrow.up") }
+                        Button { showShareOptions = true } label: {
+                            Label(langMgr.t("common.shareEllipsis"), systemImage: "square.and.arrow.up")
+                        }
                     }
                     if !transcript.isMerge {
                         Section(langMgr.t("common.section.manage")) {
@@ -881,6 +883,31 @@ struct LocalTextRow: View {
                 transcriptIds: [transcript.id]
             ))
         }
+        .confirmationDialog(langMgr.t("common.share.text"), isPresented: $showShareOptions, titleVisibility: .visible) {
+            Button(langMgr.t("common.share.asPDF")) { generateAndSharePDF() }
+            Button(langMgr.t("common.share.asRawText")) { shareTranscriptRawText() }
+            Button(langMgr.t("common.cancel"), role: .cancel) {}
+        }
+    }
+
+    private func generateAndSharePDF() {
+        let html = MarkdownWebView.buildPrintHTML(transcript.text)
+        PDFExporter.makePDF(fromHTML: html, title: transcript.label) { url in
+            guard let url else { return }
+            guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                  var top = scene.windows.first?.rootViewController else { return }
+            while let presented = top.presentedViewController { top = presented }
+            let vc = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+            top.present(vc, animated: true)
+        }
+    }
+
+    private func shareTranscriptRawText() {
+        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              var top = scene.windows.first?.rootViewController else { return }
+        while let presented = top.presentedViewController { top = presented }
+        let vc = UIActivityViewController(activityItems: [transcript.text], applicationActivities: nil)
+        top.present(vc, animated: true)
     }
 }
 
@@ -894,8 +921,10 @@ struct TranscriptViewerView: View {
     @ObservedObject private var langMgr = LanguageManager.shared
     @State private var editedText: String
     @State private var showSaveCard = false
-    @State private var showMarkdown = false
+    @State private var showMarkdown = true
     @State private var showMergeWarning = false
+    @State private var showViewerShareOptions = false
+    @State private var isGeneratingPDF = false
 
     init(transcript: TranscriptSummary, onSaved: ((String) -> Void)? = nil) {
         self.transcript = transcript
@@ -920,29 +949,35 @@ struct TranscriptViewerView: View {
                 .overlay(alignment: .bottom) {
                     Rectangle().fill((transcript.isMerge ? Color.brandCyan : Color.stageText).opacity(0.4)).frame(height: 1)
                 }
+                .padding(.trailing, showMarkdown ? 88 : 54)
                 .overlay(alignment: .trailing) {
-                    Button { withAnimation(.easeInOut(duration: 0.2)) { showMarkdown.toggle() } } label: {
-                        Image(systemName: showMarkdown ? "doc.richtext.fill" : "doc.richtext")
-                            .font(.system(size: 15))
-                            .foregroundColor(showMarkdown ? .stageText : .textSecondary)
-                            .frame(width: 36, height: 36)
-                            .background(showMarkdown ? Color.stageText.opacity(0.15) : Color.white.opacity(0.07))
-                            .overlay(Circle().stroke(Color.white.opacity(0.1), lineWidth: 1))
-                            .clipShape(Circle())
+                    HStack(spacing: 8) {
+                        if showMarkdown {
+                            Button { showViewerShareOptions = true } label: {
+                                Image(systemName: "square.and.arrow.up")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.stageText)
+                                    .frame(width: 36, height: 36)
+                                    .background(Color.stageText.opacity(0.12))
+                                    .overlay(Circle().stroke(Color.stageText.opacity(0.3), lineWidth: 1))
+                                    .clipShape(Circle())
+                            }
+                        }
+                        Button { withAnimation(.easeInOut(duration: 0.2)) { showMarkdown.toggle() } } label: {
+                            Image(systemName: showMarkdown ? "doc.richtext.fill" : "doc.richtext")
+                                .font(.system(size: 15))
+                                .foregroundColor(showMarkdown ? .stageText : .textSecondary)
+                                .frame(width: 36, height: 36)
+                                .background(showMarkdown ? Color.stageText.opacity(0.15) : Color.white.opacity(0.07))
+                                .overlay(Circle().stroke(Color.white.opacity(0.1), lineWidth: 1))
+                                .clipShape(Circle())
+                        }
                     }
                     .padding(.trailing, 18)
                 }
 
                 if showMarkdown {
-                    ScrollView {
-                        Markdown(editedText)
-                            .markdownTheme(.gitHub)
-                            .environment(\.colorScheme, .light)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 16)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .background(Color.white)
+                    MarkdownWebView(markdown: editedText, theme: .light)
                 } else if transcript.isMerge {
                     ScrollView {
                         Text(editedText)
@@ -1075,6 +1110,40 @@ struct TranscriptViewerView: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: showSaveCard)
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: showMergeWarning)
         .navigationBarHidden(true)
+        .confirmationDialog(langMgr.t("common.share.text"), isPresented: $showViewerShareOptions, titleVisibility: .visible) {
+            Button(langMgr.t("common.share.asPDF")) { generateViewerPDF() }
+            Button(langMgr.t("common.share.asRawText")) { shareViewerRawText() }
+            Button(langMgr.t("common.cancel"), role: .cancel) {}
+        }
+        .overlay {
+            if isGeneratingPDF {
+                Color.black.opacity(0.55).ignoresSafeArea().zIndex(20)
+                ProgressView().tint(.stageText).scaleEffect(1.4).zIndex(21)
+            }
+        }
+    }
+
+    @MainActor
+    private func generateViewerPDF() {
+        isGeneratingPDF = true
+        let html = MarkdownWebView.buildPrintHTML(editedText)
+        PDFExporter.makePDF(fromHTML: html, title: transcript.label) { url in
+            isGeneratingPDF = false
+            guard let url else { return }
+            guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                  var top = scene.windows.first?.rootViewController else { return }
+            while let presented = top.presentedViewController { top = presented }
+            let vc = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+            top.present(vc, animated: true)
+        }
+    }
+
+    private func shareViewerRawText() {
+        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              var top = scene.windows.first?.rootViewController else { return }
+        while let presented = top.presentedViewController { top = presented }
+        let vc = UIActivityViewController(activityItems: [editedText], applicationActivities: nil)
+        top.present(vc, animated: true)
     }
 }
 

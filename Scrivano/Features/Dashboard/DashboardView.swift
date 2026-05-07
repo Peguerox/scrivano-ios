@@ -55,6 +55,7 @@ struct DashboardView: View {
     @State private var processType: ProcessType = .audio
     @State private var processItemsSelected = Set<String>()
     @State private var showProcessItemsPrompts = false
+    @State private var pendingAutoSubmit = false
 
     // Rename / Delete collection
     @State private var showDeleteCollectionCard    = false
@@ -97,9 +98,15 @@ struct DashboardView: View {
             .onReceive(NotificationCenter.default.publisher(for: .scrivanoBackupRestored)) { _ in
                 vm.refreshFromLocalStores()
             }
-            .onReceive(NotificationCenter.default.publisher(for: .pendingImportsDidFinish)) { _ in
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("scrivano.pendingImportsDone"))) { _ in
                 vm.refreshFromLocalStores()
             }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    vm.refreshFromLocalStores()
+                }
+            }
+
     }
 
     private var withSheets: some View {
@@ -133,9 +140,10 @@ struct DashboardView: View {
                     PromptsView(context: .browse)
                 }
                 .fullScreenCover(isPresented: $showProcessItemsPrompts, onDismiss: {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-                        showProcessItemsMode = false
-                        processItemsSelected.removeAll()
+                    showProcessItemsMode = false
+                    processItemsSelected.removeAll()
+                    if autoUpload && (taskQueue.isProcessing || taskQueue.pendingCount > 0) {
+                        pendingAutoSubmit = true
                     }
                 }) {
                     let mergeEntries: [(text: String, id: String, itemId: String)] = displayedItems
@@ -186,9 +194,14 @@ struct DashboardView: View {
             }
             .onAppear { withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) { fabPulse = true } }
             .onChange(of: recorder.lastSavedItemId) { _ in vm.refreshLocalCounts() }
-            .onChange(of: notesMgr.completedItemIds) { newIds in
+            .onChange(of: notesMgr.completedItemIds) { _ in
                 vm.refreshFromLocalStores()
-                if autoUpload && !newIds.isEmpty { Task { await submitCollection() } }
+            }
+            .onChange(of: taskQueue.isProcessing) { isProcessing in
+                if !isProcessing && pendingAutoSubmit {
+                    pendingAutoSubmit = false
+                    Task { await submitCollection() }
+                }
             }
             saveToast
             if vm.isLoading || isSubmitting { LoadingOverlay() }
@@ -1347,40 +1360,38 @@ struct DashboardView: View {
                     Button {
                         processType = .text
                         processItemsSelected.removeAll()
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { showProcessItemsMode = true }
+                        showProcessItemsMode = true
                     } label: { Label(langMgr.t("dashboard.process.text"), systemImage: "text.alignleft") }
                     Button {
                         processType = .audio
                         processItemsSelected.removeAll()
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { showProcessItemsMode = true }
+                        showProcessItemsMode = true
                     } label: { Label(langMgr.t("dashboard.processAudio"), systemImage: "mic.fill") }
                 }
                 Section(langMgr.t("dashboard.section.collection")) {
                     Button { showCollectionNew = true } label: { Label(langMgr.t("dashboard.newCollection"), systemImage: "folder.badge.plus") }
                     Button {
                         renameCollectionText = vm.activeCollection?.name ?? ""
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showRenameCollectionCard = true }
+                        showRenameCollectionCard = true
                     } label: { Label(langMgr.t("dashboard.renameCollection"), systemImage: "pencil") }
                     .disabled(vm.activeCollection == nil)
                     Button(role: .destructive) {
                         guard vm.activeCollection != nil else {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showCollectionActiveError = true }
+                            showCollectionActiveError = true
                             return
                         }
                         guard vm.collections.count > 1 else {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showCollectionMinOne = true }
+                            showCollectionMinOne = true
                             return
                         }
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showDeleteCollectionCard = true }
+                        showDeleteCollectionCard = true
                     } label: { Label(langMgr.t("dashboard.deleteCollectionMenu"), systemImage: "trash") }
                 }
                 Section(langMgr.t("dashboard.section.utilities")) {
                     Button { showPromptDatabase = true } label: { Label(langMgr.t("settings.promptDatabase.title"), systemImage: "cylinder.split.1x2") }
                     Button {
                         createListResult = nil; createListError = nil; pendingListImage = nil
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showCreateListCard = true }
-                        }
+                        showCreateListCard = true
                     } label: { Label(langMgr.t("prompts.createList"), systemImage: "list.bullet.rectangle") }
                 }
             } label: {

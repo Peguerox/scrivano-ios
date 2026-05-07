@@ -758,6 +758,14 @@ struct MediaListView: View {
             }
         }
         .sheet(isPresented: $showRecorder) { RecordingView(item: item) }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("scrivano.pendingImportsDone"))) { _ in
+            localRecordings = LocalRecordingStore.shared.recordings(for: item.id)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                localRecordings = LocalRecordingStore.shared.recordings(for: item.id)
+            }
+        }
         // Advance audio queue when transcription completes or fails
         .onChange(of: transcriptionMgr.transcriptSaveCounter) { _ in
             if let rec = activeQueueItem, transcriptionMgr.transcribedRecordingIds.contains(rec.id) {

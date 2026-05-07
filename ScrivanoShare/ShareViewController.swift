@@ -13,26 +13,33 @@ class ShareViewController: UIViewController {
         guard let item = extensionContext?.inputItems.first as? NSExtensionItem,
               let provider = item.attachments?.first else { cancel(); return }
 
-        // Ordered: try audio types first, then documents
         let candidates: [(String, Bool)] = [
-            ("com.apple.m4a-audio",                                                       true),
-            ("public.mp3",                                                                true),
-            ("com.microsoft.waveform-audio",                                              true),
-            ("public.audio",                                                              true),
-            ("com.adobe.pdf",                                                             false),
-            ("org.openxmlformats.wordprocessingml.document",                              false),
-            ("public.plain-text",                                                         false),
-            ("public.data",                                                               false),
+            ("com.apple.m4a-audio",                                true),
+            ("public.mp3",                                         true),
+            ("com.microsoft.waveform-audio",                       true),
+            ("public.audio",                                       true),
+            ("com.adobe.pdf",                                      false),
+            ("org.openxmlformats.wordprocessingml.document",       false),
+            ("public.plain-text",                                  false),
+            ("public.data",                                        false),
         ]
 
         for (typeId, isAudio) in candidates where provider.hasItemConformingToTypeIdentifier(typeId) {
             let suggestedName = provider.suggestedName
+
             provider.loadFileRepresentation(forTypeIdentifier: typeId) { [weak self] url, _ in
                 guard let url else { DispatchQueue.main.async { self?.cancel() }; return }
                 let ext = url.pathExtension.isEmpty ? (isAudio ? "m4a" : "pdf") : url.pathExtension
-                // Prefer suggestedName (provider display name), fall back to actual URL filename
-                let originalName = suggestedName.map { $0.hasSuffix(".\(ext)") ? $0 : "\($0).\(ext)" }
-                    ?? url.lastPathComponent
+
+                // Use suggestedName if available; otherwise fall back to a clean generic name.
+                // Never use url.lastPathComponent — it is always a UUID temp copy from the system.
+                let originalName: String
+                if let name = suggestedName, !name.trimmingCharacters(in: .whitespaces).isEmpty {
+                    originalName = name.hasSuffix(".\(ext)") ? name : "\(name).\(ext)"
+                } else {
+                    originalName = "imported_file.\(ext)"
+                }
+
                 let tmp = FileManager.default.temporaryDirectory
                     .appendingPathComponent(UUID().uuidString + "." + ext)
                 try? FileManager.default.copyItem(at: url, to: tmp)

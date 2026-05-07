@@ -3,42 +3,45 @@ import WebKit
 
 final class PDFExporter {
 
-    // MARK: - HTML → paginated PDF (primary path)
+    // MARK: - HTML → PDF
 
-    /// Renders HTML in an off-screen WKWebView and exports a proper A4 PDF
-    /// using UIPrintPageRenderer — supports real pagination, images, tables, fonts.
+    /// Renders HTML in an off-screen WKWebView and exports a PDF using
+    /// WKWebView.createPDF() — preserves all colors, backgrounds, and styling
+    /// exactly as rendered on screen.
     static func makePDF(fromHTML html: String, title: String, completion: @escaping (URL?) -> Void) {
         DispatchQueue.main.async {
-            let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 595, height: 842))
+            let width: CGFloat = 595  // A4 width in points
+            let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: width, height: 1))
             webView.isOpaque = false
             webView.backgroundColor = .white
-            let delegate = PrintDelegate(title: title, completion: completion)
+            webView.scrollView.backgroundColor = .white
+            let delegate = PDFDelegate(title: title, completion: completion)
             webView.navigationDelegate = delegate
-            delegate.retain()                          // keep alive until done
+            delegate.retain()
             webView.loadHTMLString(html, baseURL: nil)
-            delegate.webView = webView                 // prevent dealloc
+            delegate.webView = webView
         }
     }
 
-    // MARK: - Print delegate
+    // MARK: - Delegate
 
-    private final class PrintDelegate: NSObject, WKNavigationDelegate {
+    private final class PDFDelegate: NSObject, WKNavigationDelegate {
         var webView: WKWebView?
         let title: String
         let completion: (URL?) -> Void
-        private static var pool = Set<PrintDelegate>()
+        private static var pool = Set<PDFDelegate>()
 
         init(title: String, completion: @escaping (URL?) -> Void) {
             self.title = title
             self.completion = completion
         }
 
-        func retain()  { PrintDelegate.pool.insert(self) }
-        func release() { PrintDelegate.pool.remove(self) }
+        func retain()  { PDFDelegate.pool.insert(self) }
+        func release() { PDFDelegate.pool.remove(self) }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            // Small delay to let JS finish rendering the markdown
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+            // Wait for JS markdown rendering to complete
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
                 self?.render(webView)
             }
         }
@@ -48,38 +51,27 @@ final class PDFExporter {
         }
 
         private func render(_ webView: WKWebView) {
-            let paperRect   = CGRect(x: 0, y: 0, width: 595, height: 842)   // A4
-            let printRect   = CGRect(x: 28, y: 28, width: 539, height: 786) // ~10mm margins
-
-            let renderer = UIPrintPageRenderer()
-            renderer.addPrintFormatter(webView.viewPrintFormatter(), startingAtPageAt: 0)
-            renderer.setValue(NSValue(cgRect: paperRect), forKey: "paperRect")
-            renderer.setValue(NSValue(cgRect: printRect), forKey: "printableRect")
-
-            let pdfData = NSMutableData()
-            UIGraphicsBeginPDFContextToData(pdfData, paperRect, [
-                kCGPDFContextTitle as String: title
-            ])
-            renderer.prepare(forDrawingPages: NSMakeRange(0, renderer.numberOfPages))
-            let bounds = UIGraphicsGetPDFContextBounds()
-            for i in 0 ..< renderer.numberOfPages {
-                UIGraphicsBeginPDFPage()
-                renderer.drawPage(at: i, in: bounds)
+            let config = WKPDFConfiguration()
+            // No rect set → captures full scrollable content at actual rendered size
+            webView.createPDF(configuration: config) { [weak self] result in
+                guard let self else { return }
+                defer { self.release() }
+                switch result {
+                case .success(let data):
+                    let safe = self.title.replacingOccurrences(of: "/", with: "-")
+                    let url  = FileManager.default.temporaryDirectory
+                        .appendingPathComponent(safe)
+                        .appendingPathExtension("pdf")
+                    do {
+                        try data.write(to: url)
+                        DispatchQueue.main.async { self.completion(url) }
+                    } catch {
+                        DispatchQueue.main.async { self.completion(nil) }
+                    }
+                case .failure:
+                    DispatchQueue.main.async { self.completion(nil) }
+                }
             }
-            UIGraphicsEndPDFContext()
-
-            let safe = title.replacingOccurrences(of: "/", with: "-")
-            let url  = FileManager.default.temporaryDirectory
-                .appendingPathComponent(safe)
-                .appendingPathExtension("pdf")
-            do {
-                try pdfData.write(to: url)
-                DispatchQueue.main.async { self.completion(url) }
-            } catch {
-                print("[PDFExporter] write error: \(error)")
-                DispatchQueue.main.async { self.completion(nil) }
-            }
-            release()
         }
     }
 }
