@@ -9,6 +9,10 @@
       "filename" : "logo_signin_168px_2x.png",
       "idiom" : "universal",
       "scale" : "2x"
+    },
+    {
+      "idiom" : "universal",
+      "scale" : "3x"
     }
   ],
   "info" : {

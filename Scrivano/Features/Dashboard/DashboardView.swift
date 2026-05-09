@@ -142,8 +142,12 @@ struct DashboardView: View {
                 .fullScreenCover(isPresented: $showProcessItemsPrompts, onDismiss: {
                     showProcessItemsMode = false
                     processItemsSelected.removeAll()
-                    if autoUpload && (taskQueue.isProcessing || taskQueue.pendingCount > 0) {
-                        pendingAutoSubmit = true
+                    if autoUpload {
+                        if taskQueue.isProcessing || taskQueue.pendingCount > 0 {
+                            pendingAutoSubmit = true
+                        } else {
+                            Task { await submitCollection() }
+                        }
                     }
                 }) {
                     let mergeEntries: [(text: String, id: String, itemId: String)] = displayedItems
