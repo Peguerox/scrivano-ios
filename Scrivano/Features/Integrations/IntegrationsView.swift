@@ -1,4 +1,5 @@
 import SwiftUI
+import SafariServices
 
 struct IntegrationsView: View {
     @Environment(\.dismiss) var dismiss
@@ -7,6 +8,7 @@ struct IntegrationsView: View {
     @State private var selectedId: String? = nil
     @State private var showDropdown = false
     @State private var activeTab: IntTab = .request
+    @State private var oauthURL: URL? = nil
 
     private var selected: InstalledIntegration? {
         guard let id = selectedId else { return store.installed.first }
@@ -18,7 +20,11 @@ struct IntegrationsView: View {
             Color.phoneBg.ignoresSafeArea()
             VStack(spacing: 0) {
                 topBar
-                if store.installed.isEmpty {
+                if store.isLoadingCatalog && store.catalog.isEmpty {
+                    Spacer()
+                    ProgressView().tint(.brandCyan)
+                    Spacer()
+                } else if store.installed.isEmpty {
                     emptyState
                 } else {
                     integrationDropdown
@@ -35,6 +41,13 @@ struct IntegrationsView: View {
         }
         .onAppear {
             if selectedId == nil { selectedId = store.installed.first?.id }
+            Task { await store.fetchCatalog() }
+        }
+        .onChange(of: store.installed.count) { _ in
+            if selectedId == nil { selectedId = store.installed.first?.id }
+        }
+        .sheet(item: $oauthURL) { url in
+            SafariView(url: url)
         }
     }
 
@@ -197,9 +210,13 @@ struct IntegrationsView: View {
     private var tabContent: some View {
         if let integration = selected {
             switch activeTab {
-            case .auth:    AuthTabView(integration: integration)
-            case .request: RequestTabView(integration: integration)
-            case .log:     LogTabView(integrationId: integration.id)
+            case .auth:
+                AuthTabView(integration: integration, onOAuthURL: { url in oauthURL = url })
+            case .request:
+                RequestTabView(integration: integration)
+            case .log:
+                LogTabView(integrationId: integration.id)
+                    .onAppear { Task { await store.fetchLogs(integrationId: integration.id) } }
             }
         }
     }
@@ -209,16 +226,18 @@ struct IntegrationsView: View {
     private var emptyState: some View {
         VStack(spacing: 20) {
             Spacer()
-            Text("🔗")
-                .font(.system(size: 48))
+            Text("🔗").font(.system(size: 48))
             Text("No integrations installed")
-                .font(.inter(16, weight: .bold))
-                .foregroundColor(.textPrimary)
-            Text("Browse the catalog to add your first integration")
-                .font(.inter(13))
-                .foregroundColor(.textSecondary)
-                .multilineTextAlignment(.center)
-            CatalogPillView()
+                .font(.inter(16, weight: .bold)).foregroundColor(.textPrimary)
+            if let err = store.catalogError {
+                Text(err).font(.inter(12)).foregroundColor(.danger).multilineTextAlignment(.center)
+                Button("Retry") { Task { await store.fetchCatalog() } }
+                    .font(.inter(13, weight: .bold)).foregroundColor(.brandCyan)
+            } else {
+                Text("Browse the catalog to add your first integration")
+                    .font(.inter(13)).foregroundColor(.textSecondary).multilineTextAlignment(.center)
+            }
+            CatalogPillView(onInstall: { url in oauthURL = url })
                 .padding(.horizontal, 18)
             Spacer()
         }
@@ -290,18 +309,19 @@ extension ConnectionState {
 
 struct AuthTabView: View {
     let integration: InstalledIntegration
+    var onOAuthURL: ((URL?) -> Void)? = nil
     @ObservedObject private var store = IntegrationStore.shared
     @State private var showDisconnectConfirm = false
+    @State private var showUninstallConfirm = false
+    @State private var isReconnecting = false
+    @State private var isUninstalling = false
+    @State private var actionError: String? = nil
 
-    private var fmt: DateFormatter {
-        let f = DateFormatter()
-        f.dateStyle = .none; f.timeStyle = .short
-        return f
+    private var timeFmt: DateFormatter {
+        let f = DateFormatter(); f.dateStyle = .none; f.timeStyle = .short; return f
     }
     private var dateTimeFmt: DateFormatter {
-        let f = DateFormatter()
-        f.dateStyle = .medium; f.timeStyle = .short
-        return f
+        let f = DateFormatter(); f.dateStyle = .medium; f.timeStyle = .short; return f
     }
 
     var body: some View {
@@ -309,7 +329,6 @@ struct AuthTabView: View {
             VStack(spacing: 11) {
 
                 if integration.connectionState == .connected {
-                    // Account card
                     infoCard(label: "Account") {
                         if let email = integration.accountEmail {
                             infoRow(label: "User", value: email)
@@ -318,50 +337,43 @@ struct AuthTabView: View {
                             infoRow(label: "Organization", value: org, isLast: false)
                         }
                         if let date = integration.lastAuthDate {
-                            infoRow(label: "Last auth", value: "Today, \(fmt.string(from: date))", badge: "Active", isLast: true)
+                            infoRow(label: "Last auth", value: timeFmt.string(from: date), badge: "Active", isLast: true)
                         }
                     }
-
-                    // Token card
-                    infoCard(label: "Token") {
-                        if let preview = integration.tokenPreview {
-                            infoRow(label: "Bearer", value: preview, mono: true, actionLabel: "Refresh", isLast: false)
-                        }
-                        if let expiry = integration.tokenExpiry {
-                            let diff = expiry.timeIntervalSince(Date())
-                            let hrs  = Int(diff / 3600)
-                            infoRow(label: "Expires", value: "\(dateTimeFmt.string(from: expiry)) · \(hrs) hrs", isLast: false)
-                        }
-                        if let scopes = integration.tokenScopes {
-                            infoRow(label: "Scope", value: scopes, isLast: true)
+                    if integration.tokenPreview != nil || integration.tokenExpiry != nil {
+                        infoCard(label: "Token") {
+                            if let preview = integration.tokenPreview {
+                                infoRow(label: "Bearer", value: preview, mono: true, isLast: integration.tokenExpiry == nil)
+                            }
+                            if let expiry = integration.tokenExpiry {
+                                let hrs = max(0, Int(expiry.timeIntervalSince(Date()) / 3600))
+                                infoRow(label: "Expires", value: "\(dateTimeFmt.string(from: expiry)) · \(hrs) hrs", isLast: true)
+                            }
                         }
                     }
-
-                    // Buttons
-                    actionButton("Reconnect", style: .ghost) {}
+                    actionButton("Reconnect", style: .ghost, loading: isReconnecting) { triggerReconnect() }
                     actionButton("Disconnect", style: .danger) { showDisconnectConfirm = true }
                 } else {
-                    // Not connected
                     VStack(spacing: 16) {
-                        Text(integration.connectionState == .expired ? "🔑" : "🔌")
-                            .font(.system(size: 36))
+                        Text(integration.connectionState == .expired ? "🔑" : "🔌").font(.system(size: 36))
                         Text(integration.connectionState == .expired ? "Token Expired" : "Not Connected")
-                            .font(.inter(15, weight: .bold))
-                            .foregroundColor(.textPrimary)
+                            .font(.inter(15, weight: .bold)).foregroundColor(.textPrimary)
                         Text(integration.connectionState == .expired
                              ? "Your session has expired. Reconnect to continue."
                              : "Connect to start pulling and pushing data.")
-                            .font(.inter(13))
-                            .foregroundColor(.textSecondary)
-                            .multilineTextAlignment(.center)
+                            .font(.inter(13)).foregroundColor(.textSecondary).multilineTextAlignment(.center)
                     }
                     .padding(.vertical, 24)
-
-                    actionButton("Connect", style: .primary) { simulateConnect() }
+                    actionButton("Connect", style: .primary, loading: isReconnecting) { triggerReconnect() }
                 }
 
-                // Catalog pill always at bottom of Auth tab
-                CatalogPillView()
+                if let err = actionError {
+                    Text(err).font(.inter(11)).foregroundColor(.danger).multilineTextAlignment(.center)
+                }
+
+                actionButton("Uninstall", style: .ghost, loading: isUninstalling) { showUninstallConfirm = true }
+
+                CatalogPillView(onInstall: onOAuthURL)
                     .padding(.top, 8)
 
                 Spacer().frame(height: 24)
@@ -370,26 +382,35 @@ struct AuthTabView: View {
             .padding(.top, 16)
         }
         .confirmationDialog("Disconnect \(integration.config.name)?",
-                            isPresented: $showDisconnectConfirm,
-                            titleVisibility: .visible) {
-            Button("Disconnect", role: .destructive) {
-                IntegrationStore.shared.disconnect(id: integration.id)
+                            isPresented: $showDisconnectConfirm, titleVisibility: .visible) {
+            Button("Disconnect", role: .destructive) { store.disconnect(id: integration.id) }
+            Button("Cancel", role: .cancel) {}
+        }
+        .confirmationDialog("Uninstall \(integration.config.name)?",
+                            isPresented: $showUninstallConfirm, titleVisibility: .visible) {
+            Button("Uninstall", role: .destructive) {
+                isUninstalling = true
+                Task {
+                    try? await store.uninstall(integrationId: integration.id)
+                    isUninstalling = false
+                }
             }
             Button("Cancel", role: .cancel) {}
         }
     }
 
-    // Stub — real implementation will open OAuth WebView
-    private func simulateConnect() {
-        var updated = integration
-        updated.connectionState = .connected
-        updated.accountEmail = "user@example.com"
-        updated.accountOrganization = "Demo Organization"
-        updated.tokenPreview = "ey7f…xK9p"
-        updated.tokenExpiry = Date().addingTimeInterval(6 * 3600)
-        updated.tokenScopes = "patient/*.read write"
-        updated.lastAuthDate = Date()
-        store.updateConnection(updated)
+    private func triggerReconnect() {
+        isReconnecting = true
+        actionError = nil
+        Task {
+            do {
+                let url = try await store.install(integrationId: integration.id)
+                onOAuthURL?(url)
+            } catch {
+                actionError = error.localizedDescription
+            }
+            isReconnecting = false
+        }
     }
 
     @ViewBuilder
@@ -443,28 +464,28 @@ struct AuthTabView: View {
         }
     }
 
-    enum ButtonStyle { case ghost, danger, primary }
+    enum AuthButtonStyle { case ghost, danger, primary }
 
     @ViewBuilder
-    private func actionButton(_ title: String, style: ButtonStyle, action: @escaping () -> Void) -> some View {
+    private func actionButton(_ title: String, style: AuthButtonStyle, loading: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(title)
-                .font(.inter(13, weight: .bold))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 13)
-                .foregroundColor(style == .danger ? Color(hex: "#f87171") : style == .primary ? .white : Color.white.opacity(0.6))
+            Group {
+                if loading { ProgressView().tint(style == .primary ? .white : .brandCyan).scaleEffect(0.8) }
+                else {
+                    Text(title).font(.inter(13, weight: .bold))
+                        .foregroundColor(style == .danger ? Color(hex: "#f87171") : style == .primary ? .white : Color.white.opacity(0.6))
+                }
+            }
+            .frame(maxWidth: .infinity).padding(.vertical, 13)
         }
+        .disabled(loading)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(style == .danger ? Color(hex: "#f87171").opacity(0.08) :
-                      style == .primary ? Color.brandBlue.opacity(0.5) :
-                      Color.white.opacity(0.05))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(style == .danger ? Color(hex: "#f87171").opacity(0.2) :
-                                style == .primary ? Color.brandCyan.opacity(0.3) :
-                                Color.white.opacity(0.1), lineWidth: 1)
-                )
+                      style == .primary ? Color.brandBlue.opacity(0.5) : Color.white.opacity(0.05))
+                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(style == .danger ? Color(hex: "#f87171").opacity(0.2) :
+                            style == .primary ? Color.brandCyan.opacity(0.3) : Color.white.opacity(0.1), lineWidth: 1))
         )
     }
 }
@@ -472,12 +493,15 @@ struct AuthTabView: View {
 // MARK: - CATALOG PILL
 
 struct CatalogPillView: View {
+    var onInstall: ((URL?) -> Void)? = nil
     @ObservedObject private var store = IntegrationStore.shared
     @State private var isOpen = false
     @State private var searchText = ""
+    @State private var installingId: String? = nil
+    @State private var installError: String? = nil
 
     private var filteredCatalog: [IntegrationConfig] {
-        let notInstalled = IntegrationStore.catalog.filter { cfg in
+        let notInstalled = store.catalog.filter { cfg in
             !store.installed.contains(where: { $0.id == cfg.id })
         }
         guard !searchText.isEmpty else { return notInstalled }
@@ -545,7 +569,7 @@ struct CatalogPillView: View {
                     .padding(.vertical, 12)
 
                     if filteredCatalog.isEmpty {
-                        Text(store.installed.count == IntegrationStore.catalog.count ? "All integrations installed" : "No results")
+                        Text(store.installed.count == store.catalog.count ? "All integrations installed" : "No results")
                             .font(.inter(12))
                             .foregroundColor(.textTertiary)
                             .padding(.vertical, 20)
@@ -576,33 +600,41 @@ struct CatalogPillView: View {
             Text(config.logoEmoji)
                 .font(.system(size: 18))
                 .frame(width: 38, height: 38)
-                .background(
-                    LinearGradient(
-                        colors: [Color(hex: config.logoColorStart), Color(hex: config.logoColorEnd)],
-                        startPoint: .topLeading, endPoint: .bottomTrailing
-                    )
-                )
+                .background(LinearGradient(colors: [Color(hex: config.logoColorStart), Color(hex: config.logoColorEnd)],
+                                           startPoint: .topLeading, endPoint: .bottomTrailing))
                 .overlay(RoundedRectangle(cornerRadius: 11).stroke(Color.brandCyan.opacity(0.2), lineWidth: 1))
                 .clipShape(RoundedRectangle(cornerRadius: 11))
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(config.name)
-                    .font(.inter(13, weight: .bold))
-                    .foregroundColor(.textPrimary)
-                Text(config.description)
-                    .font(.inter(11))
-                    .foregroundColor(.textTertiary)
-                    .lineLimit(2)
+                Text(config.name).font(.inter(13, weight: .bold)).foregroundColor(.textPrimary)
+                Text(config.description).font(.inter(11)).foregroundColor(.textTertiary).lineLimit(2)
+                if let err = installError, installingId == config.id {
+                    Text(err).font(.inter(10)).foregroundColor(.danger)
+                }
             }
             Spacer()
-            typeBadge(config.type)
+            if installingId == config.id {
+                ProgressView().tint(.brandCyan).scaleEffect(0.8)
+            } else {
+                typeBadge(config.type)
+            }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 11)
+        .padding(.horizontal, 14).padding(.vertical, 11)
         .contentShape(Rectangle())
         .onTapGesture {
-            store.install(config)
-            withAnimation { isOpen = false }
+            guard installingId == nil else { return }
+            installingId = config.id
+            installError = nil
+            Task {
+                do {
+                    let oauthUrl = try await store.install(integrationId: config.id)
+                    withAnimation { isOpen = false }
+                    onInstall?(oauthUrl)
+                } catch {
+                    installError = error.localizedDescription
+                }
+                installingId = nil
+            }
         }
     }
 
@@ -982,19 +1014,37 @@ struct RequestTabView: View {
     private func submitRequest() {
         guard canSubmit else { return }
         isRequesting = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            let contentNames = pullContent.filter { selectedContent.contains($0.id) }.map(\.label)
-            let targetName = isPull
-                ? (pullTargets.first(where: { $0.id == selectedTarget })?.label ?? selectedTarget)
-                : (pushTargets.first(where: { $0.id == selectedPushTarget })?.label ?? selectedPushTarget)
-            let entry = IntegrationLogEntry(
-                id: UUID().uuidString, integrationId: integration.id, integrationName: integration.config.name,
-                action: isPull ? .pull : .push, targetLabel: targetName, contentLabels: contentNames,
-                destinationName: isPull ? (destMode == .newCollection ? "New collection" : "Existing collection") : nil,
-                resultSummary: isPull ? "Request sent to server" : "Push sent to server",
-                status: .success, errorMessage: nil, date: Date()
-            )
-            IntegrationStore.shared.appendLog(entry)
+        Task {
+            do {
+                if isPull {
+                    _ = try await IntegrationStore.shared.pull(
+                        integrationId: integration.id,
+                        target: selectedTarget,
+                        content: Array(selectedContent),
+                        identifier: isSpecificTarget ? identifier : nil
+                    )
+                } else {
+                    // Push requires note content — for now sends a placeholder
+                    // Real implementation will let user pick a note from a collection
+                    _ = try await IntegrationStore.shared.push(
+                        integrationId: integration.id,
+                        noteText: "Note pushed from Scrivano",
+                        noteTitle: "Scrivano Note",
+                        ehrId: nil, mrn: identifier.isEmpty ? nil : identifier
+                    )
+                }
+            } catch {
+                // Log the error locally
+                IntegrationStore.shared.appendLog(IntegrationLogEntry(
+                    id: UUID().uuidString, integrationId: integration.id,
+                    integrationName: integration.config.name,
+                    action: isPull ? .pull : .push,
+                    targetLabel: isPull ? selectedTarget : selectedPushTarget,
+                    contentLabels: Array(selectedContent),
+                    destinationName: nil, resultSummary: nil,
+                    status: .error, errorMessage: error.localizedDescription, date: Date()
+                ))
+            }
             isRequesting = false
         }
     }
@@ -1119,4 +1169,18 @@ struct LogTabView: View {
         let f = DateFormatter(); f.dateStyle = .medium; f.timeStyle = .none
         return f.string(from: date)
     }
+}
+
+// MARK: - Safari WebView for OAuth
+
+extension URL: @retroactive Identifiable {
+    public var id: String { absoluteString }
+}
+
+struct SafariView: UIViewControllerRepresentable {
+    let url: URL
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        SFSafariViewController(url: url)
+    }
+    func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
 }
