@@ -57,7 +57,9 @@ struct ScrivanoApp: App {
                 .environmentObject(langMgr)
                 .preferredColorScheme(.dark)
                 .onOpenURL { url in
-                    if url.pathExtension == "scrivano" {
+                    if url.scheme == "scrivano", url.host == "oauth-callback" {
+                        handleOAuthCallback(url)
+                    } else if url.pathExtension == "scrivano" {
                         NotificationCenter.default.post(name: .scrivanoOpenBackupFile, object: url)
                     } else {
                         GIDSignIn.sharedInstance.handle(url)
@@ -95,6 +97,32 @@ struct ScrivanoApp: App {
             if !processing && !AudioRecorderManager.shared.isRecording {
                 lifecycle.endBackgroundTask()
             }
+        }
+    }
+
+    // MARK: - OAuth deep link handler
+
+    @MainActor
+    private func handleOAuthCallback(_ url: URL) {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let items = components.queryItems else { return }
+
+        let params = Dictionary(uniqueKeysWithValues: items.compactMap { item -> (String, String)? in
+            guard let value = item.value else { return nil }
+            return (item.name, value)
+        })
+
+        let success = params["success"] == "true"
+        let integrationId = params["integration"] ?? ""
+
+        NotificationCenter.default.post(
+            name: .integrationOAuthCallback,
+            object: nil,
+            userInfo: ["success": success, "integrationId": integrationId, "error": params["error"] ?? ""]
+        )
+
+        if success, !integrationId.isEmpty {
+            Task { await IntegrationStore.shared.markConnected(integrationId: integrationId) }
         }
     }
 }

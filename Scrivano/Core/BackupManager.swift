@@ -576,4 +576,5 @@ final class BackupManager: ObservableObject {
 extension Notification.Name {
     static let scrivanoBackupRestored  = Notification.Name("scrivano.backupRestored")
     static let scrivanoOpenBackupFile  = Notification.Name("scrivano.openBackupFile")
+    static let integrationOAuthCallback = Notification.Name("scrivano.integrationOAuthCallback")
 }

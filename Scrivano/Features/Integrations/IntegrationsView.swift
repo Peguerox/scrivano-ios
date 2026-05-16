@@ -9,6 +9,8 @@ struct IntegrationsView: View {
     @State private var showDropdown = false
     @State private var activeTab: IntTab = .request
     @State private var oauthURL: URL? = nil
+    @State private var oauthResultMessage: String? = nil
+    @State private var oauthResultSuccess: Bool = true
 
     private var selected: InstalledIntegration? {
         guard let id = selectedId else { return store.installed.first }
@@ -26,6 +28,21 @@ struct IntegrationsView: View {
                     Spacer()
                 } else {
                     integrationDropdown
+                    if let msg = oauthResultMessage {
+                        HStack(spacing: 8) {
+                            Image(systemName: oauthResultSuccess ? "checkmark.circle.fill" : "xmark.circle.fill")
+                                .foregroundColor(oauthResultSuccess ? .green : .danger)
+                            Text(msg)
+                                .font(.inter(12, weight: .semibold))
+                                .foregroundColor(oauthResultSuccess ? .green : .danger)
+                            Spacer()
+                            Button { oauthResultMessage = nil } label: {
+                                Image(systemName: "xmark").font(.system(size: 11)).foregroundColor(.textTertiary)
+                            }
+                        }
+                        .padding(.horizontal, 18).padding(.vertical, 10)
+                        .background(oauthResultSuccess ? Color.green.opacity(0.08) : Color.danger.opacity(0.08))
+                    }
                     tabBar
                         .opacity(store.installed.isEmpty ? 0.35 : 1)
                         .disabled(store.installed.isEmpty)
@@ -48,6 +65,31 @@ struct IntegrationsView: View {
         }
         .sheet(item: $oauthURL) { url in
             SafariView(url: url)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .integrationOAuthCallback)) { note in
+            let info = note.userInfo ?? [:]
+            let success = info["success"] as? Bool ?? false
+            let integrationId = info["integrationId"] as? String ?? ""
+            let errorMsg = info["error"] as? String ?? ""
+
+            // Dismiss the Safari sheet
+            oauthURL = nil
+
+            // Switch to the newly connected integration
+            if success, !integrationId.isEmpty {
+                selectedId = integrationId
+                activeTab = .auth
+                oauthResultSuccess = true
+                oauthResultMessage = "Connected successfully"
+            } else {
+                oauthResultSuccess = false
+                oauthResultMessage = errorMsg.isEmpty ? "Authentication failed" : errorMsg
+            }
+
+            // Auto-hide banner after 4 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
+                oauthResultMessage = nil
+            }
         }
     }
 

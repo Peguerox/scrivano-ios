@@ -71,6 +71,16 @@
 				<string>com.googleusercontent.apps.834233245975-a5kv77upuj67ksnckn0i4g8vjcs066ob</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>net.scrivano.oauth-callback</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>scrivano</string>
+			</array>
+		</dict>
 	</array>
 	<key>GIDClientID</key>
 	<string>834233245975-a5kv77upuj67ksnckn0i4g8vjcs066ob.apps.googleusercontent.com</string>
