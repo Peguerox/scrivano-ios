@@ -648,332 +648,24 @@ extension IntegrationType {
     }
 }
 
-// MARK: - REQUEST TAB
+// MARK: - Reusable row structs (proper structs = SwiftUI can diff and skip unchanged rows)
 
-struct RequestTabView: View {
-    let integration: InstalledIntegration
-    @ObservedObject private var store = IntegrationStore.shared
+struct IntRadioRow: View, Equatable {
+    let label: String
+    let subtitle: String
+    let icon: String?
+    let selected: Bool
+    let isLast: Bool
+    let action: () -> Void
 
-    @State private var mode: RequestMode = .pull
-    @State private var pill1Open = true
-    @State private var pill2Open = false
-    @State private var pill3Open = false
-
-    @State private var selectedTarget: String = ""
-    @State private var identifier: String = ""
-    @State private var selectedContent: Set<String> = []
-    @State private var destMode: DestMode = .newCollection
-    @State private var selectedPushTarget: String = ""
-
-    @State private var isRequesting = false
-    @State private var showSuccess = false
-
-    private var isPull: Bool { mode == .pull }
-
-    private var pullTargets: [IntegrationOption] { integration.config.pullTargets }
-    private var pushTargets: [IntegrationOption] { integration.config.pushTargets }
-    private var pullContent: [IntegrationOption] { integration.config.pullContent }
-
-    private var pill1Summary: String {
-        if isPull {
-            return pullTargets.first(where: { $0.id == selectedTarget })?.label ?? "Select option"
-        } else {
-            return pushTargets.first(where: { $0.id == selectedPushTarget })?.label ?? "Select option"
-        }
-    }
-    private var pill2Summary: String {
-        if selectedContent.isEmpty { return "None — list only" }
-        return pullContent.filter { selectedContent.contains($0.id) }.map { $0.label }.joined(separator: ", ")
-    }
-    private var pill3Summary: String {
-        isPull ? (destMode == .newCollection ? "New collection" : "Existing collection") : "Select collection"
+    static func == (l: Self, r: Self) -> Bool {
+        l.label == r.label && l.selected == r.selected && l.isLast == r.isLast
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 0) {
-                    // Pull / Push segmented control
-                    HStack(spacing: 3) {
-                        ForEach(RequestMode.allCases, id: \.self) { m in
-                            Button {
-                                withAnimation(.easeInOut(duration: 0.2)) { mode = m }
-                                resetSelections()
-                            } label: {
-                                Text(m.label)
-                                    .font(.inter(13, weight: .bold))
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 8)
-                                    .foregroundColor(mode == m ? .white : .textTertiary)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                            .fill(mode == m ? Color.brandBlue.opacity(0.35) : Color.clear)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                                    .stroke(mode == m ? Color.brandCyan.opacity(0.3) : Color.clear, lineWidth: 1)
-                                            )
-                                    )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .padding(3)
-                    .background(Color.white.opacity(0.06))
-                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .padding(.horizontal, 18)
-                    .padding(.top, 16)
-                    .padding(.bottom, 12)
-
-                    // Pill 1 — What to pull/push
-                    requestPill(
-                        id: "p1",
-                        icon: isPull ? "📥" : "📤",
-                        title: isPull ? "What to pull" : "What to push",
-                        summary: pill1Summary,
-                        isOpen: pill1Open,
-                        disabled: false
-                    ) {
-                        withAnimation(.easeInOut(duration: 0.25)) { pill1Open.toggle() }
-                    } content: {
-                        if isPull {
-                            ForEach(pullTargets) { opt in
-                                radioRow(label: opt.label, subtitle: opt.subtitle,
-                                         selected: selectedTarget == opt.id,
-                                         isLast: opt.id == pullTargets.last?.id) {
-                                    selectedTarget = opt.id
-                                    if opt.id != "specific_patient" && opt.id != "specific_client" && opt.id != "specific_contact" && opt.id != "specific" {
-                                        identifier = ""
-                                    }
-                                }
-                                if opt.id == "specific_patient" || opt.id == "specific_client" || opt.id == "specific_contact" || opt.id == "specific",
-                                   selectedTarget == opt.id {
-                                    identifierField
-                                }
-                            }
-                        } else {
-                            ForEach(pushTargets) { opt in
-                                radioRow(label: opt.label, subtitle: opt.subtitle,
-                                         selected: selectedPushTarget == opt.id,
-                                         isLast: opt.id == pushTargets.last?.id) {
-                                    selectedPushTarget = opt.id
-                                }
-                            }
-                        }
-                    }
-
-                    // Pill 2 — Pull content (disabled on Push)
-                    requestPill(
-                        id: "p2",
-                        icon: "📋",
-                        title: "Pull content",
-                        summary: pill2Summary,
-                        isOpen: pill2Open,
-                        disabled: !isPull
-                    ) {
-                        if isPull { withAnimation(.easeInOut(duration: 0.25)) { pill2Open.toggle() } }
-                    } content: {
-                        ForEach(pullContent) { opt in
-                            checkRow(label: opt.label, subtitle: opt.subtitle,
-                                     checked: selectedContent.contains(opt.id),
-                                     isLast: opt.id == pullContent.last?.id) {
-                                if selectedContent.contains(opt.id) {
-                                    selectedContent.remove(opt.id)
-                                } else {
-                                    selectedContent.insert(opt.id)
-                                }
-                            }
-                        }
-                    }
-
-                    // Pill 3 — Destination / Source
-                    requestPill(
-                        id: "p3",
-                        icon: isPull ? "📁" : "📤",
-                        title: isPull ? "Destination" : "Source",
-                        summary: pill3Summary,
-                        isOpen: pill3Open,
-                        disabled: false
-                    ) {
-                        withAnimation(.easeInOut(duration: 0.25)) { pill3Open.toggle() }
-                    } content: {
-                        if isPull {
-                            radioRow(label: "New collection",
-                                     subtitle: "\(integration.config.name) · \(shortDate())",
-                                     icon: "✨",
-                                     selected: destMode == .newCollection,
-                                     isLast: false) { destMode = .newCollection }
-                            radioRow(label: "Existing collection",
-                                     subtitle: "Choose from your collections",
-                                     icon: "📁",
-                                     selected: destMode == .existing,
-                                     isLast: true) { destMode = .existing }
-                        } else {
-                            HStack(spacing: 12) {
-                                Text("📂").font(.system(size: 17))
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Select collection")
-                                        .font(.inter(13, weight: .semibold))
-                                        .foregroundColor(.textPrimary)
-                                    Text("Choose which collection to push from")
-                                        .font(.inter(11))
-                                        .foregroundColor(.textTertiary)
-                                }
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.textTertiary)
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 13)
-                        }
-                    }
-
-                    Spacer().frame(height: 110)
-                }
-            }
-
-            // Request button
-            VStack(spacing: 0) {
-                LinearGradient(colors: [Color.phoneBg.opacity(0), Color.phoneBg],
-                               startPoint: .top, endPoint: .bottom)
-                    .frame(height: 32)
-                Button {
-                    submitRequest()
-                } label: {
-                    Group {
-                        if isRequesting {
-                            ProgressView().tint(.white)
-                        } else {
-                            Text("Request")
-                                .font(.inter(15, weight: .bold))
-                                .foregroundColor(.white)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 15)
-                    .background(
-                        LinearGradient(colors: [Color(hex: "#1e8ae0"), Color(hex: "#0d5faa")],
-                                       startPoint: .topLeading, endPoint: .bottomTrailing)
-                    )
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .disabled(isRequesting || !canSubmit)
-                .opacity(canSubmit ? 1 : 0.5)
-                .padding(.horizontal, 18)
-                .padding(.bottom, 28)
-            }
-            .background(Color.phoneBg)
-        }
-    }
-
-    private var canSubmit: Bool {
-        if integration.connectionState != .connected { return false }
-        if isPull { return !selectedTarget.isEmpty }
-        return !selectedPushTarget.isEmpty
-    }
-
-    private var identifierField: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Text((integration.config.identifierLabel ?? "ID").uppercased())
-                .font(.inter(10, weight: .heavy))
-                .foregroundColor(Color.brandCyan.opacity(0.7))
-                .tracking(0.8)
-            HStack {
-                TextField(integration.config.identifierPlaceholder ?? "Enter identifier…",
-                          text: $identifier)
-                    .font(.inter(14, weight: .medium))
-                    .foregroundColor(.textPrimary)
-                    .tint(.brandCyan)
-            }
-            .padding(.horizontal, 13)
-            .padding(.vertical, 10)
-            .background(Color.black.opacity(0.3))
-            .overlay(
-                RoundedRectangle(cornerRadius: 11)
-                    .stroke(Color.brandCyan.opacity(0.3), lineWidth: 1.5)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 11))
-            Text("Sent to server as-is — the integration resolves this identifier")
-                .font(.inter(10))
-                .foregroundColor(.textTertiary)
-                .lineSpacing(3)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(Color.brandBlue.opacity(0.06))
-    }
-
-    // MARK: - Pill builder
-
-    @ViewBuilder
-    private func requestPill(
-        id: String,
-        icon: String,
-        title: String,
-        summary: String,
-        isOpen: Bool,
-        disabled: Bool,
-        onTap: @escaping () -> Void,
-        @ViewBuilder content: () -> some View
-    ) -> some View {
-        VStack(spacing: 0) {
-            Button(action: onTap) {
-                HStack(spacing: 10) {
-                    Text(icon).font(.system(size: 16))
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(title)
-                            .font(.inter(13, weight: .bold))
-                            .foregroundColor(.textPrimary)
-                        Text(summary)
-                            .font(.inter(11))
-                            .foregroundColor(.textTertiary)
-                    }
-                    Spacer()
-                    Image(systemName: isOpen ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.textTertiary)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-            }
-            .buttonStyle(.plain)
-            .background(Color.white.opacity(0.06))
-            .disabled(disabled)
-            .opacity(disabled ? 0.35 : 1)
-            .clipShape(RoundedRectangle(cornerRadius: isOpen ? 0 : 14, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: isOpen ? 0 : 14, style: .continuous)
-                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
-            )
-
-            if isOpen {
-                VStack(spacing: 0) { content() }
-                    .background(Color.white.opacity(0.03))
-                    .overlay(
-                        Rectangle()
-                            .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                    )
-            }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(Color.white.opacity(0.1), lineWidth: 1)
-        )
-        .padding(.horizontal, 18)
-        .padding(.bottom, 10)
-    }
-
-    @ViewBuilder
-    private func radioRow(label: String, subtitle: String, icon: String? = nil,
-                          selected: Bool, isLast: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                if let icon = icon {
-                    Text(icon).font(.system(size: 17)).frame(width: 22)
-                }
+                if let icon { Text(icon).font(.system(size: 17)).frame(width: 22) }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(label).font(.inter(13, weight: .semibold)).foregroundColor(.textPrimary)
                     Text(subtitle).font(.inter(11)).foregroundColor(.textTertiary)
@@ -984,27 +676,32 @@ struct RequestTabView: View {
                         .stroke(selected ? Color.brandCyan : Color.white.opacity(0.2), lineWidth: 1.5)
                         .frame(width: 20, height: 20)
                     if selected {
-                        Circle()
-                            .fill(Color.brandCyan.opacity(0.15))
-                            .frame(width: 20, height: 20)
-                        Circle()
-                            .fill(Color.brandCyan)
-                            .frame(width: 8, height: 8)
+                        Circle().fill(Color.brandCyan.opacity(0.15)).frame(width: 20, height: 20)
+                        Circle().fill(Color.brandCyan).frame(width: 8, height: 8)
                     }
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 13)
+            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        if !isLast {
-            Divider().background(Color.white.opacity(0.05))
-        }
+        .buttonStyle(.borderless)
+        if !isLast { Divider().background(Color.white.opacity(0.05)) }
+    }
+}
+
+struct IntCheckRow: View, Equatable {
+    let label: String
+    let subtitle: String
+    let checked: Bool
+    let isLast: Bool
+    let action: () -> Void
+
+    static func == (l: Self, r: Self) -> Bool {
+        l.label == r.label && l.checked == r.checked && l.isLast == r.isLast
     }
 
-    @ViewBuilder
-    private func checkRow(label: String, subtitle: String, checked: Bool,
-                          isLast: Bool, action: @escaping () -> Void) -> some View {
+    var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
                 VStack(alignment: .leading, spacing: 1) {
@@ -1017,23 +714,262 @@ struct RequestTabView: View {
                         .stroke(checked ? Color.brandCyan : Color.white.opacity(0.2), lineWidth: 1.5)
                         .frame(width: 20, height: 20)
                     if checked {
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(Color.brandBlue.opacity(0.3))
-                            .frame(width: 20, height: 20)
-                        Text("✓")
-                            .font(.system(size: 11, weight: .black))
-                            .foregroundColor(.brandCyan)
+                        RoundedRectangle(cornerRadius: 6).fill(Color.brandBlue.opacity(0.3)).frame(width: 20, height: 20)
+                        Text("✓").font(.system(size: 11, weight: .black)).foregroundColor(.brandCyan)
                     }
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
+            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        if !isLast {
-            Divider().background(Color.white.opacity(0.05))
+        .buttonStyle(.borderless)
+        if !isLast { Divider().background(Color.white.opacity(0.05)) }
+    }
+}
+
+// MARK: - REQUEST TAB
+
+struct RequestTabView: View {
+    let integration: InstalledIntegration
+
+    @State private var mode: RequestMode = .pull
+    @State private var pill1Open = true
+    @State private var pill2Open = false
+    @State private var pill3Open = false
+    @State private var selectedTarget: String = ""
+    @State private var identifier: String = ""
+    @State private var selectedContent: Set<String> = []
+    @State private var destMode: DestMode = .newCollection
+    @State private var selectedPushTarget: String = ""
+    @State private var isRequesting = false
+
+    private var isPull: Bool { mode == .pull }
+    private var pullTargets: [IntegrationOption] { integration.config.pullTargets }
+    private var pushTargets: [IntegrationOption] { integration.config.pushTargets }
+    private var pullContent: [IntegrationOption] { integration.config.pullContent }
+
+    private var isSpecificTarget: Bool {
+        ["specific_patient","specific_client","specific_contact","specific"].contains(selectedTarget)
+    }
+
+    private var pill1Summary: String {
+        isPull
+            ? (pullTargets.first(where: { $0.id == selectedTarget })?.label ?? "Select option")
+            : (pushTargets.first(where: { $0.id == selectedPushTarget })?.label ?? "Select option")
+    }
+    private var pill2Summary: String {
+        selectedContent.isEmpty ? "None — list only"
+            : pullContent.filter { selectedContent.contains($0.id) }.map(\.label).joined(separator: ", ")
+    }
+    private var pill3Summary: String {
+        isPull ? (destMode == .newCollection ? "New collection" : "Existing collection") : "Select collection"
+    }
+    private var canSubmit: Bool {
+        guard integration.connectionState == .connected else { return false }
+        return isPull ? !selectedTarget.isEmpty : !selectedPushTarget.isEmpty
+    }
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) {
+                    segmentedControl
+                        .padding(.horizontal, 18)
+                        .padding(.top, 16)
+                        .padding(.bottom, 12)
+
+                    pill(icon: isPull ? "📥" : "📤",
+                         title: isPull ? "What to pull" : "What to push",
+                         summary: pill1Summary, isOpen: pill1Open, disabled: false) {
+                        pill1Open.toggle()
+                    } content: {
+                        if isPull {
+                            ForEach(pullTargets) { opt in
+                                IntRadioRow(label: opt.label, subtitle: opt.subtitle, icon: nil,
+                                            selected: selectedTarget == opt.id,
+                                            isLast: opt.id == pullTargets.last?.id) {
+                                    selectedTarget = opt.id
+                                    if !isSpecificTarget { identifier = "" }
+                                }
+                                if isSpecificTarget && selectedTarget == opt.id &&
+                                   ["specific_patient","specific_client","specific_contact","specific"].contains(opt.id) {
+                                    identifierField
+                                }
+                            }
+                        } else {
+                            ForEach(pushTargets) { opt in
+                                IntRadioRow(label: opt.label, subtitle: opt.subtitle, icon: nil,
+                                            selected: selectedPushTarget == opt.id,
+                                            isLast: opt.id == pushTargets.last?.id) {
+                                    selectedPushTarget = opt.id
+                                }
+                            }
+                        }
+                    }
+
+                    pill(icon: "📋", title: "Pull content", summary: pill2Summary,
+                         isOpen: pill2Open, disabled: !isPull) {
+                        if isPull { pill2Open.toggle() }
+                    } content: {
+                        ForEach(pullContent) { opt in
+                            IntCheckRow(label: opt.label, subtitle: opt.subtitle,
+                                        checked: selectedContent.contains(opt.id),
+                                        isLast: opt.id == pullContent.last?.id) {
+                                if selectedContent.contains(opt.id) { selectedContent.remove(opt.id) }
+                                else { selectedContent.insert(opt.id) }
+                            }
+                        }
+                    }
+
+                    pill(icon: isPull ? "📁" : "📤",
+                         title: isPull ? "Destination" : "Source",
+                         summary: pill3Summary, isOpen: pill3Open, disabled: false) {
+                        pill3Open.toggle()
+                    } content: {
+                        if isPull {
+                            IntRadioRow(label: "New collection",
+                                        subtitle: "\(integration.config.name) · \(shortDate())",
+                                        icon: "✨", selected: destMode == .newCollection, isLast: false) {
+                                destMode = .newCollection
+                            }
+                            IntRadioRow(label: "Existing collection",
+                                        subtitle: "Choose from your collections",
+                                        icon: "📁", selected: destMode == .existing, isLast: true) {
+                                destMode = .existing
+                            }
+                        } else {
+                            HStack(spacing: 12) {
+                                Text("📂").font(.system(size: 17))
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Select collection").font(.inter(13, weight: .semibold)).foregroundColor(.textPrimary)
+                                    Text("Choose which collection to push from").font(.inter(11)).foregroundColor(.textTertiary)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right").font(.system(size: 14)).foregroundColor(.textTertiary)
+                            }
+                            .padding(.horizontal, 16).padding(.vertical, 13)
+                        }
+                    }
+
+                    Spacer().frame(height: 110)
+                }
+            }
+
+            VStack(spacing: 0) {
+                LinearGradient(colors: [Color.phoneBg.opacity(0), Color.phoneBg], startPoint: .top, endPoint: .bottom)
+                    .frame(height: 32)
+                Button { submitRequest() } label: {
+                    Group {
+                        if isRequesting { ProgressView().tint(.white) }
+                        else { Text("Request").font(.inter(15, weight: .bold)).foregroundColor(.white) }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 15)
+                    .background(LinearGradient(colors: [Color(hex: "#1e8ae0"), Color(hex: "#0d5faa")],
+                                               startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .disabled(isRequesting || !canSubmit)
+                .opacity(canSubmit ? 1 : 0.5)
+                .padding(.horizontal, 18)
+                .padding(.bottom, 28)
+            }
+            .background(Color.phoneBg)
         }
     }
+
+    // MARK: - Segmented control
+
+    private var segmentedControl: some View {
+        HStack(spacing: 3) {
+            ForEach(RequestMode.allCases, id: \.self) { m in
+                Button {
+                    mode = m
+                    resetSelections()
+                } label: {
+                    Text(m.label)
+                        .font(.inter(13, weight: .bold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .foregroundColor(mode == m ? .white : .textTertiary)
+                        .background(
+                            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                .fill(mode == m ? Color.brandBlue.opacity(0.35) : Color.clear)
+                                .overlay(RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                    .stroke(mode == m ? Color.brandCyan.opacity(0.3) : Color.clear, lineWidth: 1))
+                        )
+                }
+                .buttonStyle(.borderless)
+            }
+        }
+        .padding(3)
+        .background(Color.white.opacity(0.06))
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    // MARK: - Pill
+
+    @ViewBuilder
+    private func pill(icon: String, title: String, summary: String,
+                      isOpen: Bool, disabled: Bool,
+                      onTap: @escaping () -> Void,
+                      @ViewBuilder content: () -> some View) -> some View {
+        VStack(spacing: 0) {
+            Button(action: onTap) {
+                HStack(spacing: 10) {
+                    Text(icon).font(.system(size: 16))
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(title).font(.inter(13, weight: .bold)).foregroundColor(.textPrimary)
+                        Text(summary).font(.inter(11)).foregroundColor(.textTertiary)
+                    }
+                    Spacer()
+                    Image(systemName: isOpen ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 13, weight: .semibold)).foregroundColor(.textTertiary)
+                }
+                .padding(.horizontal, 16).padding(.vertical, 12)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.borderless)
+            .background(Color.white.opacity(0.06))
+            .disabled(disabled).opacity(disabled ? 0.35 : 1)
+            .clipShape(RoundedRectangle(cornerRadius: isOpen ? 0 : 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: isOpen ? 0 : 14, style: .continuous)
+                .stroke(Color.white.opacity(0.1), lineWidth: 1))
+
+            if isOpen {
+                VStack(spacing: 0) { content() }
+                    .background(Color.white.opacity(0.03))
+                    .overlay(Rectangle().stroke(Color.white.opacity(0.1), lineWidth: 1))
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.white.opacity(0.1), lineWidth: 1))
+        .padding(.horizontal, 18).padding(.bottom, 10)
+    }
+
+    // MARK: - Identifier field
+
+    private var identifierField: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text((integration.config.identifierLabel ?? "ID").uppercased())
+                .font(.inter(10, weight: .heavy)).foregroundColor(Color.brandCyan.opacity(0.7)).tracking(0.8)
+            TextField(integration.config.identifierPlaceholder ?? "Enter identifier…", text: $identifier)
+                .font(.inter(14, weight: .medium)).foregroundColor(.textPrimary).tint(.brandCyan)
+                .padding(.horizontal, 13).padding(.vertical, 10)
+                .background(Color.black.opacity(0.3))
+                .overlay(RoundedRectangle(cornerRadius: 11).stroke(Color.brandCyan.opacity(0.3), lineWidth: 1.5))
+                .clipShape(RoundedRectangle(cornerRadius: 11))
+            Text("Sent to server as-is — the integration resolves this identifier")
+                .font(.inter(10)).foregroundColor(.textTertiary).lineSpacing(3)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 12)
+        .background(Color.brandBlue.opacity(0.06))
+    }
+
+    // MARK: - Helpers
 
     private func resetSelections() {
         selectedTarget = pullTargets.first?.id ?? ""
@@ -1046,24 +982,17 @@ struct RequestTabView: View {
     private func submitRequest() {
         guard canSubmit else { return }
         isRequesting = true
-        // Stub — real implementation calls server
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            let contentNames = pullContent.filter { selectedContent.contains($0.id) }.map { $0.label }
+            let contentNames = pullContent.filter { selectedContent.contains($0.id) }.map(\.label)
             let targetName = isPull
                 ? (pullTargets.first(where: { $0.id == selectedTarget })?.label ?? selectedTarget)
                 : (pushTargets.first(where: { $0.id == selectedPushTarget })?.label ?? selectedPushTarget)
             let entry = IntegrationLogEntry(
-                id: UUID().uuidString,
-                integrationId: integration.id,
-                integrationName: integration.config.name,
-                action: isPull ? .pull : .push,
-                targetLabel: targetName,
-                contentLabels: contentNames,
+                id: UUID().uuidString, integrationId: integration.id, integrationName: integration.config.name,
+                action: isPull ? .pull : .push, targetLabel: targetName, contentLabels: contentNames,
                 destinationName: isPull ? (destMode == .newCollection ? "New collection" : "Existing collection") : nil,
                 resultSummary: isPull ? "Request sent to server" : "Push sent to server",
-                status: .success,
-                errorMessage: nil,
-                date: Date()
+                status: .success, errorMessage: nil, date: Date()
             )
             IntegrationStore.shared.appendLog(entry)
             isRequesting = false
@@ -1071,9 +1000,7 @@ struct RequestTabView: View {
     }
 
     private func shortDate() -> String {
-        let f = DateFormatter()
-        f.dateStyle = .medium
-        f.timeStyle = .none
+        let f = DateFormatter(); f.dateStyle = .medium; f.timeStyle = .none
         return f.string(from: Date())
     }
 }
