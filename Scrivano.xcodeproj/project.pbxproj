@@ -61,6 +61,9 @@
 		F1A2B3C4D5E6F7A8B9C0D1E2 /* TrashView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F2 /* TrashView.swift */; };
 		F4EF985C8EF327D82873A0EF /* VerifyCodeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE3F145DC89C9A2CFB627070 /* VerifyCodeView.swift */; };
 		FF33AA44BB55CC66DD77EE88 /* APIKeyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE33FF44AA55BB66CC77DD88 /* APIKeyView.swift */; };
+		AA01BB02CC03DD04EE05FF06 /* IntegrationModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC01DD02EE03FF04AA05BB06 /* IntegrationModels.swift */; };
+		AA07BB08CC09DD0AEE0BFF0C /* IntegrationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA77BB88CC99DDAAEEBBFFCC /* IntegrationStore.swift */; };
+		AA0DBB0ECC0FDD10EE11FF12 /* IntegrationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AADDBBEECC11DD00EE11FF22 /* IntegrationsView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -141,6 +144,9 @@
 		F1F1A2A2B3B3C4C4D5D5E6E6 /* LanguagePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LanguagePickerView.swift; sourceTree = "<group>"; };
 		FB8204215F6E3D3B4877AFCC /* TextViewerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextViewerView.swift; sourceTree = "<group>"; };
 		FF11AA22BB33CC44DD55EE66 /* BackupView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupView.swift; sourceTree = "<group>"; };
+		CC01DD02EE03FF04AA05BB06 /* IntegrationModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationModels.swift; sourceTree = "<group>"; };
+		AA77BB88CC99DDAAEEBBFFCC /* IntegrationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationStore.swift; sourceTree = "<group>"; };
+		AADDBBEECC11DD00EE11FF22 /* IntegrationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntegrationsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -228,6 +234,7 @@
 			children = (
 				707FDA0F50C016A16FDD3472 /* Auth */,
 				BA677EC99B8305009FF8D276 /* Dashboard */,
+				AA99BB00CC11DD22EE33FF44 /* Integrations */,
 				D14610D7AE3C50B31018AFDA /* Media */,
 				64F9BAC4B0144F3214FC080B /* Notes */,
 				5BD103BA1A278F406F5725B4 /* Prompts */,
@@ -237,6 +244,16 @@
 				A80F8464EA37B12E9F6CAFA2 /* Text */,
 			);
 			path = Features;
+			sourceTree = "<group>";
+		};
+		AA99BB00CC11DD22EE33FF44 /* Integrations */ = {
+			isa = PBXGroup;
+			children = (
+				CC01DD02EE03FF04AA05BB06 /* IntegrationModels.swift */,
+				AA77BB88CC99DDAAEEBBFFCC /* IntegrationStore.swift */,
+				AADDBBEECC11DD00EE11FF22 /* IntegrationsView.swift */,
+			);
+			path = Integrations;
 			sourceTree = "<group>";
 		};
 		32479CBA395A66A9F7A2FBA2 /* Auth */ = {
@@ -536,6 +553,9 @@
 				C1D2E3F4A5B6C7D8E9F0A1B2 /* SecurityLockManager.swift in Sources */,
 				D2E3F4A5B6C7D8E9F0A1B2C3 /* LockScreenView.swift in Sources */,
 				E5E86AE4DC49FA27AE914E20 /* AutomationView.swift in Sources */,
+				AA01BB02CC03DD04EE05FF06 /* IntegrationModels.swift in Sources */,
+				AA07BB08CC09DD0AEE0BFF0C /* IntegrationStore.swift in Sources */,
+				AA0DBB0ECC0FDD10EE11FF12 /* IntegrationsView.swift in Sources */,
 				F1A2B3C4D5E6F7A8B9C0D1E2 /* TrashView.swift in Sources */,
 				607DA6A944FCE732A31DDA3C /* CreditsView.swift in Sources */,
 				439835EB2F8CADF400B23817 /* PDFExporter.swift in Sources */,

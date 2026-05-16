@@ -26,6 +26,7 @@ struct SettingsView: View {
     @State private var trashCount = 0
     @State private var showBackup = false
     @State private var showAPIKey = false
+    @State private var showIntegrations = false
 
     var user: User? { auth.currentUser }
 
@@ -72,6 +73,8 @@ struct SettingsView: View {
                             NavRow(icon: "✦", iconColor: Color(hex: "#a78bfa"), title: langMgr.t("settings.promptDatabase.title"), subtitle: langMgr.t("settings.promptDatabase.subtitle")) { showPrompts = true }
                             Divider().background(Color.white.opacity(0.05)).padding(.leading, 68)
                             NavRow(icon: "🤖", iconColor: .brandBlue, title: langMgr.t("settings.automation.title"), subtitle: langMgr.t("settings.automation.subtitle")) { showAutomation = true }
+                            Divider().background(Color.white.opacity(0.05)).padding(.leading, 68)
+                            NavRow(icon: "🔗", iconColor: Color(hex: "#38d9f5"), title: langMgr.t("settings.integrations.title"), subtitle: langMgr.t("settings.integrations.subtitle")) { showIntegrations = true }
                             Divider().background(Color.white.opacity(0.05)).padding(.leading, 68)
                             NavRow(icon: "🗑", iconColor: .danger, title: langMgr.t("settings.recycleBin.title"),
                                    subtitle: trashCount > 0 ? "\(trashCount) \(trashCount == 1 ? "item" : "items")" : langMgr.t("settings.recycleBin.subtitle.empty")) { showTrash = true }
@@ -373,6 +376,7 @@ struct SettingsView: View {
         .fullScreenCover(isPresented: $showCredits) { CreditsView() }
         .fullScreenCover(isPresented: $showAutomation) { AutomationView() }
         .fullScreenCover(isPresented: $showPrompts) { PromptsView(context: .browse) }
+        .fullScreenCover(isPresented: $showIntegrations) { IntegrationsView() }
         .fullScreenCover(isPresented: $showRecorder) { RecorderSettingsView() }
         .fullScreenCover(isPresented: $showLog) { ConnectionLogView() }
         .fullScreenCover(isPresented: $showTrash) {
