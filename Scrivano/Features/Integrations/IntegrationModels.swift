@@ -7,10 +7,14 @@ struct IntegrationConfig: Codable, Identifiable, Hashable {
     let name: String
     let type: IntegrationType
     let description: String
-    let logoEmoji: String
+    let logoUrl: String?          // URL from server (may be nil for legacy)
+    let logoEmoji: String         // fallback emoji when no logo URL
     let logoColorStart: String
     let logoColorEnd: String
     let authType: AuthType
+    let requiresBaseUrl: Bool
+    let baseUrlLabel: String?
+    let baseUrlDefault: String?
     let pullTargets: [IntegrationOption]
     let pullContent: [IntegrationOption]
     let pushTargets: [IntegrationOption]
@@ -41,7 +45,21 @@ enum IntegrationType: String, Codable {
     }
 }
 
-enum AuthType: String, Codable { case oauth2, apiKey }
+enum AuthType: String, Codable {
+    case oauth2
+    case apiKey = "api-key"
+    case basic
+
+    var isOAuth: Bool { self == .oauth2 }
+    var requiresCredentials: Bool { self == .apiKey || self == .basic }
+    var credentialLabel: String {
+        switch self {
+        case .oauth2:  return "OAuth 2.0"
+        case .apiKey:  return "API Key"
+        case .basic:   return "Username & Password"
+        }
+    }
+}
 
 struct InstalledIntegration: Codable, Identifiable {
     let id: String
@@ -54,6 +72,7 @@ struct InstalledIntegration: Codable, Identifiable {
     var tokenScopes: String?
     var lastAuthDate: Date?
     var installedAt: Date = Date()
+    var baseUrl: String?          // user-entered EHR base URL (if required)
 }
 
 enum ConnectionState: String, Codable {
@@ -97,56 +116,140 @@ struct IntegrationItemMetadata: Codable {
 // MARK: - Server response models
 
 struct IntegrationListResponse: Codable {
-    let integrations: [ServerIntegrationConfig]
+    let integrations: [ServerIntegrationListItem]
 }
 
-struct ServerIntegrationConfig: Codable {
+/// Lightweight item from GET /api/integrations list
+struct ServerIntegrationListItem: Codable {
     let id: String
     let name: String
-    let type: String?
     let description: String?
-    let logoEmoji: String?
-    let logoColorStart: String?
-    let logoColorEnd: String?
-    let authType: String?
-    let pullTargets: [ServerOption]?
-    let pullContent: [ServerOption]?
-    let pushTargets: [ServerOption]?
-    let identifierLabel: String?
-    let identifierPlaceholder: String?
+    let logoUrl: String?
+    let version: String?
     let installed: Bool?
+    let status: String?           // "active" | "pending_auth" | "error"
+    let lastSyncedAt: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, name, type, description, installed
-        case logoEmoji          = "logo_emoji"
-        case logoColorStart     = "logo_color_start"
-        case logoColorEnd       = "logo_color_end"
-        case authType           = "auth_type"
-        case pullTargets        = "pull_targets"
-        case pullContent        = "pull_content"
-        case pushTargets        = "push_targets"
-        case identifierLabel    = "identifier_label"
-        case identifierPlaceholder = "identifier_placeholder"
+        case id, name, description, version, installed, status
+        case logoUrl       = "logo_url"
+        case lastSyncedAt  = "last_synced_at"
     }
 
-    func toConfig() -> IntegrationConfig {
+    /// Converts list item to a minimal config; full config fetched separately via GET /api/integrations/{id}
+    func toMinimalConfig() -> IntegrationConfig {
         IntegrationConfig(
             id: id,
             name: name,
-            type: IntegrationType(rawValue: type ?? "custom") ?? .custom,
+            type: .custom,
             description: description ?? "",
-            logoEmoji: logoEmoji ?? "🔗",
-            logoColorStart: logoColorStart ?? "#1a1a2e",
-            logoColorEnd: logoColorEnd ?? "#0e0e1e",
-            authType: AuthType(rawValue: authType ?? "oauth2") ?? .oauth2,
-            pullTargets: (pullTargets ?? []).map(\.toOption),
-            pullContent: (pullContent ?? []).map(\.toOption),
-            pushTargets: (pushTargets ?? []).map(\.toOption),
-            identifierLabel: identifierLabel,
-            identifierPlaceholder: identifierPlaceholder,
+            logoUrl: logoUrl,
+            logoEmoji: "🔗",
+            logoColorStart: "#1a1a2e",
+            logoColorEnd: "#0e0e1e",
+            authType: .oauth2,
+            requiresBaseUrl: false,
+            baseUrlLabel: nil,
+            baseUrlDefault: nil,
+            pullTargets: [],
+            pullContent: [],
+            pushTargets: [],
+            identifierLabel: nil,
+            identifierPlaceholder: nil,
             installed: installed ?? false
         )
     }
+}
+
+/// Full detail from GET /api/integrations/{id}
+struct ServerIntegrationDetail: Codable {
+    let id: String
+    let name: String
+    let description: String?
+    let logoUrl: String?
+    let version: String?
+    let installed: Bool?
+    let status: String?
+    let auth: ServerAuth?
+    let capabilities: ServerCapabilities?
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, description, version, installed, status, auth, capabilities
+        case logoUrl = "logo_url"
+    }
+
+    func toConfig() -> IntegrationConfig {
+        let rawType = auth?.type ?? "oauth2"
+        let authType = AuthType(rawValue: rawType) ?? .oauth2
+        let entities = capabilities?.entities ?? []
+        let contentTypes = capabilities?.contentTypes ?? []
+
+        return IntegrationConfig(
+            id: id,
+            name: name,
+            type: .medical,
+            description: description ?? "",
+            logoUrl: logoUrl,
+            logoEmoji: "🔗",
+            logoColorStart: "#1a1a2e",
+            logoColorEnd: "#0e0e1e",
+            authType: authType,
+            requiresBaseUrl: auth?.requiresBaseUrl ?? false,
+            baseUrlLabel: auth?.baseUrlLabel,
+            baseUrlDefault: auth?.baseUrlDefault,
+            pullTargets: entities.map { IntegrationOption(id: $0.id, label: $0.label, subtitle: $0.description ?? "") },
+            pullContent: contentTypes.map { IntegrationOption(id: $0.id, label: $0.label, subtitle: "") },
+            pushTargets: [],
+            identifierLabel: entities.first(where: { $0.requiresId == true })?.idLabel,
+            identifierPlaceholder: entities.first(where: { $0.requiresId == true })?.idLabel,
+            installed: installed ?? false
+        )
+    }
+}
+
+struct ServerAuth: Codable {
+    let type: String?
+    let requiresBaseUrl: Bool?
+    let baseUrlLabel: String?
+    let baseUrlDefault: String?
+
+    enum CodingKeys: String, CodingKey {
+        case type
+        case requiresBaseUrl  = "requires_base_url"
+        case baseUrlLabel     = "base_url_label"
+        case baseUrlDefault   = "base_url_default"
+    }
+}
+
+struct ServerCapabilities: Codable {
+    let entities: [ServerEntity]?
+    let contentTypes: [ServerContentType]?
+    let canPush: Bool?
+
+    enum CodingKeys: String, CodingKey {
+        case entities
+        case contentTypes = "content_types"
+        case canPush      = "can_push"
+    }
+}
+
+struct ServerEntity: Codable {
+    let id: String
+    let label: String
+    let description: String?
+    let requiresId: Bool?
+    let idLabel: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, label, description
+        case requiresId = "requires_id"
+        case idLabel    = "id_label"
+    }
+}
+
+struct ServerContentType: Codable {
+    let id: String
+    let label: String
 }
 
 struct ServerOption: Codable {
@@ -159,33 +262,78 @@ struct ServerOption: Codable {
     }
 }
 
+// MARK: - Install
+
+struct InstallRequest: Encodable {
+    let baseUrl: String?
+    let apiKey: String?
+    let username: String?
+    let password: String?
+
+    enum CodingKeys: String, CodingKey {
+        case baseUrl  = "base_url"
+        case apiKey   = "api_key"
+        case username
+        case password
+    }
+}
+
 struct InstallResponse: Codable {
     let success: Bool?
-    let oauthUrl: String?
+    let authUrl: String?     // OAuth2: redirect URL
+    let status: String?      // API key/basic: "active" when done
     let message: String?
 
     enum CodingKeys: String, CodingKey {
-        case success, message
-        case oauthUrl = "oauth_url"
+        case success, status, message
+        case authUrl = "auth_url"
     }
 }
+
+// MARK: - Pull
 
 struct PullRequest: Encodable {
     let entityId: String
+    let entityRecordId: String?
     let contentTypes: [String]
-    let identifier: String?
+    let collectionName: String?
 
     enum CodingKeys: String, CodingKey {
-        case entityId    = "entity_id"
-        case contentTypes = "content_types"
-        case identifier
+        case entityId       = "entity_id"
+        case entityRecordId = "entity_record_id"
+        case contentTypes   = "content_types"
+        case collectionName = "collection_name"
     }
 }
+
+struct PullResponse: Codable {
+    let collection: PullCollection?
+    let success: Bool?
+    let message: String?
+}
+
+struct PullCollection: Codable {
+    let name: String?
+    let items: [PullItem]?
+}
+
+struct PullItem: Codable {
+    let name: String?
+    let metadata: [String: String]?
+    let transcripts: [PullTranscript]?
+}
+
+struct PullTranscript: Codable {
+    let title: String?
+    let content: String?
+}
+
+// MARK: - Push
 
 struct PushRequest: Encodable {
     let noteText: String
     let noteTitle: String
-    let metadata: PushMetadata
+    let metadata: [String: String]
 
     enum CodingKeys: String, CodingKey {
         case noteText  = "note_text"
@@ -194,44 +342,41 @@ struct PushRequest: Encodable {
     }
 }
 
-struct PushMetadata: Encodable {
-    let ehrId: String?
-    let mrn: String?
-
-    enum CodingKeys: String, CodingKey {
-        case ehrId = "ehr_id"
-        case mrn
-    }
-}
-
 struct ActionResponse: Codable {
     let success: Bool?
     let message: String?
     let collectionId: String?
+    let ehrId: String?
 
     enum CodingKeys: String, CodingKey {
         case success, message
         case collectionId = "collection_id"
+        case ehrId        = "ehr_id"
     }
 }
 
+// MARK: - Logs
+
 struct ServerLogEntry: Codable {
     let id: String?
-    let action: String?
-    let target: String?
-    let content: [String]?
+    let entity: String?
+    let contentTypes: [String]?
+    let collectionName: String?
     let status: String?
-    let message: String?
-    let summary: String?
+    let errorMessage: String?
+    let itemsCount: Int?
     let createdAt: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, action, target, content, status, message, summary
-        case createdAt = "created_at"
+        case id, entity, status
+        case contentTypes   = "content_types"
+        case collectionName = "collection_name"
+        case errorMessage   = "error_message"
+        case itemsCount     = "items_count"
+        case createdAt      = "created_at"
     }
 }
 
 struct ServerLogsResponse: Codable {
     let logs: [ServerLogEntry]?
-    // Also accept top-level array
 }

@@ -321,13 +321,17 @@ struct AuthTabView: View {
     @ObservedObject private var store = IntegrationStore.shared
     @State private var showDisconnectConfirm = false
     @State private var showUninstallConfirm = false
-    @State private var isReconnecting = false
+    @State private var isConnecting = false
     @State private var isUninstalling = false
     @State private var actionError: String? = nil
-    // API key credentials form
-    @State private var apiUsername = ""
-    @State private var apiPassword = ""
-    @State private var isSavingCredentials = false
+    // Credential fields (api-key / basic auth)
+    @State private var credUsername = ""
+    @State private var credPassword = ""
+    @State private var credApiKey = ""
+    // Base URL field (for integrations that require it)
+    @State private var baseUrl = ""
+
+    private var authType: AuthType { integration.config.authType }
 
     private var timeFmt: DateFormatter {
         let f = DateFormatter(); f.dateStyle = .none; f.timeStyle = .short; return f
@@ -340,59 +344,23 @@ struct AuthTabView: View {
         ScrollView(showsIndicators: false) {
             VStack(spacing: 11) {
 
+                // Auth type badge
+                HStack(spacing: 6) {
+                    Image(systemName: authType.isOAuth ? "safari" : "key.fill")
+                        .font(.system(size: 11, weight: .semibold))
+                    Text(authType.credentialLabel)
+                        .font(.inter(11, weight: .bold))
+                }
+                .foregroundColor(.brandCyan.opacity(0.8))
+                .padding(.horizontal, 10).padding(.vertical, 5)
+                .background(Color.brandCyan.opacity(0.1))
+                .clipShape(Capsule())
+                .frame(maxWidth: .infinity, alignment: .leading)
+
                 if integration.connectionState == .connected {
-                    infoCard(label: "Account") {
-                        if let email = integration.accountEmail {
-                            infoRow(label: "User", value: email)
-                        }
-                        if let org = integration.accountOrganization {
-                            infoRow(label: "Organization", value: org, isLast: false)
-                        }
-                        if let date = integration.lastAuthDate {
-                            infoRow(label: "Last auth", value: timeFmt.string(from: date), badge: "Active", isLast: true)
-                        }
-                    }
-                    if integration.tokenPreview != nil || integration.tokenExpiry != nil {
-                        infoCard(label: "Token") {
-                            if let preview = integration.tokenPreview {
-                                infoRow(label: "Bearer", value: preview, mono: true, isLast: integration.tokenExpiry == nil)
-                            }
-                            if let expiry = integration.tokenExpiry {
-                                let hrs = max(0, Int(expiry.timeIntervalSince(Date()) / 3600))
-                                infoRow(label: "Expires", value: "\(dateTimeFmt.string(from: expiry)) · \(hrs) hrs", isLast: true)
-                            }
-                        }
-                    }
-                    if integration.config.authType == .oauth2 {
-                        actionButton("Reconnect", style: .ghost, loading: isReconnecting) { triggerReconnect() }
-                    } else {
-                        credentialsForm(reconnect: true)
-                    }
-                    actionButton("Disconnect", style: .danger) { showDisconnectConfirm = true }
+                    connectedSection
                 } else {
-                    if integration.config.authType == .oauth2 {
-                        VStack(spacing: 16) {
-                            Text(integration.connectionState == .expired ? "🔑" : "🔌").font(.system(size: 36))
-                            Text(integration.connectionState == .expired ? "Token Expired" : "Not Connected")
-                                .font(.inter(15, weight: .bold)).foregroundColor(.textPrimary)
-                            Text(integration.connectionState == .expired
-                                 ? "Your session has expired. Reconnect to continue."
-                                 : "Tap Connect — you'll be taken to the provider's login page.")
-                                .font(.inter(13)).foregroundColor(.textSecondary).multilineTextAlignment(.center)
-                        }
-                        .padding(.vertical, 24)
-                        actionButton("Connect via Browser", style: .primary, loading: isReconnecting) { triggerReconnect() }
-                    } else {
-                        VStack(spacing: 8) {
-                            Text("🔑").font(.system(size: 36))
-                            Text("Enter your credentials")
-                                .font(.inter(15, weight: .bold)).foregroundColor(.textPrimary)
-                            Text("Your username and password are sent securely to the server and never stored on device.")
-                                .font(.inter(12)).foregroundColor(.textSecondary).multilineTextAlignment(.center)
-                        }
-                        .padding(.vertical, 16)
-                        credentialsForm(reconnect: false)
-                    }
+                    disconnectedSection
                 }
 
                 if let err = actionError {
@@ -408,6 +376,9 @@ struct AuthTabView: View {
             }
             .padding(.horizontal, 18)
             .padding(.top, 16)
+        }
+        .onAppear {
+            baseUrl = integration.baseUrl ?? integration.config.baseUrlDefault ?? ""
         }
         .confirmationDialog("Disconnect \(integration.config.name)?",
                             isPresented: $showDisconnectConfirm, titleVisibility: .visible) {
@@ -427,86 +398,181 @@ struct AuthTabView: View {
         }
     }
 
+    // MARK: - Connected section
+
+    @ViewBuilder
+    private var connectedSection: some View {
+        infoCard(label: "Account") {
+            if let email = integration.accountEmail {
+                infoRow(label: "User", value: email)
+            }
+            if let org = integration.accountOrganization {
+                infoRow(label: "Organization", value: org, isLast: false)
+            }
+            if let date = integration.lastAuthDate {
+                infoRow(label: "Last auth", value: timeFmt.string(from: date), badge: "Active", isLast: true)
+            }
+        }
+        if integration.tokenPreview != nil || integration.tokenExpiry != nil {
+            infoCard(label: "Token") {
+                if let preview = integration.tokenPreview {
+                    infoRow(label: "Bearer", value: preview, mono: true, isLast: integration.tokenExpiry == nil)
+                }
+                if let expiry = integration.tokenExpiry {
+                    let hrs = max(0, Int(expiry.timeIntervalSince(Date()) / 3600))
+                    infoRow(label: "Expires", value: "\(dateTimeFmt.string(from: expiry)) · \(hrs) hrs", isLast: true)
+                }
+            }
+        }
+        if authType.isOAuth {
+            actionButton("Reconnect via Browser", style: .ghost, loading: isConnecting) { triggerConnect() }
+        } else {
+            credentialsForm(reconnect: true)
+        }
+        actionButton("Disconnect", style: .danger) { showDisconnectConfirm = true }
+    }
+
+    // MARK: - Disconnected section
+
+    @ViewBuilder
+    private var disconnectedSection: some View {
+        if authType.isOAuth {
+            VStack(spacing: 14) {
+                Text(integration.connectionState == .expired ? "🔑" : "🔌").font(.system(size: 36))
+                Text(integration.connectionState == .expired ? "Session Expired" : "Not Connected")
+                    .font(.inter(15, weight: .bold)).foregroundColor(.textPrimary)
+                Text(integration.connectionState == .expired
+                     ? "Your session has expired. Reconnect to continue."
+                     : "You'll be taken to \(integration.config.name)'s login page.")
+                    .font(.inter(13)).foregroundColor(.textSecondary).multilineTextAlignment(.center)
+            }
+            .padding(.vertical, 20)
+
+            if integration.config.requiresBaseUrl {
+                baseUrlField
+            }
+            actionButton("Connect via Browser", style: .primary, loading: isConnecting) { triggerConnect() }
+        } else {
+            VStack(spacing: 8) {
+                Text("🔑").font(.system(size: 32))
+                Text("Enter Credentials")
+                    .font(.inter(15, weight: .bold)).foregroundColor(.textPrimary)
+                Text("Credentials are sent securely to the server and never stored on device.")
+                    .font(.inter(12)).foregroundColor(.textSecondary).multilineTextAlignment(.center)
+            }
+            .padding(.vertical, 12)
+            credentialsForm(reconnect: false)
+        }
+    }
+
+    // MARK: - Base URL field
+
+    private var baseUrlField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text((integration.config.baseUrlLabel ?? "Base URL").uppercased())
+                .font(.inter(10, weight: .heavy))
+                .foregroundColor(.textTertiary)
+                .tracking(0.8)
+            HStack(spacing: 10) {
+                Image(systemName: "link")
+                    .font(.system(size: 13))
+                    .foregroundColor(.textTertiary)
+                TextField(integration.config.baseUrlDefault ?? "https://", text: $baseUrl)
+                    .font(.inter(13))
+                    .foregroundColor(.textPrimary)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.URL)
+            }
+            .padding(.horizontal, 14).padding(.vertical, 12)
+            .background(Color.white.opacity(0.04))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).stroke(Color.white.opacity(0.09), lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+    }
+
+    // MARK: - Credentials form (api-key / basic)
+
     @ViewBuilder
     private func credentialsForm(reconnect: Bool) -> some View {
+        if integration.config.requiresBaseUrl {
+            baseUrlField
+        }
+
         VStack(spacing: 0) {
-            credentialField(label: "Username", text: $apiUsername, secure: false, isLast: false)
-            Divider().background(Color.white.opacity(0.06))
-            credentialField(label: "Password", text: $apiPassword, secure: true, isLast: true)
+            if authType == .apiKey {
+                credentialField(icon: "key.fill", label: "API Key", text: $credApiKey, secure: true, isLast: true)
+            } else {
+                credentialField(icon: "person.fill", label: "Username", text: $credUsername, secure: false, isLast: false)
+                Divider().background(Color.white.opacity(0.06))
+                credentialField(icon: "lock.fill", label: "Password", text: $credPassword, secure: true, isLast: true)
+            }
         }
         .background(Color.white.opacity(0.04))
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.white.opacity(0.09), lineWidth: 1))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
-        actionButton(reconnect ? "Update Credentials" : "Connect", style: .primary,
-                     loading: isSavingCredentials,
-                     disabled: apiUsername.isEmpty || apiPassword.isEmpty) {
-            saveCredentials()
+        let canSubmit = authType == .apiKey ? !credApiKey.isEmpty : (!credUsername.isEmpty && !credPassword.isEmpty)
+        actionButton(reconnect ? "Update Credentials" : "Connect",
+                     style: .primary,
+                     loading: isConnecting,
+                     disabled: !canSubmit) {
+            triggerConnect()
         }
     }
 
     @ViewBuilder
-    private func credentialField(label: String, text: Binding<String>, secure: Bool, isLast: Bool) -> some View {
+    private func credentialField(icon: String, label: String, text: Binding<String>, secure: Bool, isLast: Bool) -> some View {
         HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.textTertiary)
+                .frame(width: 20)
             Text(label)
                 .font(.inter(13, weight: .semibold))
                 .foregroundColor(.textSecondary)
-                .frame(width: 80, alignment: .leading)
+                .frame(width: 72, alignment: .leading)
             if secure {
                 SecureField("••••••••", text: text)
-                    .font(.inter(13))
-                    .foregroundColor(.textPrimary)
-                    .textContentType(.password)
+                    .font(.inter(13)).foregroundColor(.textPrimary)
+                    .textContentType(label == "Password" ? .password : .none)
                     .autocorrectionDisabled()
             } else {
                 TextField("Enter \(label.lowercased())", text: text)
-                    .font(.inter(13))
-                    .foregroundColor(.textPrimary)
+                    .font(.inter(13)).foregroundColor(.textPrimary)
                     .textContentType(.username)
                     .autocorrectionDisabled()
                     .textInputAutocapitalization(.never)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 13)
+        .padding(.horizontal, 14).padding(.vertical, 13)
     }
 
-    private func saveCredentials() {
-        isSavingCredentials = true
+    // MARK: - Connect action
+
+    private func triggerConnect() {
+        isConnecting = true
         actionError = nil
         Task {
             do {
-                _ = try await APIClient.shared.request(
-                    path: "/api/integrations/\(integration.id)/credentials",
-                    method: "POST",
-                    body: CredentialsBody(username: apiUsername, password: apiPassword),
-                    responseType: ActionResponse.self
+                let url = try await store.install(
+                    integrationId: integration.id,
+                    baseUrl: integration.config.requiresBaseUrl ? baseUrl : nil,
+                    username: authType == .basic ? credUsername : nil,
+                    password: authType == .basic ? credPassword : nil,
+                    apiKey: authType == .apiKey ? credApiKey : nil
                 )
-                store.markConnected(integrationId: integration.id, email: apiUsername)
-                apiPassword = ""
+                if let url {
+                    onOAuthURL?(url)
+                } else {
+                    // Credentials-based: server confirmed active, clear sensitive fields
+                    credPassword = ""
+                    credApiKey = ""
+                }
             } catch {
                 actionError = error.localizedDescription
             }
-            isSavingCredentials = false
-        }
-    }
-
-    private struct CredentialsBody: Encodable {
-        let username: String
-        let password: String
-    }
-
-    private func triggerReconnect() {
-        isReconnecting = true
-        actionError = nil
-        Task {
-            do {
-                let url = try await store.install(integrationId: integration.id)
-                onOAuthURL?(url)
-            } catch {
-                actionError = error.localizedDescription
-            }
-            isReconnecting = false
+            isConnecting = false
         }
     }
 
@@ -1117,22 +1183,20 @@ struct RequestTabView: View {
                 if isPull {
                     _ = try await IntegrationStore.shared.pull(
                         integrationId: integration.id,
-                        target: selectedTarget,
+                        entityId: selectedTarget,
+                        entityRecordId: isSpecificTarget ? identifier : nil,
                         content: Array(selectedContent),
-                        identifier: isSpecificTarget ? identifier : nil
+                        collectionName: nil
                     )
                 } else {
-                    // Push requires note content — for now sends a placeholder
-                    // Real implementation will let user pick a note from a collection
                     _ = try await IntegrationStore.shared.push(
                         integrationId: integration.id,
                         noteText: "Note pushed from Scrivano",
                         noteTitle: "Scrivano Note",
-                        ehrId: nil, mrn: identifier.isEmpty ? nil : identifier
+                        metadata: identifier.isEmpty ? [:] : ["mrn": identifier]
                     )
                 }
             } catch {
-                // Log the error locally
                 IntegrationStore.shared.appendLog(IntegrationLogEntry(
                     id: UUID().uuidString, integrationId: integration.id,
                     integrationName: integration.config.name,

@@ -12,14 +12,14 @@ final class IntegrationStore: ObservableObject {
     @Published var isLoadingCatalog = false
     @Published var catalogError: String? = nil
 
-    private let installedKey = "integrations.installed.v2"
+    private let installedKey = "integrations.installed.v3"
     private let api = APIClient.shared
 
     private init() {
         installed = load(key: installedKey) ?? []
     }
 
-    // MARK: - Catalog (from server)
+    // MARK: - Catalog
 
     func fetchCatalog() async {
         isLoadingCatalog = true
@@ -30,28 +30,58 @@ final class IntegrationStore: ObservableObject {
                 method: "GET",
                 responseType: IntegrationListResponse.self
             )
-            let configs = response.integrations.map { $0.toConfig() }
+            // For catalog display use minimal configs; full config loads on demand
+            let configs = response.integrations.map { $0.toMinimalConfig() }
             catalog = configs
-            // Sync installed flags
-            syncInstalledFromCatalog(configs)
+            syncInstalledFromCatalog(response.integrations)
         } catch {
             catalogError = error.localizedDescription
         }
         isLoadingCatalog = false
     }
 
-    private func syncInstalledFromCatalog(_ configs: [IntegrationConfig]) {
-        // Mark integrations the server says are installed
-        for config in configs where config.installed {
-            if !installed.contains(where: { $0.id == config.id }) {
-                let integration = InstalledIntegration(id: config.id, config: config,
-                                                       connectionState: .connected)
+    /// Fetches full config for a single integration and updates catalog + installed entries.
+    func fetchDetail(integrationId: String) async throws {
+        let detail = try await api.request(
+            path: "/api/integrations/\(integrationId)",
+            method: "GET",
+            responseType: ServerIntegrationDetail.self
+        )
+        let config = detail.toConfig()
+        if let idx = catalog.firstIndex(where: { $0.id == integrationId }) {
+            catalog[idx] = config
+        } else {
+            catalog.append(config)
+        }
+        if let idx = installed.firstIndex(where: { $0.id == integrationId }) {
+            installed[idx].config = config
+            save(installed, key: installedKey)
+        }
+    }
+
+    private func syncInstalledFromCatalog(_ items: [ServerIntegrationListItem]) {
+        for item in items where item.installed == true {
+            if !installed.contains(where: { $0.id == item.id }) {
+                let config = item.toMinimalConfig()
+                var integration = InstalledIntegration(id: item.id, config: config,
+                                                       connectionState: .disconnected)
+                if item.status == "active" {
+                    integration.connectionState = .connected
+                } else if item.status == "error" {
+                    integration.connectionState = .error
+                }
                 installed.append(integration)
                 save(installed, key: installedKey)
+            } else if let idx = installed.firstIndex(where: { $0.id == item.id }) {
+                // Update connection state from server
+                if item.status == "active" && installed[idx].connectionState != .connected {
+                    installed[idx].connectionState = .connected
+                    save(installed, key: installedKey)
+                }
             }
         }
-        // Remove locally installed ones the server no longer lists as installed
-        let serverInstalledIds = Set(configs.filter(\.installed).map(\.id))
+        // Remove ones the server no longer lists as installed
+        let serverInstalledIds = Set(items.filter { $0.installed == true }.map(\.id))
         let before = installed.count
         installed.removeAll { !serverInstalledIds.contains($0.id) }
         if installed.count != before { save(installed, key: installedKey) }
@@ -59,33 +89,48 @@ final class IntegrationStore: ObservableObject {
 
     // MARK: - Install
 
-    /// Installs an integration and returns the OAuth URL if auth is required.
-    func install(integrationId: String) async throws -> URL? {
-        let body = ["base_url": String?.none as Any?]  // null base_url per spec
-        struct InstallBody: Encodable { let base_url: String? }
+    /// Installs or reconnects an integration.
+    /// - For OAuth2: returns the auth URL to open in Safari.
+    /// - For api-key/basic: pass credentials; returns nil (marks connected on success).
+    func install(integrationId: String,
+                 baseUrl: String? = nil,
+                 username: String? = nil,
+                 password: String? = nil,
+                 apiKey: String? = nil) async throws -> URL? {
+
+        let body = InstallRequest(
+            baseUrl: baseUrl?.isEmpty == true ? nil : baseUrl,
+            apiKey: apiKey?.isEmpty == true ? nil : apiKey,
+            username: username?.isEmpty == true ? nil : username,
+            password: password?.isEmpty == true ? nil : password
+        )
         let response = try await api.request(
             path: "/api/integrations/\(integrationId)/install",
             method: "POST",
-            body: InstallBody(base_url: nil),
+            body: body,
             responseType: InstallResponse.self
         )
-        // Add to installed list
+
         if let config = catalog.first(where: { $0.id == integrationId }) {
-            var integration = InstalledIntegration(id: integrationId, config: config,
-                                                   connectionState: .disconnected)
-            if let urlStr = response.oauthUrl, !urlStr.isEmpty {
-                integration.connectionState = .disconnected
-            } else {
-                integration.connectionState = .connected
-                integration.lastAuthDate = Date()
-            }
             if !installed.contains(where: { $0.id == integrationId }) {
+                var integration = InstalledIntegration(id: integrationId, config: config,
+                                                       connectionState: .disconnected)
+                if let bu = baseUrl, !bu.isEmpty { integration.baseUrl = bu }
                 installed.append(integration)
-                save(installed, key: installedKey)
             }
+            if let idx = installed.firstIndex(where: { $0.id == integrationId }) {
+                if let bu = baseUrl, !bu.isEmpty { installed[idx].baseUrl = bu }
+            }
+            save(installed, key: installedKey)
         }
-        if let urlStr = response.oauthUrl, let url = URL(string: urlStr) {
+
+        // OAuth2: return the auth URL for Safari
+        if let urlStr = response.authUrl, let url = URL(string: urlStr) {
             return url
+        }
+        // API key / basic: server confirms active immediately
+        if response.status == "active" || response.success == true {
+            markConnected(integrationId: integrationId, email: username)
         }
         return nil
     }
@@ -93,7 +138,6 @@ final class IntegrationStore: ObservableObject {
     // MARK: - Uninstall
 
     func uninstall(integrationId: String) async throws {
-        struct Empty: Codable {}
         _ = try? await api.request(
             path: "/api/integrations/\(integrationId)/uninstall",
             method: "DELETE",
@@ -104,7 +148,7 @@ final class IntegrationStore: ObservableObject {
         save(installed, key: installedKey)
     }
 
-    // MARK: - Mark connected (called after OAuth callback)
+    // MARK: - Mark connected (called after OAuth callback deep link)
 
     func markConnected(integrationId: String, email: String? = nil, org: String? = nil) {
         guard let idx = installed.firstIndex(where: { $0.id == integrationId }) else { return }
@@ -113,6 +157,8 @@ final class IntegrationStore: ObservableObject {
         if let email { installed[idx].accountEmail = email }
         if let org   { installed[idx].accountOrganization = org }
         save(installed, key: installedKey)
+        // Fetch full config now that it's connected
+        Task { try? await fetchDetail(integrationId: integrationId) }
     }
 
     func disconnect(id: String) {
@@ -135,25 +181,36 @@ final class IntegrationStore: ObservableObject {
 
     // MARK: - Pull
 
-    func pull(integrationId: String, target: String, content: [String], identifier: String?) async throws -> ActionResponse {
-        let body = PullRequest(entityId: target, contentTypes: content, identifier: identifier?.isEmpty == true ? nil : identifier)
+    func pull(integrationId: String,
+              entityId: String,
+              entityRecordId: String?,
+              content: [String],
+              collectionName: String?) async throws -> PullResponse {
+
+        let body = PullRequest(
+            entityId: entityId,
+            entityRecordId: entityRecordId?.isEmpty == true ? nil : entityRecordId,
+            contentTypes: content,
+            collectionName: collectionName?.isEmpty == true ? nil : collectionName
+        )
         let response = try await api.request(
             path: "/api/integrations/\(integrationId)/pull",
             method: "POST",
             body: body,
-            responseType: ActionResponse.self
+            responseType: PullResponse.self
         )
+        let itemCount = response.collection?.items?.count ?? 0
         appendLog(IntegrationLogEntry(
             id: UUID().uuidString,
             integrationId: integrationId,
             integrationName: installed.first(where: { $0.id == integrationId })?.config.name ?? integrationId,
             action: .pull,
-            targetLabel: target,
+            targetLabel: entityId,
             contentLabels: content,
-            destinationName: nil,
-            resultSummary: response.message,
-            status: response.success == true ? .success : .error,
-            errorMessage: response.success == true ? nil : response.message,
+            destinationName: response.collection?.name,
+            resultSummary: response.message ?? "\(itemCount) item(s) received",
+            status: .success,
+            errorMessage: nil,
             date: Date()
         ))
         return response
@@ -161,9 +218,12 @@ final class IntegrationStore: ObservableObject {
 
     // MARK: - Push
 
-    func push(integrationId: String, noteText: String, noteTitle: String, ehrId: String?, mrn: String?) async throws -> ActionResponse {
-        let body = PushRequest(noteText: noteText, noteTitle: noteTitle,
-                               metadata: PushMetadata(ehrId: ehrId, mrn: mrn))
+    func push(integrationId: String,
+              noteText: String,
+              noteTitle: String,
+              metadata: [String: String]) async throws -> ActionResponse {
+
+        let body = PushRequest(noteText: noteText, noteTitle: noteTitle, metadata: metadata)
         let response = try await api.request(
             path: "/api/integrations/\(integrationId)/push",
             method: "POST",
@@ -178,7 +238,7 @@ final class IntegrationStore: ObservableObject {
             targetLabel: "Note",
             contentLabels: [],
             destinationName: nil,
-            resultSummary: response.message,
+            resultSummary: response.message ?? (response.success == true ? "Note pushed" : "Failed"),
             status: response.success == true ? .success : .error,
             errorMessage: response.success == true ? nil : response.message,
             date: Date()
@@ -186,44 +246,44 @@ final class IntegrationStore: ObservableObject {
         return response
     }
 
-    // MARK: - Fetch logs from server
+    // MARK: - Logs
 
     func fetchLogs(integrationId: String) async {
         do {
-            // Try object wrapper first
-            if let response = try? await api.request(
+            let response = try await api.request(
                 path: "/api/integrations/\(integrationId)/logs",
                 method: "GET",
                 responseType: ServerLogsResponse.self
-            ), let entries = response.logs {
+            )
+            if let entries = response.logs {
                 let mapped = entries.compactMap { mapServerLog($0, integrationId: integrationId) }
                 let existing = log.filter { $0.integrationId != integrationId }
                 log = existing + mapped
             }
-        }
+        } catch {}
     }
 
     private func mapServerLog(_ e: ServerLogEntry, integrationId: String) -> IntegrationLogEntry? {
         let name = installed.first(where: { $0.id == integrationId })?.config.name ?? integrationId
-        let action: LogAction = e.action == "push" ? .push : .pull
-        let status: LogEntryStatus = e.status == "success" || e.status == "completed" ? .success : .error
+        let status: LogEntryStatus = e.status == "success" ? .success : .error
         var date = Date()
         if let str = e.createdAt {
             let f = ISO8601DateFormatter()
             f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
             date = f.date(from: str) ?? Date()
         }
+        let count = e.itemsCount ?? 0
         return IntegrationLogEntry(
             id: e.id ?? UUID().uuidString,
             integrationId: integrationId,
             integrationName: name,
-            action: action,
-            targetLabel: e.target ?? "Request",
-            contentLabels: e.content ?? [],
-            destinationName: nil,
-            resultSummary: e.summary ?? e.message,
+            action: .pull,
+            targetLabel: e.entity ?? e.collectionName ?? "Request",
+            contentLabels: e.contentTypes ?? [],
+            destinationName: e.collectionName,
+            resultSummary: status == .success ? "\(count) item(s)" : e.errorMessage,
             status: status,
-            errorMessage: status == .error ? (e.message ?? "Unknown error") : nil,
+            errorMessage: status == .error ? e.errorMessage : nil,
             date: date
         )
     }
