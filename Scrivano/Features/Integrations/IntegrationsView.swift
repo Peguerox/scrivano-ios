@@ -324,6 +324,10 @@ struct AuthTabView: View {
     @State private var isReconnecting = false
     @State private var isUninstalling = false
     @State private var actionError: String? = nil
+    // API key credentials form
+    @State private var apiUsername = ""
+    @State private var apiPassword = ""
+    @State private var isSavingCredentials = false
 
     private var timeFmt: DateFormatter {
         let f = DateFormatter(); f.dateStyle = .none; f.timeStyle = .short; return f
@@ -359,20 +363,36 @@ struct AuthTabView: View {
                             }
                         }
                     }
-                    actionButton("Reconnect", style: .ghost, loading: isReconnecting) { triggerReconnect() }
+                    if integration.config.authType == .oauth2 {
+                        actionButton("Reconnect", style: .ghost, loading: isReconnecting) { triggerReconnect() }
+                    } else {
+                        credentialsForm(reconnect: true)
+                    }
                     actionButton("Disconnect", style: .danger) { showDisconnectConfirm = true }
                 } else {
-                    VStack(spacing: 16) {
-                        Text(integration.connectionState == .expired ? "🔑" : "🔌").font(.system(size: 36))
-                        Text(integration.connectionState == .expired ? "Token Expired" : "Not Connected")
-                            .font(.inter(15, weight: .bold)).foregroundColor(.textPrimary)
-                        Text(integration.connectionState == .expired
-                             ? "Your session has expired. Reconnect to continue."
-                             : "Connect to start pulling and pushing data.")
-                            .font(.inter(13)).foregroundColor(.textSecondary).multilineTextAlignment(.center)
+                    if integration.config.authType == .oauth2 {
+                        VStack(spacing: 16) {
+                            Text(integration.connectionState == .expired ? "🔑" : "🔌").font(.system(size: 36))
+                            Text(integration.connectionState == .expired ? "Token Expired" : "Not Connected")
+                                .font(.inter(15, weight: .bold)).foregroundColor(.textPrimary)
+                            Text(integration.connectionState == .expired
+                                 ? "Your session has expired. Reconnect to continue."
+                                 : "Tap Connect — you'll be taken to the provider's login page.")
+                                .font(.inter(13)).foregroundColor(.textSecondary).multilineTextAlignment(.center)
+                        }
+                        .padding(.vertical, 24)
+                        actionButton("Connect via Browser", style: .primary, loading: isReconnecting) { triggerReconnect() }
+                    } else {
+                        VStack(spacing: 8) {
+                            Text("🔑").font(.system(size: 36))
+                            Text("Enter your credentials")
+                                .font(.inter(15, weight: .bold)).foregroundColor(.textPrimary)
+                            Text("Your username and password are sent securely to the server and never stored on device.")
+                                .font(.inter(12)).foregroundColor(.textSecondary).multilineTextAlignment(.center)
+                        }
+                        .padding(.vertical, 16)
+                        credentialsForm(reconnect: false)
                     }
-                    .padding(.vertical, 24)
-                    actionButton("Connect", style: .primary, loading: isReconnecting) { triggerReconnect() }
                 }
 
                 if let err = actionError {
@@ -405,6 +425,75 @@ struct AuthTabView: View {
             }
             Button("Cancel", role: .cancel) {}
         }
+    }
+
+    @ViewBuilder
+    private func credentialsForm(reconnect: Bool) -> some View {
+        VStack(spacing: 0) {
+            credentialField(label: "Username", text: $apiUsername, secure: false, isLast: false)
+            Divider().background(Color.white.opacity(0.06))
+            credentialField(label: "Password", text: $apiPassword, secure: true, isLast: true)
+        }
+        .background(Color.white.opacity(0.04))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.white.opacity(0.09), lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+        actionButton(reconnect ? "Update Credentials" : "Connect", style: .primary,
+                     loading: isSavingCredentials,
+                     disabled: apiUsername.isEmpty || apiPassword.isEmpty) {
+            saveCredentials()
+        }
+    }
+
+    @ViewBuilder
+    private func credentialField(label: String, text: Binding<String>, secure: Bool, isLast: Bool) -> some View {
+        HStack(spacing: 12) {
+            Text(label)
+                .font(.inter(13, weight: .semibold))
+                .foregroundColor(.textSecondary)
+                .frame(width: 80, alignment: .leading)
+            if secure {
+                SecureField("••••••••", text: text)
+                    .font(.inter(13))
+                    .foregroundColor(.textPrimary)
+                    .textContentType(.password)
+                    .autocorrectionDisabled()
+            } else {
+                TextField("Enter \(label.lowercased())", text: text)
+                    .font(.inter(13))
+                    .foregroundColor(.textPrimary)
+                    .textContentType(.username)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 13)
+    }
+
+    private func saveCredentials() {
+        isSavingCredentials = true
+        actionError = nil
+        Task {
+            do {
+                _ = try await APIClient.shared.request(
+                    path: "/api/integrations/\(integration.id)/credentials",
+                    method: "POST",
+                    body: CredentialsBody(username: apiUsername, password: apiPassword),
+                    responseType: ActionResponse.self
+                )
+                store.markConnected(integrationId: integration.id, email: apiUsername)
+                apiPassword = ""
+            } catch {
+                actionError = error.localizedDescription
+            }
+            isSavingCredentials = false
+        }
+    }
+
+    private struct CredentialsBody: Encodable {
+        let username: String
+        let password: String
     }
 
     private func triggerReconnect() {
@@ -475,7 +564,7 @@ struct AuthTabView: View {
     enum AuthButtonStyle { case ghost, danger, primary }
 
     @ViewBuilder
-    private func actionButton(_ title: String, style: AuthButtonStyle, loading: Bool = false, action: @escaping () -> Void) -> some View {
+    private func actionButton(_ title: String, style: AuthButtonStyle, loading: Bool = false, disabled: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Group {
                 if loading { ProgressView().tint(style == .primary ? .white : .brandCyan).scaleEffect(0.8) }
@@ -486,7 +575,8 @@ struct AuthTabView: View {
             }
             .frame(maxWidth: .infinity).padding(.vertical, 13)
         }
-        .disabled(loading)
+        .disabled(loading || disabled)
+        .opacity(disabled && !loading ? 0.4 : 1)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(style == .danger ? Color(hex: "#f87171").opacity(0.08) :
