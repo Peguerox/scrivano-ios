@@ -20,15 +20,15 @@ struct IntegrationsView: View {
             Color.phoneBg.ignoresSafeArea()
             VStack(spacing: 0) {
                 topBar
-                if store.isLoadingCatalog && store.catalog.isEmpty {
+                if store.isLoadingCatalog && store.catalog.isEmpty && store.installed.isEmpty {
                     Spacer()
                     ProgressView().tint(.brandCyan)
                     Spacer()
-                } else if store.installed.isEmpty {
-                    emptyState
                 } else {
                     integrationDropdown
                     tabBar
+                        .opacity(store.installed.isEmpty ? 0.35 : 1)
+                        .disabled(store.installed.isEmpty)
                     tabContent
                 }
             }
@@ -80,8 +80,9 @@ struct IntegrationsView: View {
     private var integrationDropdown: some View {
         ZStack(alignment: .top) {
             VStack(spacing: 0) {
-                // Selected row
+                // Selected row (or placeholder when nothing installed)
                 Button {
+                    guard !store.installed.isEmpty else { return }
                     withAnimation(.easeInOut(duration: 0.18)) { showDropdown.toggle() }
                 } label: {
                     HStack(spacing: 10) {
@@ -102,12 +103,23 @@ struct IntegrationsView: View {
                             Image(systemName: showDropdown ? "chevron.up" : "chevron.down")
                                 .font(.system(size: 11, weight: .semibold))
                                 .foregroundColor(.textTertiary)
+                        } else {
+                            Image(systemName: "link")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(.textTertiary)
+                                .frame(width: 28, height: 28)
+                                .background(Color.white.opacity(0.06))
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                            Text("No integration selected")
+                                .font(.inter(13, weight: .semibold))
+                                .foregroundColor(.textTertiary)
+                            Spacer()
                         }
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
                     .background(
-                        RoundedRectangle(cornerRadius: showDropdown ? 14 : 14, style: .continuous)
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
                             .fill(Color.white.opacity(0.05))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -218,30 +230,26 @@ struct IntegrationsView: View {
                 LogTabView(integrationId: integration.id)
                     .onAppear { Task { await store.fetchLogs(integrationId: integration.id) } }
             }
-        }
-    }
-
-    // MARK: - Empty state
-
-    private var emptyState: some View {
-        VStack(spacing: 20) {
-            Spacer()
-            Text("🔗").font(.system(size: 48))
-            Text("No integrations installed")
-                .font(.inter(16, weight: .bold)).foregroundColor(.textPrimary)
-            if let err = store.catalogError {
-                Text(err).font(.inter(12)).foregroundColor(.danger).multilineTextAlignment(.center)
-                Button("Retry") { Task { await store.fetchCatalog() } }
-                    .font(.inter(13, weight: .bold)).foregroundColor(.brandCyan)
-            } else {
-                Text("Browse the catalog to add your first integration")
-                    .font(.inter(13)).foregroundColor(.textSecondary).multilineTextAlignment(.center)
-            }
-            CatalogPillView(onInstall: { url in oauthURL = url })
+        } else {
+            // Nothing installed — show catalog so user can add one
+            ScrollView {
+                VStack(spacing: 16) {
+                    if let err = store.catalogError {
+                        Text(err).font(.inter(12)).foregroundColor(.danger)
+                            .multilineTextAlignment(.center).padding(.top, 24)
+                        Button("Retry") { Task { await store.fetchCatalog() } }
+                            .font(.inter(13, weight: .bold)).foregroundColor(.brandCyan)
+                    } else {
+                        Text("Add an integration to get started")
+                            .font(.inter(13)).foregroundColor(.textSecondary)
+                            .padding(.top, 24)
+                    }
+                    CatalogPillView(onInstall: { url in oauthURL = url })
+                }
                 .padding(.horizontal, 18)
-            Spacer()
+                .padding(.bottom, 32)
+            }
         }
-        .padding(.horizontal, 18)
     }
 
     // MARK: - Helpers
