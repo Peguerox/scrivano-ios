@@ -47,6 +47,9 @@ struct IntegrationsView: View {
                         .opacity(store.installed.isEmpty ? 0.35 : 1)
                         .disabled(store.installed.isEmpty)
                     tabContent
+                    CatalogPillView(onInstall: { url in oauthURL = url })
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 12)
                 }
             }
             if showDropdown {
@@ -283,24 +286,7 @@ struct IntegrationsView: View {
                     .onAppear { Task { await store.fetchLogs(integrationId: integration.id) } }
             }
         } else {
-            // Nothing installed — show catalog so user can add one
-            ScrollView {
-                VStack(spacing: 16) {
-                    if let err = store.catalogError {
-                        Text(err).font(.inter(12)).foregroundColor(.danger)
-                            .multilineTextAlignment(.center).padding(.top, 24)
-                        Button("Retry") { Task { await store.fetchCatalog() } }
-                            .font(.inter(13, weight: .bold)).foregroundColor(.brandCyan)
-                    } else {
-                        Text("Add an integration to get started")
-                            .font(.inter(13)).foregroundColor(.textSecondary)
-                            .padding(.top, 24)
-                    }
-                    CatalogPillView(onInstall: { url in oauthURL = url })
-                }
-                .padding(.horizontal, 18)
-                .padding(.bottom, 32)
-            }
+            Spacer()
         }
     }
 
@@ -420,9 +406,6 @@ struct AuthTabView: View {
                 }
 
                 actionButton("Uninstall", style: .ghost, loading: isUninstalling) { showUninstallConfirm = true }
-
-                CatalogPillView(onInstall: onOAuthURL)
-                    .padding(.top, 8)
 
                 Spacer().frame(height: 24)
             }
