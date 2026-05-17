@@ -58,10 +58,20 @@ struct IntegrationsView: View {
         }
         .onAppear {
             if selectedId == nil { selectedId = store.installed.first?.id }
-            Task { await store.fetchCatalog() }
+            Task {
+                await store.fetchCatalog()
+                // Load full config (with pull targets & content types) for selected integration
+                if let id = selectedId ?? store.installed.first?.id {
+                    try? await store.fetchDetail(integrationId: id)
+                }
+            }
         }
         .onChange(of: store.installed.count) { _ in
             if selectedId == nil { selectedId = store.installed.first?.id }
+        }
+        .onChange(of: selectedId) { id in
+            // Fetch full config whenever user switches integration
+            if let id { Task { try? await store.fetchDetail(integrationId: id) } }
         }
         .sheet(item: $oauthURL) { url in
             SafariView(url: url)
