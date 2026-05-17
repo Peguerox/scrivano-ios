@@ -179,16 +179,29 @@ final class IntegrationStore: ObservableObject {
         save(installed, key: installedKey)
     }
 
+    // MARK: - Browse (list dropdown before pull)
+
+    func browse(integrationId: String, entityId: String) async throws -> [BrowseItem] {
+        let response = try await api.request(
+            path: "/api/integrations/\(integrationId)/browse?entity_id=\(entityId)",
+            method: "GET",
+            responseType: BrowseResponse.self
+        )
+        return response.items ?? []
+    }
+
     // MARK: - Pull
 
     func pull(integrationId: String,
               entityId: String,
+              listId: String?,
               entityRecordId: String?,
               content: [String],
               collectionName: String?) async throws -> PullResponse {
 
         let body = PullRequest(
             entityId: entityId,
+            listId: listId?.isEmpty == true ? nil : listId,
             entityRecordId: entityRecordId?.isEmpty == true ? nil : entityRecordId,
             contentTypes: content,
             collectionName: collectionName?.isEmpty == true ? nil : collectionName

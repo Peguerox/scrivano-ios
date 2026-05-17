@@ -974,14 +974,23 @@ struct RequestTabView: View {
     @State private var destMode: DestMode = .newCollection
     @State private var selectedPushTarget: String = ""
     @State private var isRequesting = false
+    // Browse list dropdown
+    @State private var availableLists: [BrowseItem] = []
+    @State private var selectedListId: String = ""
+    @State private var isLoadingLists = false
+    @State private var showListDropdown = false
 
     private var isPull: Bool { mode == .pull }
     private var pullTargets: [IntegrationOption] { integration.config.pullTargets }
     private var pushTargets: [IntegrationOption] { integration.config.pushTargets }
     private var pullContent: [IntegrationOption] { integration.config.pullContent }
+    private var listSourceEntity: String? { integration.config.listSourceEntity }
 
-    private var isSpecificTarget: Bool {
-        ["specific_patient","specific_client","specific_contact","specific"].contains(selectedTarget)
+    private var selectedEntity: IntegrationOption? {
+        pullTargets.first(where: { $0.id == selectedTarget })
+    }
+    private var selectedListName: String {
+        availableLists.first(where: { $0.id == selectedListId })?.name ?? "Select a list"
     }
 
     private var pill1Summary: String {
@@ -998,7 +1007,12 @@ struct RequestTabView: View {
     }
     private var canSubmit: Bool {
         guard integration.connectionState == .connected else { return false }
-        return isPull ? !selectedTarget.isEmpty : !selectedPushTarget.isEmpty
+        if isPull {
+            guard !selectedTarget.isEmpty else { return false }
+            if listSourceEntity != nil { return !selectedListId.isEmpty }
+            return true
+        }
+        return !selectedPushTarget.isEmpty
     }
 
     var body: some View {
@@ -1009,6 +1023,11 @@ struct RequestTabView: View {
                         .padding(.horizontal, 18)
                         .padding(.top, 16)
                         .padding(.bottom, 12)
+
+                    // List dropdown — shown above "What to pull" when config has list_source_entity
+                    if isPull, let _ = listSourceEntity {
+                        listDropdownPill
+                    }
 
                     pill(icon: isPull ? "📥" : "📤",
                          title: isPull ? "What to pull" : "What to push",
@@ -1021,10 +1040,9 @@ struct RequestTabView: View {
                                             selected: selectedTarget == opt.id,
                                             isLast: opt.id == pullTargets.last?.id) {
                                     selectedTarget = opt.id
-                                    if !isSpecificTarget { identifier = "" }
+                                    if !opt.requiresId { identifier = "" }
                                 }
-                                if isSpecificTarget && selectedTarget == opt.id &&
-                                   ["specific_patient","specific_client","specific_contact","specific"].contains(opt.id) {
+                                if selectedTarget == opt.id && opt.requiresId {
                                     identifierField
                                 }
                             }
@@ -1109,6 +1127,90 @@ struct RequestTabView: View {
             }
             .background(Color.phoneBg)
         }
+        .onAppear {
+            selectedTarget = pullTargets.first?.id ?? ""
+            selectedPushTarget = pushTargets.first?.id ?? ""
+            if let entity = listSourceEntity {
+                fetchLists(entityId: entity)
+            }
+        }
+    }
+
+    // MARK: - List dropdown pill
+
+    private var listDropdownPill: some View {
+        VStack(spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) { showListDropdown.toggle() }
+            } label: {
+                HStack(spacing: 10) {
+                    if isLoadingLists {
+                        ProgressView().scaleEffect(0.7).tint(.brandCyan)
+                    } else {
+                        Image(systemName: "list.bullet")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.brandCyan)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("List").font(.inter(11, weight: .heavy)).foregroundColor(.textTertiary).tracking(0.8)
+                        Text(selectedListId.isEmpty ? "Select a list" : selectedListName)
+                            .font(.inter(13, weight: .semibold))
+                            .foregroundColor(selectedListId.isEmpty ? .textTertiary : .textPrimary)
+                    }
+                    Spacer()
+                    Image(systemName: showListDropdown ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 11, weight: .semibold)).foregroundColor(.textTertiary)
+                }
+                .padding(.horizontal, 16).padding(.vertical, 12)
+            }
+            .buttonStyle(.plain)
+
+            if showListDropdown {
+                Divider().background(Color.white.opacity(0.07))
+                if availableLists.isEmpty {
+                    Text(isLoadingLists ? "Loading…" : "No lists available")
+                        .font(.inter(12)).foregroundColor(.textTertiary)
+                        .padding(.vertical, 14)
+                } else {
+                    ForEach(availableLists) { item in
+                        Button {
+                            selectedListId = item.id
+                            withAnimation { showListDropdown = false }
+                        } label: {
+                            HStack {
+                                Text(item.name).font(.inter(13)).foregroundColor(.textPrimary)
+                                Spacer()
+                                if item.id == selectedListId {
+                                    Image(systemName: "checkmark").font(.system(size: 12, weight: .bold)).foregroundColor(.brandCyan)
+                                }
+                            }
+                            .padding(.horizontal, 16).padding(.vertical, 11)
+                        }
+                        .buttonStyle(.plain)
+                        if item.id != availableLists.last?.id {
+                            Divider().background(Color.white.opacity(0.05))
+                        }
+                    }
+                }
+            }
+        }
+        .background(Color.white.opacity(0.04))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(
+            selectedListId.isEmpty ? Color.brandCyan.opacity(0.3) : Color.white.opacity(0.1), lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .padding(.horizontal, 18).padding(.bottom, 10)
+    }
+
+    private func fetchLists(entityId: String) {
+        isLoadingLists = true
+        Task {
+            if let items = try? await IntegrationStore.shared.browse(
+                integrationId: integration.id, entityId: entityId) {
+                availableLists = items
+                if selectedListId.isEmpty { selectedListId = items.first?.id ?? "" }
+            }
+            isLoadingLists = false
+        }
     }
 
     // MARK: - Segmented control
@@ -1184,17 +1286,17 @@ struct RequestTabView: View {
     // MARK: - Identifier field
 
     private var identifierField: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Text((integration.config.identifierLabel ?? "ID").uppercased())
+        let label = pullTargets.first(where: { $0.id == selectedTarget })?.idLabel
+            ?? integration.config.identifierLabel ?? "ID"
+        return VStack(alignment: .leading, spacing: 7) {
+            Text(label.uppercased())
                 .font(.inter(10, weight: .heavy)).foregroundColor(Color.brandCyan.opacity(0.7)).tracking(0.8)
-            TextField(integration.config.identifierPlaceholder ?? "Enter identifier…", text: $identifier)
+            TextField("Enter \(label)…", text: $identifier)
                 .font(.inter(14, weight: .medium)).foregroundColor(.textPrimary).tint(.brandCyan)
                 .padding(.horizontal, 13).padding(.vertical, 10)
                 .background(Color.black.opacity(0.3))
                 .overlay(RoundedRectangle(cornerRadius: 11).stroke(Color.brandCyan.opacity(0.3), lineWidth: 1.5))
                 .clipShape(RoundedRectangle(cornerRadius: 11))
-            Text("Sent to server as-is — the integration resolves this identifier")
-                .font(.inter(10)).foregroundColor(.textTertiary).lineSpacing(3)
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
         .background(Color.brandBlue.opacity(0.06))
@@ -1208,6 +1310,7 @@ struct RequestTabView: View {
         selectedContent = []
         identifier = ""
         destMode = .newCollection
+        selectedListId = availableLists.first?.id ?? ""
     }
 
     private func submitRequest() {
@@ -1216,12 +1319,16 @@ struct RequestTabView: View {
         Task {
             do {
                 if isPull {
+                    let collectionName = selectedListName == "Select a list"
+                        ? "\(integration.config.name) — \(shortDate())"
+                        : "\(selectedListName) — \(shortDate())"
                     _ = try await IntegrationStore.shared.pull(
                         integrationId: integration.id,
                         entityId: selectedTarget,
-                        entityRecordId: isSpecificTarget ? identifier : nil,
+                        listId: listSourceEntity != nil ? selectedListId : nil,
+                        entityRecordId: identifier.isEmpty ? nil : identifier,
                         content: Array(selectedContent),
-                        collectionName: nil
+                        collectionName: collectionName
                     )
                 } else {
                     _ = try await IntegrationStore.shared.push(

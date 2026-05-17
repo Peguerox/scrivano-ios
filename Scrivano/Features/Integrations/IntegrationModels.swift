@@ -7,19 +7,20 @@ struct IntegrationConfig: Codable, Identifiable, Hashable {
     let name: String
     let type: IntegrationType
     let description: String
-    let logoUrl: String?          // URL from server (may be nil for legacy)
-    let logoEmoji: String         // fallback emoji when no logo URL
+    let logoUrl: String?
+    let logoEmoji: String
     let logoColorStart: String
     let logoColorEnd: String
     let authType: AuthType
     let requiresBaseUrl: Bool
     let baseUrlLabel: String?
     let baseUrlDefault: String?
-    let pullTargets: [IntegrationOption]
-    let pullContent: [IntegrationOption]
+    let pullTargets: [IntegrationOption]   // entities → radio buttons
+    let pullContent: [IntegrationOption]   // content_types → checkboxes
     let pushTargets: [IntegrationOption]
     let identifierLabel: String?
     let identifierPlaceholder: String?
+    let listSourceEntity: String?          // if set, browse endpoint must be called first
     var installed: Bool
 
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
@@ -30,6 +31,8 @@ struct IntegrationOption: Codable, Identifiable {
     let id: String
     let label: String
     let subtitle: String
+    var requiresId: Bool = false
+    var idLabel: String? = nil
 }
 
 enum IntegrationType: String, Codable {
@@ -156,6 +159,7 @@ struct ServerIntegrationListItem: Codable {
             pushTargets: [],
             identifierLabel: nil,
             identifierPlaceholder: nil,
+            listSourceEntity: nil,
             installed: installed ?? false
         )
     }
@@ -197,11 +201,12 @@ struct ServerIntegrationDetail: Codable {
             requiresBaseUrl: auth?.requiresBaseUrl ?? false,
             baseUrlLabel: auth?.baseUrlLabel,
             baseUrlDefault: auth?.baseUrlDefault,
-            pullTargets: entities.map { IntegrationOption(id: $0.id, label: $0.label, subtitle: $0.description ?? "") },
+            pullTargets: entities.map { IntegrationOption(id: $0.id, label: $0.label, subtitle: $0.description ?? "", requiresId: $0.requiresId ?? false, idLabel: $0.idLabel) },
             pullContent: contentTypes.map { IntegrationOption(id: $0.id, label: $0.label, subtitle: "") },
             pushTargets: [],
             identifierLabel: entities.first(where: { $0.requiresId == true })?.idLabel,
             identifierPlaceholder: entities.first(where: { $0.requiresId == true })?.idLabel,
+            listSourceEntity: capabilities?.listSourceEntity,
             installed: installed ?? false
         )
     }
@@ -225,11 +230,13 @@ struct ServerCapabilities: Codable {
     let entities: [ServerEntity]?
     let contentTypes: [ServerContentType]?
     let canPush: Bool?
+    let listSourceEntity: String?
 
     enum CodingKeys: String, CodingKey {
         case entities
-        case contentTypes = "content_types"
-        case canPush      = "can_push"
+        case contentTypes     = "content_types"
+        case canPush          = "can_push"
+        case listSourceEntity = "list_source_entity"
     }
 }
 
@@ -294,16 +301,29 @@ struct InstallResponse: Codable {
 
 struct PullRequest: Encodable {
     let entityId: String
-    let entityRecordId: String?
+    let listId: String?           // selected list from browse dropdown
+    let entityRecordId: String?   // only when entity requires_id = true
     let contentTypes: [String]
     let collectionName: String?
 
     enum CodingKeys: String, CodingKey {
         case entityId       = "entity_id"
+        case listId         = "list_id"
         case entityRecordId = "entity_record_id"
         case contentTypes   = "content_types"
         case collectionName = "collection_name"
     }
+}
+
+// MARK: - Browse
+
+struct BrowseResponse: Codable {
+    let items: [BrowseItem]?
+}
+
+struct BrowseItem: Codable, Identifiable {
+    let id: String
+    let name: String
 }
 
 struct PullResponse: Codable {
