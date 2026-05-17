@@ -7,6 +7,7 @@ struct IntegrationsView: View {
 
     @State private var selectedId: String? = nil
     @State private var showDropdown = false
+    @State private var showCatalogSheet = false
     @State private var activeTab: IntTab = .request
     @State private var oauthURL: URL? = nil
     @State private var oauthResultMessage: String? = nil
@@ -75,6 +76,12 @@ struct IntegrationsView: View {
         }
         .sheet(item: $oauthURL) { url in
             SafariView(url: url)
+        }
+        .sheet(isPresented: $showCatalogSheet) {
+            CatalogSheetView(onInstall: { url in
+                showCatalogSheet = false
+                oauthURL = url
+            })
         }
         .onReceive(NotificationCenter.default.publisher(for: .integrationOAuthCallback)) { note in
             let info = note.userInfo ?? [:]
@@ -218,10 +225,24 @@ struct IntegrationsView: View {
                         .buttonStyle(.plain)
                         Divider().background(Color.white.opacity(0.05))
                     }
-                    // Add integration — always at the bottom of the dropdown
-                    CatalogPillView(onInstall: { url in oauthURL = url })
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
+                    // Add integration row
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.18)) { showDropdown = false }
+                        showCatalogSheet = true
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 18))
+                                .foregroundColor(.brandCyan)
+                            Text("Add Integration")
+                                .font(.inter(13, weight: .semibold))
+                                .foregroundColor(.brandCyan)
+                            Spacer()
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                    }
+                    .buttonStyle(.plain)
                 }
                 .background(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -688,10 +709,48 @@ struct AuthTabView: View {
     }
 }
 
+// MARK: - CATALOG SHEET
+
+struct CatalogSheetView: View {
+    var onInstall: ((URL?) -> Void)? = nil
+    @Environment(\.dismiss) var dismiss
+
+    var body: some View {
+        ZStack {
+            Color.phoneBg.ignoresSafeArea()
+            VStack(spacing: 0) {
+                HStack {
+                    Text("Add Integration")
+                        .font(.inter(16, weight: .heavy))
+                        .foregroundColor(.textPrimary)
+                    Spacer()
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.textTertiary)
+                            .frame(width: 32, height: 32)
+                            .background(Color.white.opacity(0.07))
+                            .clipShape(Circle())
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+
+                ScrollView(showsIndicators: false) {
+                    CatalogPillView(onInstall: onInstall, startExpanded: true)
+                        .padding(.horizontal, 18)
+                        .padding(.bottom, 32)
+                }
+            }
+        }
+    }
+}
+
 // MARK: - CATALOG PILL
 
 struct CatalogPillView: View {
     var onInstall: ((URL?) -> Void)? = nil
+    var startExpanded: Bool = false
     @ObservedObject private var store = IntegrationStore.shared
     @State private var isOpen = false
     @State private var searchText = ""
@@ -790,6 +849,7 @@ struct CatalogPillView: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(Color.white.opacity(0.1), lineWidth: 1)
         )
+        .onAppear { if startExpanded { isOpen = true } }
     }
 
     @ViewBuilder
