@@ -1035,6 +1035,7 @@ struct RequestTabView: View {
     @State private var isRequesting = false
     // Browse list dropdown
     @State private var availableLists: [BrowseItem] = []
+    @State private var listsLoaded = false       // true once browse call completes
     @State private var selectedListId: String = ""
     @State private var isLoadingLists = false
     @State private var showListDropdown = false
@@ -1045,11 +1046,17 @@ struct RequestTabView: View {
     private var pullContent: [IntegrationOption] { integration.config.pullContent }
     private var listSourceEntity: String? { integration.config.listSourceEntity }
 
-    private var selectedEntity: IntegrationOption? {
-        pullTargets.first(where: { $0.id == selectedTarget })
+    // Whether the list picker should be shown (only when lists exist)
+    private var showListPicker: Bool { listSourceEntity != nil && !availableLists.isEmpty }
+
+    // "Patient List" is only selectable when a list is chosen; otherwise only Specific Patient
+    private func isEntityDisabled(_ opt: IntegrationOption) -> Bool {
+        guard listSourceEntity != nil && listsLoaded && availableLists.isEmpty else { return false }
+        return !opt.requiresId  // disable non-specific entities when no lists available
     }
+
     private var selectedListName: String {
-        availableLists.first(where: { $0.id == selectedListId })?.name ?? "Select a list"
+        availableLists.first(where: { $0.id == selectedListId })?.name ?? ""
     }
 
     private var pill1Summary: String {
@@ -1058,8 +1065,8 @@ struct RequestTabView: View {
             : (pushTargets.first(where: { $0.id == selectedPushTarget })?.label ?? "Select option")
     }
     private var pill2Summary: String {
-        selectedContent.isEmpty ? "None — list only"
-            : pullContent.filter { selectedContent.contains($0.id) }.map(\.label).joined(separator: ", ")
+        let checked = pullContent.filter { selectedContent.contains($0.id) }.map(\.label)
+        return checked.isEmpty ? "None — names only" : checked.joined(separator: ", ")
     }
     private var pill3Summary: String {
         isPull ? (destMode == .newCollection ? "New collection" : "Existing collection") : "Select collection"
@@ -1068,7 +1075,12 @@ struct RequestTabView: View {
         guard integration.connectionState == .connected else { return false }
         if isPull {
             guard !selectedTarget.isEmpty else { return false }
-            if listSourceEntity != nil { return !selectedListId.isEmpty }
+            // If list picker shown, require a list selection
+            if showListPicker && selectedListId.isEmpty { return false }
+            // If specific entity, require identifier
+            if pullTargets.first(where: { $0.id == selectedTarget })?.requiresId == true {
+                return !identifier.isEmpty
+            }
             return true
         }
         return !selectedPushTarget.isEmpty
@@ -1083,8 +1095,8 @@ struct RequestTabView: View {
                         .padding(.top, 16)
                         .padding(.bottom, 12)
 
-                    // List dropdown — shown above "What to pull" when config has list_source_entity
-                    if isPull, let _ = listSourceEntity {
+                    // List picker — only shown when browse returned items
+                    if isPull && showListPicker {
                         listDropdownPill
                     }
 
@@ -1095,12 +1107,16 @@ struct RequestTabView: View {
                     } content: {
                         if isPull {
                             ForEach(pullTargets) { opt in
+                                let disabled = isEntityDisabled(opt)
                                 IntRadioRow(label: opt.label, subtitle: opt.subtitle, icon: nil,
                                             selected: selectedTarget == opt.id,
                                             isLast: opt.id == pullTargets.last?.id) {
-                                    selectedTarget = opt.id
-                                    if !opt.requiresId { identifier = "" }
+                                    if !disabled {
+                                        selectedTarget = opt.id
+                                        if !opt.requiresId { identifier = "" }
+                                    }
                                 }
+                                .opacity(disabled ? 0.35 : 1)
                                 if selectedTarget == opt.id && opt.requiresId {
                                     identifierField
                                 }
@@ -1189,6 +1205,8 @@ struct RequestTabView: View {
         .onAppear {
             selectedTarget = pullTargets.first?.id ?? ""
             selectedPushTarget = pushTargets.first?.id ?? ""
+            // Default all content types checked
+            selectedContent = Set(pullContent.map(\.id))
             if let entity = listSourceEntity {
                 fetchLists(entityId: entity)
             }
@@ -1266,8 +1284,14 @@ struct RequestTabView: View {
             if let items = try? await IntegrationStore.shared.browse(
                 integrationId: integration.id, entityId: entityId) {
                 availableLists = items
+                // Pre-select first list if available
                 if selectedListId.isEmpty { selectedListId = items.first?.id ?? "" }
+                // If no lists, force-select the specific entity (requires_id)
+                if items.isEmpty, let specificEntity = pullTargets.first(where: { $0.requiresId }) {
+                    selectedTarget = specificEntity.id
+                }
             }
+            listsLoaded = true
             isLoadingLists = false
         }
     }
@@ -1366,7 +1390,7 @@ struct RequestTabView: View {
     private func resetSelections() {
         selectedTarget = pullTargets.first?.id ?? ""
         selectedPushTarget = pushTargets.first?.id ?? ""
-        selectedContent = []
+        selectedContent = Set(pullContent.map(\.id))
         identifier = ""
         destMode = .newCollection
         selectedListId = availableLists.first?.id ?? ""
@@ -1378,13 +1402,12 @@ struct RequestTabView: View {
         Task {
             do {
                 if isPull {
-                    let collectionName = selectedListName == "Select a list"
-                        ? "\(integration.config.name) — \(shortDate())"
-                        : "\(selectedListName) — \(shortDate())"
+                    let listName = selectedListName.isEmpty ? nil : selectedListName
+                    let collectionName = listName ?? "\(integration.config.name) — \(shortDate())"
                     _ = try await IntegrationStore.shared.pull(
                         integrationId: integration.id,
                         entityId: selectedTarget,
-                        listId: listSourceEntity != nil ? selectedListId : nil,
+                        listId: showListPicker ? selectedListId : nil,
                         entityRecordId: identifier.isEmpty ? nil : identifier,
                         content: Array(selectedContent),
                         collectionName: collectionName

@@ -318,7 +318,13 @@ struct PullRequest: Encodable {
 // MARK: - Browse
 
 struct BrowseResponse: Codable {
+    let entityId: String?
     let items: [BrowseItem]?
+
+    enum CodingKeys: String, CodingKey {
+        case entityId = "entity_id"
+        case items
+    }
 }
 
 struct BrowseItem: Codable, Identifiable {
