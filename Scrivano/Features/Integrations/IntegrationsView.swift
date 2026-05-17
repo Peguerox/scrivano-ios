@@ -47,9 +47,6 @@ struct IntegrationsView: View {
                         .opacity(store.installed.isEmpty ? 0.35 : 1)
                         .disabled(store.installed.isEmpty)
                     tabContent
-                    CatalogPillView(onInstall: { url in oauthURL = url })
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 12)
                 }
             }
             if showDropdown {
@@ -219,10 +216,12 @@ struct IntegrationsView: View {
                             .padding(.vertical, 11)
                         }
                         .buttonStyle(.plain)
-                        if integration.id != store.installed.last?.id {
-                            Divider().background(Color.white.opacity(0.05))
-                        }
+                        Divider().background(Color.white.opacity(0.05))
                     }
+                    // Add integration — always at the bottom of the dropdown
+                    CatalogPillView(onInstall: { url in oauthURL = url })
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
                 }
                 .background(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -965,7 +964,7 @@ struct RequestTabView: View {
     let integration: InstalledIntegration
 
     @State private var mode: RequestMode = .pull
-    @State private var pill1Open = true
+    @State private var pill1Open = false
     @State private var pill2Open = false
     @State private var pill3Open = false
     @State private var selectedTarget: String = ""
@@ -1198,7 +1197,7 @@ struct RequestTabView: View {
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(
             selectedListId.isEmpty ? Color.brandCyan.opacity(0.3) : Color.white.opacity(0.1), lineWidth: 1))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .padding(.horizontal, 18).padding(.bottom, 10)
+        .padding(.horizontal, 18).padding(.bottom, 16)
     }
 
     private func fetchLists(entityId: String) {
@@ -1280,7 +1279,7 @@ struct RequestTabView: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Color.white.opacity(0.1), lineWidth: 1))
-        .padding(.horizontal, 18).padding(.bottom, 10)
+        .padding(.horizontal, 18).padding(.bottom, 16)
     }
 
     // MARK: - Identifier field
