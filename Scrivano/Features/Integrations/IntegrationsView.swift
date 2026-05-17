@@ -50,12 +50,6 @@ struct IntegrationsView: View {
                     tabContent
                 }
             }
-            if showDropdown {
-                Color.clear
-                    .ignoresSafeArea()
-                    .contentShape(Rectangle())
-                    .onTapGesture { withAnimation(.easeInOut(duration: 0.18)) { showDropdown = false } }
-            }
         }
         .onAppear {
             if selectedId == nil { selectedId = store.installed.first?.id }
@@ -137,128 +131,113 @@ struct IntegrationsView: View {
     // MARK: - Dropdown
 
     private var integrationDropdown: some View {
-        ZStack(alignment: .top) {
-            VStack(spacing: 0) {
-                // Selected row (or placeholder when nothing installed)
-                Button {
-                    guard !store.installed.isEmpty else { return }
-                    withAnimation(.easeInOut(duration: 0.18)) { showDropdown.toggle() }
-                } label: {
-                    HStack(spacing: 10) {
-                        if let sel = selected {
-                            logoView(emoji: sel.config.logoEmoji,
-                                     start: sel.config.logoColorStart,
-                                     end: sel.config.logoColorEnd, size: 28)
+        VStack(spacing: 0) {
+            // Selected row
+            Button {
+                guard !store.installed.isEmpty else { return }
+                withAnimation(.easeInOut(duration: 0.18)) { showDropdown.toggle() }
+            } label: {
+                HStack(spacing: 10) {
+                    if let sel = selected {
+                        logoView(emoji: sel.config.logoEmoji,
+                                 start: sel.config.logoColorStart,
+                                 end: sel.config.logoColorEnd, size: 28)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(sel.config.name)
+                                .font(.inter(13, weight: .bold))
+                                .foregroundColor(.textPrimary)
+                            Text("\(sel.config.type.label) · \(sel.accountOrganization ?? "Not connected")")
+                                .font(.inter(10))
+                                .foregroundColor(.textTertiary)
+                        }
+                        Spacer()
+                        stateBadge(sel.connectionState)
+                        Image(systemName: showDropdown ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(.textTertiary)
+                    } else {
+                        Image(systemName: "link")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.textTertiary)
+                            .frame(width: 28, height: 28)
+                            .background(Color.white.opacity(0.06))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        Text("No integration selected")
+                            .font(.inter(13, weight: .semibold))
+                            .foregroundColor(.textTertiary)
+                        Spacer()
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+            }
+            .buttonStyle(.plain)
+
+            // List expands directly below the button
+            if showDropdown {
+                Divider().background(Color.brandCyan.opacity(0.2))
+
+                ForEach(store.installed) { integration in
+                    Button {
+                        selectedId = integration.id
+                        withAnimation(.easeInOut(duration: 0.18)) { showDropdown = false }
+                    } label: {
+                        HStack(spacing: 10) {
+                            logoView(emoji: integration.config.logoEmoji,
+                                     start: integration.config.logoColorStart,
+                                     end: integration.config.logoColorEnd, size: 28)
                             VStack(alignment: .leading, spacing: 2) {
-                                Text(sel.config.name)
-                                    .font(.inter(13, weight: .bold))
+                                Text(integration.config.name)
+                                    .font(.inter(13, weight: .semibold))
                                     .foregroundColor(.textPrimary)
-                                Text("\(sel.config.type.label) · \(sel.accountOrganization ?? "Not connected")")
+                                Text(integration.config.type.label)
                                     .font(.inter(10))
                                     .foregroundColor(.textTertiary)
                             }
                             Spacer()
-                            stateBadge(sel.connectionState)
-                            Image(systemName: showDropdown ? "chevron.up" : "chevron.down")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(.textTertiary)
-                        } else {
-                            Image(systemName: "link")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(.textTertiary)
-                                .frame(width: 28, height: 28)
-                                .background(Color.white.opacity(0.06))
-                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                            Text("No integration selected")
-                                .font(.inter(13, weight: .semibold))
-                                .foregroundColor(.textTertiary)
-                            Spacer()
+                            if integration.id == selectedId {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(.brandCyan)
+                            }
                         }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 11)
+                    }
+                    .buttonStyle(.plain)
+                    Divider().background(Color.white.opacity(0.05))
+                }
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) { showDropdown = false }
+                    showCatalogSheet = true
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(.brandCyan)
+                        Text("Add Integration")
+                            .font(.inter(13, weight: .semibold))
+                            .foregroundColor(.brandCyan)
+                        Spacer()
                     }
                     .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(Color.white.opacity(0.05))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .stroke(showDropdown ? Color.brandCyan.opacity(0.3) : Color.white.opacity(0.1), lineWidth: 1)
-                            )
-                    )
+                    .padding(.vertical, 12)
                 }
                 .buttonStyle(.plain)
             }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 12)
-            .zIndex(10)
-
-            // Dropdown list
-            if showDropdown {
-                VStack(spacing: 0) {
-                    ForEach(store.installed) { integration in
-                        Button {
-                            selectedId = integration.id
-                            withAnimation(.easeInOut(duration: 0.18)) { showDropdown = false }
-                        } label: {
-                            HStack(spacing: 10) {
-                                logoView(emoji: integration.config.logoEmoji,
-                                         start: integration.config.logoColorStart,
-                                         end: integration.config.logoColorEnd, size: 28)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(integration.config.name)
-                                        .font(.inter(13, weight: .semibold))
-                                        .foregroundColor(.textPrimary)
-                                    Text(integration.config.type.label)
-                                        .font(.inter(10))
-                                        .foregroundColor(.textTertiary)
-                                }
-                                Spacer()
-                                if integration.id == selectedId {
-                                    Text("✓")
-                                        .font(.inter(13, weight: .bold))
-                                        .foregroundColor(.brandCyan)
-                                }
-                            }
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 11)
-                        }
-                        .buttonStyle(.plain)
-                        Divider().background(Color.white.opacity(0.05))
-                    }
-                    // Add integration row
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.18)) { showDropdown = false }
-                        showCatalogSheet = true
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 18))
-                                .foregroundColor(.brandCyan)
-                            Text("Add Integration")
-                                .font(.inter(13, weight: .semibold))
-                                .foregroundColor(.brandCyan)
-                            Spacer()
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 12)
-                    }
-                    .buttonStyle(.plain)
-                }
-                .background(
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color.white.opacity(0.05))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .stroke(Color.brandCyan.opacity(0.3), lineWidth: 1)
-                        )
-                )
-                .padding(.horizontal, 18)
-                .padding(.top, 60)
-                .zIndex(20)
-                .transition(.opacity.combined(with: .move(edge: .top)))
-            }
         }
-        .zIndex(100)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.white.opacity(0.05))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(showDropdown ? Color.brandCyan.opacity(0.3) : Color.white.opacity(0.1), lineWidth: 1)
+                )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .padding(.horizontal, 18)
+        .padding(.vertical, 12)
     }
 
     private var accountOrganization: String? { selected?.accountOrganization }
@@ -426,6 +405,9 @@ struct AuthTabView: View {
                 }
 
                 actionButton("Uninstall", style: .ghost, loading: isUninstalling) { showUninstallConfirm = true }
+
+                CatalogPillView(onInstall: onOAuthURL)
+                    .padding(.top, 8)
 
                 Spacer().frame(height: 24)
             }
