@@ -285,7 +285,25 @@ struct IntegrationsView: View {
                     .onAppear { Task { await store.fetchLogs(integrationId: integration.id) } }
             }
         } else {
-            Spacer()
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 12) {
+                    if let err = store.catalogError {
+                        Text(err).font(.inter(12)).foregroundColor(.danger)
+                            .multilineTextAlignment(.center).padding(.top, 24)
+                        Button("Retry") { Task { await store.fetchCatalog() } }
+                            .font(.inter(13, weight: .bold)).foregroundColor(.brandCyan)
+                    } else if store.isLoadingCatalog {
+                        ProgressView().tint(.brandCyan).padding(.top, 32)
+                    } else {
+                        Text("Install an integration to get started")
+                            .font(.inter(13)).foregroundColor(.textSecondary)
+                            .padding(.top, 24)
+                    }
+                    CatalogPillView(onInstall: { url in oauthURL = url })
+                }
+                .padding(.horizontal, 18)
+                .padding(.bottom, 32)
+            }
         }
     }
 

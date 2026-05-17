@@ -146,6 +146,8 @@ final class IntegrationStore: ObservableObject {
         installed.removeAll { $0.id == integrationId }
         log.removeAll { $0.integrationId == integrationId }
         save(installed, key: installedKey)
+        // Refresh catalog so the uninstalled integration reappears as available
+        await fetchCatalog()
     }
 
     // MARK: - Mark connected (called after OAuth callback deep link)
