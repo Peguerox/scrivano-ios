@@ -1087,9 +1087,30 @@ struct RequestTabView: View {
     @ViewBuilder
     private var pullContentRows: some View {
         ForEach(contentGroups(), id: \.0) { groupName, opts in
-            Text(groupName.uppercased())
-                .font(.inter(10, weight: .heavy)).foregroundColor(.textTertiary)
-                .tracking(0.8).padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 2)
+            let allSelected = opts.allSatisfy { selectedContent.contains($0.id) }
+            Button {
+                if allSelected {
+                    opts.forEach { selectedContent.remove($0.id) }
+                } else {
+                    opts.forEach {
+                        selectedContent.insert($0.id)
+                        if contentCounts[$0.id] == nil { contentCounts[$0.id] = $0.defaultCount ?? 1 }
+                    }
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: allSelected ? "checkmark.square.fill" : "square")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(allSelected ? .brandCyan : .textTertiary)
+                    Text(groupName.uppercased())
+                        .font(.inter(10, weight: .heavy)).foregroundColor(.textTertiary)
+                        .tracking(0.8)
+                    Spacer()
+                }
+                .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 2)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
             ForEach(opts) { opt in
                 HStack(spacing: 0) {
                     IntCheckRow(label: opt.label, subtitle: opt.subtitle,
@@ -1219,7 +1240,7 @@ struct RequestTabView: View {
                         // List picker — always shown when integration uses a list source entity
                         if showListPicker { listDropdownPill }
 
-                        pill(icon: "📥", title: "What to pull", summary: pill1Summary,
+                        pill(icon: "📥", title: "Source", summary: pill1Summary,
                              isOpen: pill1Open, disabled: false) {
                             let opening = !pill1Open
                             pill1Open = opening; pill2Open = false; pill3Open = false; showListDropdown = false
@@ -1236,7 +1257,7 @@ struct RequestTabView: View {
                             }
                         }
 
-                        pill(icon: "📋", title: "Pull content", summary: pill2Summary,
+                        pill(icon: "📋", title: "Content", summary: pill2Summary,
                              isOpen: pill2Open, disabled: false) {
                             let opening = !pill2Open; pill1Open = false; pill2Open = opening; pill3Open = false; showListDropdown = false
                         } content: {
@@ -2004,6 +2025,10 @@ struct RequestTabView: View {
                     if response.success == false {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
                             requestError = response.message ?? "Request failed"
+                        }
+                    } else if response.collection?.items?.isEmpty != false {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            requestError = "No items found. Try a different search or check that the patient exists in the system."
                         }
                     } else if response.collection?.items?.isEmpty == false {
                         if destMode == .existing, !selectedExistingCollectionId.isEmpty {
