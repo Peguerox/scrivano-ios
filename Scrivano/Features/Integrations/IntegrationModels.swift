@@ -33,6 +33,8 @@ struct IntegrationOption: Codable, Identifiable {
     let subtitle: String
     var requiresId: Bool = false
     var idLabel: String? = nil
+    var group: String? = nil
+    var defaultCount: Int? = nil
 }
 
 enum IntegrationType: String, Codable {
@@ -83,9 +85,9 @@ enum ConnectionState: String, Codable {
     var label: String {
         switch self {
         case .disconnected: return "Not connected"
-        case .connected:    return "Connected"
-        case .expired:      return "Token expired"
-        case .error:        return "Error"
+        case .connected:    return "Active"
+        case .expired:      return "Expired"
+        case .error:        return "Invalid"
         }
     }
 }
@@ -186,7 +188,22 @@ struct ServerIntegrationDetail: Codable {
         let rawType = auth?.type ?? "oauth2"
         let authType = AuthType(rawValue: rawType) ?? .oauth2
         let entities = capabilities?.entities ?? []
-        let contentTypes = capabilities?.contentTypes ?? []
+
+        // Prefer new grouped format; fall back to flat content_types if groups not present yet
+        let pullContent: [IntegrationOption]
+        if let groups = capabilities?.contentTypeGroups, !groups.isEmpty {
+            pullContent = groups.flatMap { group in
+                group.items.map { item in
+                    IntegrationOption(id: item.id, label: item.label, subtitle: "",
+                                      group: group.group, defaultCount: item.defaultCount)
+                }
+            }
+        } else {
+            pullContent = (capabilities?.contentTypes ?? []).map { item in
+                IntegrationOption(id: item.id, label: item.label, subtitle: "",
+                                  defaultCount: item.defaultCount)
+            }
+        }
 
         return IntegrationConfig(
             id: id,
@@ -202,7 +219,7 @@ struct ServerIntegrationDetail: Codable {
             baseUrlLabel: auth?.baseUrlLabel,
             baseUrlDefault: auth?.baseUrlDefault,
             pullTargets: entities.map { IntegrationOption(id: $0.id, label: $0.label, subtitle: $0.description ?? "", requiresId: $0.requiresId ?? false, idLabel: $0.idLabel) },
-            pullContent: contentTypes.map { IntegrationOption(id: $0.id, label: $0.label, subtitle: "") },
+            pullContent: pullContent,
             pushTargets: [],
             identifierLabel: entities.first(where: { $0.requiresId == true })?.idLabel,
             identifierPlaceholder: entities.first(where: { $0.requiresId == true })?.idLabel,
@@ -228,15 +245,33 @@ struct ServerAuth: Codable {
 
 struct ServerCapabilities: Codable {
     let entities: [ServerEntity]?
-    let contentTypes: [ServerContentType]?
+    let contentTypeGroups: [ServerContentTypeGroup]?   // new format
+    let contentTypes: [ServerContentTypeItem]?          // old flat format (fallback)
     let canPush: Bool?
     let listSourceEntity: String?
 
     enum CodingKeys: String, CodingKey {
         case entities
-        case contentTypes     = "content_types"
-        case canPush          = "can_push"
-        case listSourceEntity = "list_source_entity"
+        case contentTypeGroups = "content_type_groups"
+        case contentTypes      = "content_types"
+        case canPush           = "can_push"
+        case listSourceEntity  = "list_source_entity"
+    }
+}
+
+struct ServerContentTypeGroup: Codable {
+    let group: String
+    let items: [ServerContentTypeItem]
+}
+
+struct ServerContentTypeItem: Codable {
+    let id: String
+    let label: String
+    let defaultCount: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case id, label
+        case defaultCount = "default_count"
     }
 }
 
@@ -254,10 +289,6 @@ struct ServerEntity: Codable {
     }
 }
 
-struct ServerContentType: Codable {
-    let id: String
-    let label: String
-}
 
 struct ServerOption: Codable {
     let id: String
@@ -301,9 +332,10 @@ struct InstallResponse: Codable {
 
 struct PullRequest: Encodable {
     let entityId: String
-    let listId: String?           // selected list from browse dropdown
-    let entityRecordId: String?   // only when entity requires_id = true
+    let listId: String?
+    let entityRecordId: String?
     let contentTypes: [String]
+    let counts: [String: Int]?
     let collectionName: String?
 
     enum CodingKeys: String, CodingKey {
@@ -311,6 +343,7 @@ struct PullRequest: Encodable {
         case listId         = "list_id"
         case entityRecordId = "entity_record_id"
         case contentTypes   = "content_types"
+        case counts
         case collectionName = "collection_name"
     }
 }
@@ -330,6 +363,7 @@ struct BrowseResponse: Codable {
 struct BrowseItem: Codable, Identifiable {
     let id: String
     let name: String
+    let metadata: [String: String]?
 }
 
 struct PullResponse: Codable {
@@ -347,6 +381,7 @@ struct PullItem: Codable {
     let name: String?
     let metadata: [String: String]?
     let transcripts: [PullTranscript]?
+    let errors: [String]?
 }
 
 struct PullTranscript: Codable {
@@ -371,11 +406,12 @@ struct PushRequest: Encodable {
 struct ActionResponse: Codable {
     let success: Bool?
     let message: String?
+    let error: String?
     let collectionId: String?
     let ehrId: String?
 
     enum CodingKeys: String, CodingKey {
-        case success, message
+        case success, message, error
         case collectionId = "collection_id"
         case ehrId        = "ehr_id"
     }

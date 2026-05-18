@@ -11,6 +11,7 @@ final class IntegrationStore: ObservableObject {
     @Published private(set) var log: [IntegrationLogEntry] = []
     @Published var isLoadingCatalog = false
     @Published var catalogError: String? = nil
+    @Published var lastPullWarnings: [String] = []   // non-fatal errors from pull items (e.g. 403 on labs)
 
     private let installedKey = "integrations.installed.v3"
     private let api = APIClient.shared
@@ -55,27 +56,26 @@ final class IntegrationStore: ObservableObject {
         }
         if let idx = installed.firstIndex(where: { $0.id == integrationId }) {
             installed[idx].config = config
+            let serverState = connectionState(from: detail.status)
+            if serverState != .disconnected {
+                installed[idx].connectionState = serverState
+            }
             save(installed, key: installedKey)
         }
     }
 
     private func syncInstalledFromCatalog(_ items: [ServerIntegrationListItem]) {
         for item in items where item.installed == true {
+            let serverState = connectionState(from: item.status)
             if !installed.contains(where: { $0.id == item.id }) {
                 let config = item.toMinimalConfig()
-                var integration = InstalledIntegration(id: item.id, config: config,
-                                                       connectionState: .disconnected)
-                if item.status == "active" {
-                    integration.connectionState = .connected
-                } else if item.status == "error" {
-                    integration.connectionState = .error
-                }
+                let integration = InstalledIntegration(id: item.id, config: config,
+                                                       connectionState: serverState)
                 installed.append(integration)
                 save(installed, key: installedKey)
             } else if let idx = installed.firstIndex(where: { $0.id == item.id }) {
-                // Update connection state from server
-                if item.status == "active" && installed[idx].connectionState != .connected {
-                    installed[idx].connectionState = .connected
+                if installed[idx].connectionState != serverState {
+                    installed[idx].connectionState = serverState
                     save(installed, key: installedKey)
                 }
             }
@@ -199,6 +199,7 @@ final class IntegrationStore: ObservableObject {
               listId: String?,
               entityRecordId: String?,
               content: [String],
+              counts: [String: Int]?,
               collectionName: String?) async throws -> PullResponse {
 
         let body = PullRequest(
@@ -206,6 +207,7 @@ final class IntegrationStore: ObservableObject {
             listId: listId?.isEmpty == true ? nil : listId,
             entityRecordId: entityRecordId?.isEmpty == true ? nil : entityRecordId,
             contentTypes: content,
+            counts: counts?.isEmpty == true ? nil : counts,
             collectionName: collectionName?.isEmpty == true ? nil : collectionName
         )
         let response = try await api.request(
@@ -214,11 +216,12 @@ final class IntegrationStore: ObservableObject {
             body: body,
             responseType: PullResponse.self
         )
+        let integrationName = installed.first(where: { $0.id == integrationId })?.config.name ?? integrationId
         let itemCount = response.collection?.items?.count ?? 0
         appendLog(IntegrationLogEntry(
             id: UUID().uuidString,
             integrationId: integrationId,
-            integrationName: installed.first(where: { $0.id == integrationId })?.config.name ?? integrationId,
+            integrationName: integrationName,
             action: .pull,
             targetLabel: entityId,
             contentLabels: content,
@@ -231,13 +234,164 @@ final class IntegrationStore: ObservableObject {
         return response
     }
 
+    // MARK: - Persist pull result (called after user names the collection)
+
+    @discardableResult
+    func persistPullResult(_ response: PullResponse,
+                           integrationId: String,
+                           collectionName: String,
+                           entityRecordId: String? = nil,
+                           existingCollectionId: String? = nil) -> ScrivanoCollection? {
+        guard let pullCollection = response.collection,
+              let items = pullCollection.items, !items.isEmpty else { return nil }
+
+        let integrationName = installed.first(where: { $0.id == integrationId })?.config.name ?? integrationId
+
+        // Use existing collection if provided
+        let collection: ScrivanoCollection
+        if let existingId = existingCollectionId,
+           let found = LocalCollectionStore.shared.collections.first(where: { $0.id == existingId }) {
+            collection = found
+        } else {
+            // Ensure unique name — append counter if name already taken
+            let baseName = collectionName.isEmpty ? integrationName : collectionName
+            let existingNames = Set(LocalCollectionStore.shared.collections.map(\.name))
+            var finalName = baseName
+            var counter = 2
+            while existingNames.contains(finalName) {
+                finalName = "\(baseName) (\(counter))"
+                counter += 1
+            }
+            collection = ScrivanoCollection(id: UUID().uuidString, name: finalName)
+            LocalCollectionStore.shared.save(collection)
+        }
+
+        let isoFmt = ISO8601DateFormatter()
+        var transcriptBatch: [LocalTranscriptEntry] = []
+        var metadataMap = loadItemMetadataMap()
+        var warnings: [String] = []
+        for pullItem in items {
+            let trimmedName = pullItem.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            guard !trimmedName.isEmpty else { continue }
+
+            // Reuse existing item in this collection if name matches — avoids duplicates when pulling additional content
+            let existingItem = LocalItemStore.shared.items.first(where: {
+                $0.collectionId == collection.id && $0.name == trimmedName
+            })
+            let itemId: String
+            if let existing = existingItem {
+                itemId = existing.id
+            } else {
+                itemId = UUID().uuidString
+                let storedItem = LocalStoredItem(
+                    id: itemId,
+                    name: trimmedName,
+                    collection: collection.name,
+                    collectionId: collection.id,
+                    createdAt: isoFmt.string(from: Date())
+                )
+                LocalItemStore.shared.save(storedItem)
+            }
+            // Store integration metadata
+            var rawFields = pullItem.metadata ?? [:]
+            if let mrn = entityRecordId, !mrn.isEmpty {
+                rawFields["mrn"] = rawFields["mrn"] ?? mrn
+            }
+            let sourceId = entityRecordId ?? rawFields["mrn"] ?? rawFields["id"] ?? trimmedName
+            metadataMap[itemId] = IntegrationItemMetadata(
+                integrationId: integrationId,
+                integrationName: integrationName,
+                sourceIdentifier: sourceId,
+                identifierLabel: "MRN",
+                rawFields: rawFields,
+                lastSynced: Date()
+            )
+
+            // Collect non-fatal errors (e.g. 403 on labs in sandbox)
+            if let errs = pullItem.errors { warnings.append(contentsOf: errs) }
+
+            // Save transcripts nested directly on the patient item
+            if let transcripts = pullItem.transcripts {
+                for transcript in transcripts {
+                    guard let content = transcript.content, !content.isEmpty else { continue }
+                    transcriptBatch.append(LocalTranscriptEntry(
+                        id: UUID().uuidString,
+                        itemId: itemId,
+                        label: transcript.title ?? "Clinical Note",
+                        text: content,
+                        durationSeconds: nil,
+                        createdAt: Date()
+                    ))
+                }
+            }
+        }
+
+        if !transcriptBatch.isEmpty { LocalTranscriptStore.shared.addBatch(transcriptBatch) }
+        saveItemMetadataMap(metadataMap)
+        lastPullWarnings = warnings
+        return collection
+    }
+
+    // MARK: - Integration item metadata
+
+    private let metadataKey = "integration.item.metadata.v1"
+
+    func integrationMetadata(for itemId: String) -> IntegrationItemMetadata? {
+        loadItemMetadataMap()[itemId]
+    }
+
+    /// Returns the collection name if any patient in the pull response already exists locally.
+    func existingCollectionName(for response: PullResponse, entityRecordId: String?) -> String? {
+        let map = loadItemMetadataMap()
+        let items = response.collection?.items ?? []
+        for pullItem in items {
+            let name = pullItem.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let mrn = entityRecordId ?? pullItem.metadata?["mrn"] ?? ""
+            // Check by MRN first (most reliable)
+            if !mrn.isEmpty, let entry = map.first(where: { $0.value.sourceIdentifier == mrn }) {
+                if let item = LocalItemStore.shared.items.first(where: { $0.id == entry.key }),
+                   let colId = item.collectionId,
+                   let col = LocalCollectionStore.shared.collections.first(where: { $0.id == colId }) {
+                    return col.name
+                }
+            }
+            // Fall back to patient name match
+            if !name.isEmpty, let entry = map.first(where: { _ in
+                LocalItemStore.shared.items.first(where: { $0.name == name && map[$0.id] != nil }) != nil
+            }) {
+                let _ = entry
+                if let item = LocalItemStore.shared.items.first(where: { $0.name == name && map[$0.id] != nil }),
+                   let colId = item.collectionId,
+                   let col = LocalCollectionStore.shared.collections.first(where: { $0.id == colId }) {
+                    return col.name
+                }
+            }
+        }
+        return nil
+    }
+
+    private func loadItemMetadataMap() -> [String: IntegrationItemMetadata] {
+        guard let data = UserDefaults.standard.data(forKey: metadataKey),
+              let map = try? JSONDecoder().decode([String: IntegrationItemMetadata].self, from: data)
+        else { return [:] }
+        return map
+    }
+
+    private func saveItemMetadataMap(_ map: [String: IntegrationItemMetadata]) {
+        if let data = try? JSONEncoder().encode(map) {
+            UserDefaults.standard.set(data, forKey: metadataKey)
+        }
+    }
+
     // MARK: - Push
 
     func push(integrationId: String,
+              itemId: String,
               noteText: String,
-              noteTitle: String,
-              metadata: [String: String]) async throws -> ActionResponse {
+              noteTitle: String) async throws -> ActionResponse {
 
+        // Send back the exact metadata received during pull — Epic needs ehr_encounter_id etc.
+        let metadata = integrationMetadata(for: itemId)?.rawFields ?? [:]
         let body = PushRequest(noteText: noteText, noteTitle: noteTitle, metadata: metadata)
         let response = try await api.request(
             path: "/api/integrations/\(integrationId)/push",
@@ -245,6 +399,7 @@ final class IntegrationStore: ObservableObject {
             body: body,
             responseType: ActionResponse.self
         )
+        let errorMsg = response.error ?? (response.success == false ? response.message : nil)
         appendLog(IntegrationLogEntry(
             id: UUID().uuidString,
             integrationId: integrationId,
@@ -254,10 +409,11 @@ final class IntegrationStore: ObservableObject {
             contentLabels: [],
             destinationName: nil,
             resultSummary: response.message ?? (response.success == true ? "Note pushed" : "Failed"),
-            status: response.success == true ? .success : .error,
-            errorMessage: response.success == true ? nil : response.message,
+            status: errorMsg == nil ? .success : .error,
+            errorMessage: errorMsg,
             date: Date()
         ))
+        if let err = errorMsg { throw NSError(domain: "push", code: 502, userInfo: [NSLocalizedDescriptionKey: err]) }
         return response
     }
 
@@ -312,6 +468,17 @@ final class IntegrationStore: ObservableObject {
 
     func logEntries(for integrationId: String) -> [IntegrationLogEntry] {
         log.filter { $0.integrationId == integrationId }
+    }
+
+    // MARK: - Helpers
+
+    private func connectionState(from status: String?) -> ConnectionState {
+        switch status {
+        case "active":   return .connected
+        case "expired":  return .expired
+        case "error":    return .error
+        default:         return .disconnected
+        }
     }
 
     // MARK: - Persistence

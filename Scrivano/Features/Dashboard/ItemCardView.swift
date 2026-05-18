@@ -24,6 +24,7 @@ struct ItemCardView: View {
     @ObservedObject private var transcriptionMgr: TranscriptionManager = TranscriptionManager.shared
     @ObservedObject private var notesMgr: NoteGenerationManager = NoteGenerationManager.shared
     @ObservedObject private var langMgr = LanguageManager.shared
+    @State private var showIntegrationMeta = false
 
     private var mediaCount: Int { localAudioCount }
     private var textCount: Int { localTextCount ?? item.textCount }
@@ -43,6 +44,11 @@ struct ItemCardView: View {
         }
         .contentShape(Rectangle())
         .onTapGesture { onTap() }
+        .sheet(isPresented: $showIntegrationMeta) {
+            if let meta = IntegrationStore.shared.integrationMetadata(for: item.id) {
+                IntegrationMetaSheet(meta: meta)
+            }
+        }
     }
 
     // MARK: - Shared style helpers
@@ -98,6 +104,12 @@ struct ItemCardView: View {
                             DeleteConfirmPresenter.show(itemName: item.name) { vm.deleteItem(item) }
                         } label: {
                             Label(langMgr.t("dashboard.deleteItemMenu"), systemImage: "trash")
+                        }
+                        if IntegrationStore.shared.integrationMetadata(for: item.id) != nil {
+                            Divider()
+                            Button { showIntegrationMeta = true } label: {
+                                Label("Integration Source", systemImage: "link.badge.plus")
+                            }
                         }
                     } label: {
                         Text("···")
@@ -875,5 +887,110 @@ struct ItemMenuView: View {
             .padding(.vertical, 10)
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Integration metadata sheet
+
+struct IntegrationMetaSheet: View {
+    let meta: IntegrationItemMetadata
+    @Environment(\.dismiss) var dismiss
+
+    private var dateFmt: DateFormatter {
+        let f = DateFormatter(); f.dateStyle = .medium; f.timeStyle = .short; return f
+    }
+
+    var body: some View {
+        ZStack {
+            Color.phoneBg.ignoresSafeArea()
+            VStack(spacing: 0) {
+                // Header
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Integration Source")
+                            .font(.inter(16, weight: .heavy))
+                            .foregroundColor(.textPrimary)
+                        Text(meta.integrationName)
+                            .font(.inter(12))
+                            .foregroundColor(.textTertiary)
+                    }
+                    Spacer()
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.textTertiary)
+                            .frame(width: 32, height: 32)
+                            .background(Color.white.opacity(0.07))
+                            .clipShape(Circle())
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 12) {
+                        // Sync info card
+                        infoCard(label: "Sync Info") {
+                            infoRow(label: meta.identifierLabel, value: meta.sourceIdentifier, mono: true, isLast: false)
+                            infoRow(label: "Last synced", value: dateFmt.string(from: meta.lastSynced), mono: false, isLast: true)
+                        }
+
+                        // Raw fields card — exclude keys already shown in Sync Info
+                        let hiddenKeys: Set<String> = ["patient_name"]
+                        let ehrKeys = meta.rawFields.keys.filter { !hiddenKeys.contains($0.lowercased()) }.sorted()
+                        if !ehrKeys.isEmpty {
+                            infoCard(label: "EHR Fields") {
+                                ForEach(ehrKeys, id: \.self) { key in
+                                    infoRow(label: key.replacingOccurrences(of: "_", with: " "),
+                                            value: meta.rawFields[key] ?? "", mono: false,
+                                            isLast: key == ehrKeys.last)
+                                }
+                            }
+                        }
+
+                        Spacer().frame(height: 32)
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.top, 8)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func infoCard(label: String, @ViewBuilder content: () -> some View) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(label.uppercased())
+                .font(.inter(10, weight: .heavy))
+                .foregroundColor(.textTertiary)
+                .tracking(0.8)
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 4)
+            content()
+        }
+        .background(Color.white.opacity(0.04))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(Color.white.opacity(0.09), lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    @ViewBuilder
+    private func infoRow(label: String, value: String, mono: Bool, isLast: Bool) -> some View {
+        HStack(spacing: 10) {
+            Text(label.capitalized)
+                .font(.inter(11, weight: .bold))
+                .foregroundColor(.textTertiary)
+                .frame(width: 100, alignment: .leading)
+            Text(value)
+                .font(mono ? .system(size: 11, design: .monospaced) : .inter(12, weight: .semibold))
+                .foregroundColor(mono ? Color.brandCyan.opacity(0.85) : .textSecondary)
+                .lineLimit(2)
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 11)
+        if !isLast {
+            Divider().background(Color.white.opacity(0.05)).padding(.leading, 16)
+        }
     }
 }

@@ -567,6 +567,19 @@ struct DashboardView: View {
         .onChange(of: vm.activeCollection?.id) { _ in
             if let sel = selectedItem, !vm.items.contains(where: { $0.id == sel.id }) { selectedItem = nil }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .integrationCollectionCreated)) { note in
+            if let id = note.userInfo?["collectionId"] as? String {
+                // Dismiss the Settings + Integrations stack
+                showSettings = false
+                // Give the dismissal animation time to complete, then select the collection
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    vm.refreshFromLocalStores()
+                    if let col = vm.collections.first(where: { $0.id == id }) {
+                        vm.selectCollection(col)
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - Process Items bar

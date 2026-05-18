@@ -153,7 +153,7 @@ struct IntegrationsView: View {
                         Spacer()
                         stateBadge(sel.connectionState)
                         Image(systemName: showDropdown ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 11, weight: .semibold))
+                            .font(.system(size: 13, weight: .semibold))
                             .foregroundColor(.textTertiary)
                     } else {
                         Image(systemName: "link")
@@ -279,7 +279,14 @@ struct IntegrationsView: View {
             case .auth:
                 AuthTabView(integration: integration, onOAuthURL: { url in oauthURL = url })
             case .request:
-                RequestTabView(integration: integration)
+                RequestTabView(integration: integration, onGoToCollection: { col in
+                    NotificationCenter.default.post(
+                        name: .integrationCollectionCreated,
+                        object: nil,
+                        userInfo: ["collectionId": col.id]
+                    )
+                    // DashboardView receives notification and dismisses the full Settings stack
+                })
             case .log:
                 LogTabView(integrationId: integration.id)
                     .onAppear { Task { await store.fetchLogs(integrationId: integration.id) } }
@@ -1022,6 +1029,8 @@ struct IntCheckRow: View, Equatable {
 
 struct RequestTabView: View {
     let integration: InstalledIntegration
+    var onGoToCollection: ((ScrivanoCollection) -> Void)? = nil
+    @ObservedObject private var store = IntegrationStore.shared
 
     @State private var mode: RequestMode = .pull
     @State private var pill1Open = false
@@ -1030,9 +1039,23 @@ struct RequestTabView: View {
     @State private var selectedTarget: String = ""
     @State private var identifier: String = ""
     @State private var selectedContent: Set<String> = []
+    @State private var contentCounts: [String: Int] = [:]   // per-type count, defaults from server
     @State private var destMode: DestMode = .newCollection
+    @State private var selectedExistingCollectionId: String = ""
     @State private var selectedPushTarget: String = ""
+    @State private var pushCollectionId: String = ""
+    @State private var pushSelectedItems: Set<String> = []
+    @State private var pushNotePerItem: [String: String] = [:]
+    @State private var pushAll: Bool = false
+    @State private var pushSuccess = false
     @State private var isRequesting = false
+    @State private var pendingPullResponse: PullResponse? = nil
+    @State private var pendingCollectionName: String = ""
+    @State private var pendingEntityRecordId: String = ""
+    @State private var showCollectionNameAlert = false
+    @State private var createdCollection: ScrivanoCollection? = nil
+    @State private var requestError: String? = nil
+    @State private var existingPatientWarning: String? = nil  // collection name when duplicate detected
     // Browse list dropdown
     @State private var availableLists: [BrowseItem] = []
     @State private var listsLoaded = false       // true once browse call completes
@@ -1046,8 +1069,81 @@ struct RequestTabView: View {
     private var pullContent: [IntegrationOption] { integration.config.pullContent }
     private var listSourceEntity: String? { integration.config.listSourceEntity }
 
-    // Whether the list picker should be shown (only when lists exist)
-    private var showListPicker: Bool { listSourceEntity != nil && !availableLists.isEmpty }
+    // Always show list picker when integration uses a list source entity
+    private var showListPicker: Bool { listSourceEntity != nil }
+
+    // Only patients that (a) have integration metadata for this integration and
+    // (b) still belong to an active collection
+    private var pushableItems: [LocalStoredItem] {
+        let activeIds = Set(LocalCollectionStore.shared.collections.map(\.id))
+        return LocalItemStore.shared.items.filter { item in
+            guard let colId = item.collectionId, activeIds.contains(colId),
+                  let meta = IntegrationStore.shared.integrationMetadata(for: item.id)
+            else { return false }
+            return meta.integrationId == integration.id
+        }
+    }
+
+    @ViewBuilder
+    private var pullContentRows: some View {
+        ForEach(contentGroups(), id: \.0) { groupName, opts in
+            Text(groupName.uppercased())
+                .font(.inter(10, weight: .heavy)).foregroundColor(.textTertiary)
+                .tracking(0.8).padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 2)
+            ForEach(opts) { opt in
+                HStack(spacing: 0) {
+                    IntCheckRow(label: opt.label, subtitle: opt.subtitle,
+                                checked: selectedContent.contains(opt.id), isLast: true) {
+                        if selectedContent.contains(opt.id) {
+                            selectedContent.remove(opt.id)
+                        } else {
+                            selectedContent.insert(opt.id)
+                            if contentCounts[opt.id] == nil { contentCounts[opt.id] = opt.defaultCount ?? 1 }
+                        }
+                    }
+                    if selectedContent.contains(opt.id), opt.defaultCount != nil {
+                        HStack(spacing: 0) {
+                            Button {
+                                let v = contentCounts[opt.id] ?? opt.defaultCount ?? 1
+                                if v > 1 { contentCounts[opt.id] = v - 1 }
+                            } label: { Image(systemName: "minus").font(.system(size: 11, weight: .bold)).foregroundColor(.brandCyan).frame(width: 28, height: 28) }
+                            .buttonStyle(.borderless)
+                            Text("\(contentCounts[opt.id] ?? opt.defaultCount ?? 1)")
+                                .font(.inter(12, weight: .bold)).foregroundColor(.textPrimary).frame(minWidth: 24, alignment: .center)
+                            Button {
+                                let v = contentCounts[opt.id] ?? opt.defaultCount ?? 1
+                                contentCounts[opt.id] = v + 1
+                            } label: { Image(systemName: "plus").font(.system(size: 11, weight: .bold)).foregroundColor(.brandCyan).frame(width: 28, height: 28) }
+                            .buttonStyle(.borderless)
+                        }
+                        .background(Color.white.opacity(0.06))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                        .padding(.trailing, 12)
+                    }
+                }
+                if opt.id != opts.last?.id { Divider().background(Color.white.opacity(0.05)) }
+            }
+            if groupName != contentGroups().last?.0 {
+                Divider().background(Color.brandCyan.opacity(0.08)).padding(.top, 4)
+            }
+        }
+    }
+
+    private var pushItemSummary: String {
+        if pushAll {
+            let multiNoteCount = itemsInPushCollection.filter {
+                LocalNoteStore.shared.notes(for: $0.id).count >= 2
+            }.count
+            return multiNoteCount > 0 ? "Select note for \(multiNoteCount) item\(multiNoteCount == 1 ? "" : "s")" : "All items"
+        }
+        let count = pushSelectedItems.count
+        if count == 0 { return "Select items" }
+        if count == 1, let item = LocalItemStore.shared.items.first(where: { pushSelectedItems.contains($0.id) }) {
+            return item.name
+        }
+        return "\(count) items selected"
+    }
 
     // "Patient List" is only selectable when a list is chosen; otherwise only Specific Patient
     private func isEntityDisabled(_ opt: IntegrationOption) -> Bool {
@@ -1069,21 +1165,45 @@ struct RequestTabView: View {
         return checked.isEmpty ? "None — names only" : checked.joined(separator: ", ")
     }
     private var pill3Summary: String {
-        isPull ? (destMode == .newCollection ? "New collection" : "Existing collection") : "Select collection"
+        if isPull {
+            if destMode == .newCollection { return "New collection" }
+            let name = LocalCollectionStore.shared.collections.first(where: { $0.id == selectedExistingCollectionId })?.name
+            return name ?? "Choose a collection"
+        }
+        return "Select collection"
     }
     private var canSubmit: Bool {
         guard integration.connectionState == .connected else { return false }
         if isPull {
             guard !selectedTarget.isEmpty else { return false }
-            // If list picker shown, require a list selection
-            if showListPicker && selectedListId.isEmpty { return false }
+            // Require list selection only when lists are actually available
+            if showListPicker && !isLoadingLists && !availableLists.isEmpty && selectedListId.isEmpty { return false }
             // If specific entity, require identifier
             if pullTargets.first(where: { $0.id == selectedTarget })?.requiresId == true {
-                return !identifier.isEmpty
+                if identifier.isEmpty { return false }
             }
+            // If existing collection chosen, require selection
+            if destMode == .existing && selectedExistingCollectionId.isEmpty { return false }
             return true
         }
-        return !selectedPushTarget.isEmpty
+        if pushAll {
+            guard !pushCollectionId.isEmpty else { return false }
+            // All push-all items with 2+ notes need a note chosen
+            let pushableInCollection = itemsInPushCollection.filter {
+                IntegrationStore.shared.integrationMetadata(for: $0.id)?.integrationId == integration.id &&
+                !LocalNoteStore.shared.notes(for: $0.id).isEmpty
+            }
+            return pushableInCollection.allSatisfy { item in
+                let noteCount = LocalNoteStore.shared.notes(for: item.id).count
+                return noteCount <= 1 || pushNotePerItem[item.id] != nil
+            }
+        }
+        if pushSelectedItems.isEmpty { return false }
+        // All selected items with 2+ notes need a note chosen
+        return pushSelectedItems.allSatisfy { itemId in
+            let noteCount = LocalNoteStore.shared.notes(for: itemId).count
+            return noteCount <= 1 || pushNotePerItem[itemId] != nil
+        }
     }
 
     var body: some View {
@@ -1093,86 +1213,97 @@ struct RequestTabView: View {
                     segmentedControl
                         .padding(.horizontal, 18)
                         .padding(.top, 16)
-                        .padding(.bottom, 12)
+                        .padding(.bottom, 16)
 
-                    // List picker — only shown when browse returned items
-                    if isPull && showListPicker {
-                        listDropdownPill
-                    }
+                    if isPull {
+                        // List picker — always shown when integration uses a list source entity
+                        if showListPicker { listDropdownPill }
 
-                    pill(icon: isPull ? "📥" : "📤",
-                         title: isPull ? "What to pull" : "What to push",
-                         summary: pill1Summary, isOpen: pill1Open, disabled: false) {
-                        pill1Open.toggle()
-                    } content: {
-                        if isPull {
+                        pill(icon: "📥", title: "What to pull", summary: pill1Summary,
+                             isOpen: pill1Open, disabled: false) {
+                            let opening = !pill1Open
+                            pill1Open = opening; pill2Open = false; pill3Open = false; showListDropdown = false
+                        } content: {
                             ForEach(pullTargets) { opt in
                                 let disabled = isEntityDisabled(opt)
                                 IntRadioRow(label: opt.label, subtitle: opt.subtitle, icon: nil,
                                             selected: selectedTarget == opt.id,
                                             isLast: opt.id == pullTargets.last?.id) {
-                                    if !disabled {
-                                        selectedTarget = opt.id
-                                        if !opt.requiresId { identifier = "" }
-                                    }
+                                    if !disabled { selectedTarget = opt.id; if !opt.requiresId { identifier = "" } }
                                 }
                                 .opacity(disabled ? 0.35 : 1)
-                                if selectedTarget == opt.id && opt.requiresId {
-                                    identifierField
-                                }
+                                if selectedTarget == opt.id && opt.requiresId { identifierField }
                             }
-                        } else {
-                            ForEach(pushTargets) { opt in
-                                IntRadioRow(label: opt.label, subtitle: opt.subtitle, icon: nil,
-                                            selected: selectedPushTarget == opt.id,
-                                            isLast: opt.id == pushTargets.last?.id) {
-                                    selectedPushTarget = opt.id
-                                }
-                            }
+                        }
+
+                        pill(icon: "📋", title: "Pull content", summary: pill2Summary,
+                             isOpen: pill2Open, disabled: false) {
+                            let opening = !pill2Open; pill1Open = false; pill2Open = opening; pill3Open = false; showListDropdown = false
+                        } content: {
+                            pullContentRows
+                        }
+
+                    } else {
+                        // Pill 1: Collection
+                        let selColName = LocalCollectionStore.shared.collections.first(where: { $0.id == pushCollectionId })?.name ?? "Select collection"
+                        pill(icon: "📁", title: "Collection", summary: selColName,
+                             isOpen: pill1Open, disabled: false) {
+                            pill1Open = !pill1Open; pill2Open = false; pill3Open = false
+                        } content: { pushCollectionPicker }
+
+                        // Pill 2: Items — shown whenever a collection is selected
+                        if !pushCollectionId.isEmpty {
+                            pill(icon: "👤", title: "Items", summary: pushItemSummary,
+                                 isOpen: pill2Open, disabled: false) {
+                                pill2Open = !pill2Open; pill1Open = false; pill3Open = false
+                            } content: { pushItemPicker }
                         }
                     }
 
-                    pill(icon: "📋", title: "Pull content", summary: pill2Summary,
-                         isOpen: pill2Open, disabled: !isPull) {
-                        if isPull { pill2Open.toggle() }
-                    } content: {
-                        ForEach(pullContent) { opt in
-                            IntCheckRow(label: opt.label, subtitle: opt.subtitle,
-                                        checked: selectedContent.contains(opt.id),
-                                        isLast: opt.id == pullContent.last?.id) {
-                                if selectedContent.contains(opt.id) { selectedContent.remove(opt.id) }
-                                else { selectedContent.insert(opt.id) }
-                            }
-                        }
-                    }
-
-                    pill(icon: isPull ? "📁" : "📤",
-                         title: isPull ? "Destination" : "Source",
-                         summary: pill3Summary, isOpen: pill3Open, disabled: false) {
-                        pill3Open.toggle()
-                    } content: {
-                        if isPull {
+                    if isPull {
+                        pill(icon: "📁", title: "Destination", summary: pill3Summary,
+                             isOpen: pill3Open, disabled: false) {
+                            let opening = !pill3Open
+                            pill1Open = false; pill2Open = false; pill3Open = opening; showListDropdown = false
+                        } content: {
                             IntRadioRow(label: "New collection",
                                         subtitle: "\(integration.config.name) · \(shortDate())",
                                         icon: "✨", selected: destMode == .newCollection, isLast: false) {
                                 destMode = .newCollection
                             }
+                            let collections = LocalCollectionStore.shared.collections
                             IntRadioRow(label: "Existing collection",
-                                        subtitle: "Choose from your collections",
-                                        icon: "📁", selected: destMode == .existing, isLast: true) {
-                                destMode = .existing
+                                        subtitle: collections.isEmpty ? "No collections yet" : "Add to an existing collection",
+                                        icon: "📁", selected: destMode == .existing, isLast: destMode != .existing) {
+                                if !collections.isEmpty { destMode = .existing }
                             }
-                        } else {
-                            HStack(spacing: 12) {
-                                Text("📂").font(.system(size: 17))
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Select collection").font(.inter(13, weight: .semibold)).foregroundColor(.textPrimary)
-                                    Text("Choose which collection to push from").font(.inter(11)).foregroundColor(.textTertiary)
+                            .opacity(collections.isEmpty ? 0.4 : 1)
+                            if destMode == .existing {
+                                Divider().background(Color.white.opacity(0.05))
+                                VStack(spacing: 0) {
+                                    ForEach(collections) { col in
+                                        Button { selectedExistingCollectionId = col.id } label: {
+                                            HStack(spacing: 10) {
+                                                Text("📁").font(.system(size: 15))
+                                                Text(col.name)
+                                                    .font(.inter(13, weight: .semibold))
+                                                    .foregroundColor(.textPrimary)
+                                                Spacer()
+                                                if col.id == selectedExistingCollectionId {
+                                                    Image(systemName: "checkmark")
+                                                        .font(.system(size: 12, weight: .bold))
+                                                        .foregroundColor(.brandCyan)
+                                                }
+                                            }
+                                            .padding(.horizontal, 20).padding(.vertical, 11)
+                                        }
+                                        .buttonStyle(.plain)
+                                        if col.id != collections.last?.id {
+                                            Divider().background(Color.white.opacity(0.04)).padding(.leading, 20)
+                                        }
+                                    }
                                 }
-                                Spacer()
-                                Image(systemName: "chevron.right").font(.system(size: 14)).foregroundColor(.textTertiary)
                             }
-                            .padding(.horizontal, 16).padding(.vertical, 13)
                         }
                     }
 
@@ -1201,14 +1332,438 @@ struct RequestTabView: View {
                 .padding(.bottom, 28)
             }
             .background(Color.phoneBg)
+
+            // MARK: - Centered overlays
+
+            if let existingCol = existingPatientWarning {
+                Color.black.opacity(0.65).ignoresSafeArea()
+                    .transition(.opacity)
+                VStack {
+                    Spacer()
+                    VStack(spacing: 20) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 44))
+                            .foregroundColor(Color(hex: "#fbbf24"))
+                            .shadow(color: Color(hex: "#fbbf24").opacity(0.5), radius: 12)
+                        VStack(spacing: 6) {
+                            Text("Patient Already Exists")
+                                .font(.inter(18, weight: .heavy))
+                                .foregroundColor(.textPrimary)
+                            Text("MRN \(identifier) was already pulled into \"\(existingCol)\". Add to that collection instead?")
+                                .font(.inter(13))
+                                .foregroundColor(.textSecondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        VStack(spacing: 10) {
+                            Button {
+                                // Add to the existing collection
+                                if let response = pendingPullResponse,
+                                   let col = LocalCollectionStore.shared.collections.first(where: { $0.name == existingCol }) {
+                                    let saved = IntegrationStore.shared.persistPullResult(
+                                        response,
+                                        integrationId: integration.id,
+                                        collectionName: "",
+                                        entityRecordId: pendingEntityRecordId.isEmpty ? nil : pendingEntityRecordId,
+                                        existingCollectionId: col.id
+                                    )
+                                    pendingPullResponse = nil
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                        existingPatientWarning = nil
+                                        createdCollection = saved
+                                    }
+                                }
+                            } label: {
+                                Text("Add to \"\(existingCol)\"")
+                                    .font(.inter(14, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 14)
+                                    .background(LinearGradient(colors: [Color(hex: "#1e8ae0"), Color(hex: "#0d5faa")],
+                                                               startPoint: .leading, endPoint: .trailing))
+                                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                            Button {
+                                // Create new anyway — go to name alert
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { existingPatientWarning = nil }
+                                pendingCollectionName = integration.config.name
+                                showCollectionNameAlert = true
+                            } label: {
+                                Text("Create New Anyway")
+                                    .font(.inter(13, weight: .semibold))
+                                    .foregroundColor(.textTertiary)
+                            }
+                            .buttonStyle(.plain)
+                            Button {
+                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                    existingPatientWarning = nil
+                                    pendingPullResponse = nil
+                                }
+                            } label: {
+                                Text("Cancel")
+                                    .font(.inter(13, weight: .semibold))
+                                    .foregroundColor(.textTertiary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(28)
+                    .background(Color(hex: "#081221"))
+                    .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color(hex: "#fbbf24").opacity(0.35), lineWidth: 1.5))
+                    .clipShape(RoundedRectangle(cornerRadius: 22))
+                    .shadow(color: .black.opacity(0.4), radius: 20)
+                    .padding(.horizontal, 28)
+                    Spacer()
+                }
+                .transition(.scale(scale: 0.92).combined(with: .opacity))
+            }
+
+            if let col = createdCollection {
+                Color.black.opacity(0.65).ignoresSafeArea()
+                    .transition(.opacity)
+                VStack {
+                    Spacer()
+                    VStack(spacing: 20) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 44))
+                            .foregroundColor(Color(hex: "#4ade80"))
+                            .shadow(color: Color(hex: "#4ade80").opacity(0.6), radius: 12)
+                        VStack(spacing: 6) {
+                            Text(destMode == .existing ? "Items Added" : "Collection Created")
+                                .font(.inter(18, weight: .heavy))
+                                .foregroundColor(.textPrimary)
+                            Text("\"\(col.name)\" is ready in your dashboard")
+                                .font(.inter(13))
+                                .foregroundColor(.textSecondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        VStack(spacing: 10) {
+                            Button { onGoToCollection?(col) } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "arrow.right.circle.fill")
+                                    Text("Go to Dashboard")
+                                        .font(.inter(14, weight: .bold))
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(LinearGradient(colors: [Color(hex: "#1e8ae0"), Color(hex: "#0d5faa")],
+                                                           startPoint: .leading, endPoint: .trailing))
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                            Button { createdCollection = nil } label: {
+                                Text("Stay Here")
+                                    .font(.inter(13, weight: .semibold))
+                                    .foregroundColor(.textTertiary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(28)
+                    .background(Color(hex: "#081221"))
+                    .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color(hex: "#4ade80").opacity(0.3), lineWidth: 1.5))
+                    .clipShape(RoundedRectangle(cornerRadius: 22))
+                    .shadow(color: .black.opacity(0.4), radius: 20)
+                    .padding(.horizontal, 28)
+                    Spacer()
+                }
+                .transition(.scale(scale: 0.92).combined(with: .opacity))
+            }
+
+            // Pull item warnings (e.g. 403 on labs in sandbox)
+            if !store.lastPullWarnings.isEmpty && createdCollection != nil {
+                // shown alongside success — tap dismiss on success card clears both
+            }
+
+            if pushSuccess {
+                Color.black.opacity(0.65).ignoresSafeArea()
+                    .transition(.opacity)
+                VStack {
+                    Spacer()
+                    VStack(spacing: 20) {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.system(size: 44))
+                            .foregroundColor(Color(hex: "#4ade80"))
+                            .shadow(color: Color(hex: "#4ade80").opacity(0.6), radius: 12)
+                        VStack(spacing: 6) {
+                            Text("Note Pushed")
+                                .font(.inter(18, weight: .heavy))
+                                .foregroundColor(.textPrimary)
+                            Text("Your note was sent to the EHR successfully.")
+                                .font(.inter(13))
+                                .foregroundColor(.textSecondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        Button { pushSuccess = false } label: {
+                            Text("Done")
+                                .font(.inter(14, weight: .bold))
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(LinearGradient(colors: [Color(hex: "#1e8ae0"), Color(hex: "#0d5faa")],
+                                                           startPoint: .leading, endPoint: .trailing))
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(28)
+                    .background(Color(hex: "#081221"))
+                    .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color(hex: "#4ade80").opacity(0.3), lineWidth: 1.5))
+                    .clipShape(RoundedRectangle(cornerRadius: 22))
+                    .shadow(color: .black.opacity(0.4), radius: 20)
+                    .padding(.horizontal, 28)
+                    Spacer()
+                }
+                .transition(.scale(scale: 0.92).combined(with: .opacity))
+            }
+
+            if let err = requestError {
+                Color.black.opacity(0.65).ignoresSafeArea()
+                    .transition(.opacity)
+                VStack {
+                    Spacer()
+                    VStack(spacing: 20) {
+                        Image(systemName: "exclamationmark.circle.fill")
+                            .font(.system(size: 44))
+                            .foregroundColor(.danger)
+                            .shadow(color: Color.danger.opacity(0.6), radius: 12)
+                        VStack(spacing: 6) {
+                            Text("Request Failed")
+                                .font(.inter(18, weight: .heavy))
+                                .foregroundColor(.textPrimary)
+                            Text(err)
+                                .font(.inter(13))
+                                .foregroundColor(.textSecondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        VStack(spacing: 10) {
+                            Button { requestError = nil; submitRequest() } label: {
+                                Text("Try Again")
+                                    .font(.inter(14, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 14)
+                                    .background(Color.danger.opacity(0.75))
+                                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                            Button { requestError = nil } label: {
+                                Text("Dismiss")
+                                    .font(.inter(13, weight: .semibold))
+                                    .foregroundColor(.textTertiary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(28)
+                    .background(Color(hex: "#081221"))
+                    .overlay(RoundedRectangle(cornerRadius: 22).stroke(Color.danger.opacity(0.35), lineWidth: 1.5))
+                    .clipShape(RoundedRectangle(cornerRadius: 22))
+                    .shadow(color: .black.opacity(0.4), radius: 20)
+                    .padding(.horizontal, 28)
+                    Spacer()
+                }
+                .transition(.scale(scale: 0.92).combined(with: .opacity))
+            }
         }
         .onAppear {
             selectedTarget = pullTargets.first?.id ?? ""
             selectedPushTarget = pushTargets.first?.id ?? ""
-            // Default all content types checked
-            selectedContent = Set(pullContent.map(\.id))
+            selectedContent = []
             if let entity = listSourceEntity {
                 fetchLists(entityId: entity)
+            }
+        }
+        .alert("Name this collection", isPresented: $showCollectionNameAlert) {
+            TextField("Collection name", text: $pendingCollectionName)
+                .autocorrectionDisabled()
+            Button("Save") {
+                if let response = pendingPullResponse {
+                    let name = pendingCollectionName.isEmpty ? integration.config.name : pendingCollectionName
+                    let col = IntegrationStore.shared.persistPullResult(
+                        response,
+                        integrationId: integration.id,
+                        collectionName: name,
+                        entityRecordId: pendingEntityRecordId.isEmpty ? nil : pendingEntityRecordId
+                    )
+                    pendingPullResponse = nil
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { createdCollection = col }
+                }
+            }
+            Button("Cancel", role: .cancel) { pendingPullResponse = nil }
+        } message: {
+            Text("Items will be saved to a new collection in your dashboard.")
+        }
+    }
+
+    // MARK: - Push pickers
+
+    // All items in the selected collection
+    private var itemsInPushCollection: [LocalStoredItem] {
+        LocalItemStore.shared.items.filter { $0.collectionId == pushCollectionId }
+    }
+
+    // Collections that have at least one pushable item (has integration metadata)
+    private var pushableCollections: [ScrivanoCollection] {
+        let activeIds = Set(pushableItems.compactMap(\.collectionId))
+        return LocalCollectionStore.shared.collections.filter { activeIds.contains($0.id) }
+    }
+
+    @ViewBuilder
+    private var pushCollectionPicker: some View {
+        if pushableCollections.isEmpty {
+            Text("No collections with synced items — pull data first")
+                .font(.inter(12)).foregroundColor(.textTertiary)
+                .padding(.horizontal, 16).padding(.vertical, 14)
+        } else {
+            ForEach(pushableCollections) { col in
+                Button {
+                    if pushCollectionId != col.id {
+                        pushCollectionId = col.id; pushSelectedItems = []; pushNotePerItem = [:]; pushAll = false
+                    }
+                    pill1Open = false
+                } label: {
+                    HStack(spacing: 10) {
+                        Text("📁").font(.system(size: 15))
+                        Text(col.name).font(.inter(13, weight: .semibold)).foregroundColor(.textPrimary)
+                        Spacer()
+                        if col.id == pushCollectionId {
+                            Image(systemName: "checkmark").font(.system(size: 12, weight: .bold)).foregroundColor(.brandCyan)
+                        }
+                    }
+                    .padding(.horizontal, 16).padding(.vertical, 11)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                if col.id != pushableCollections.last?.id { Divider().background(Color.white.opacity(0.05)) }
+            }
+            Divider().background(Color.brandCyan.opacity(0.1)).padding(.top, 4)
+            // Toggleable push-all
+            Button {
+                if !pushCollectionId.isEmpty { pushAll.toggle(); pushSelectedItems = []; pushNotePerItem = [:]; pill1Open = false }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "arrow.up.doc.fill").font(.system(size: 14)).foregroundColor(.brandCyan)
+                    Text("Push all notes from collection")
+                        .font(.inter(13, weight: .semibold)).foregroundColor(.brandCyan)
+                    Spacer()
+                    if pushAll {
+                        Image(systemName: "checkmark.circle.fill").font(.system(size: 16)).foregroundColor(.brandCyan)
+                    }
+                }
+                .padding(.horizontal, 16).padding(.vertical, 12)
+            }
+            .buttonStyle(.plain)
+            .opacity(pushCollectionId.isEmpty ? 0.35 : 1)
+        }
+    }
+
+    @ViewBuilder
+    private var pushItemPicker: some View {
+        let items = pushAll ? itemsInPushCollection.filter {
+            IntegrationStore.shared.integrationMetadata(for: $0.id)?.integrationId == integration.id &&
+            !LocalNoteStore.shared.notes(for: $0.id).isEmpty
+        } : itemsInPushCollection
+
+        if items.isEmpty {
+            Text(pushAll ? "No pushable items in this collection — pull data first" : "No items in this collection")
+                .font(.inter(12)).foregroundColor(.textTertiary)
+                .padding(.horizontal, 16).padding(.vertical, 14)
+        } else {
+            if pushAll {
+                Text("Select which note to push for items with multiple notes")
+                    .font(.inter(11)).foregroundColor(.textTertiary)
+                    .padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 4)
+            }
+            ForEach(items) { item in
+                let noteCount = LocalNoteStore.shared.notes(for: item.id).count
+                let hasMeta = IntegrationStore.shared.integrationMetadata(for: item.id)?.integrationId == integration.id
+                let canPush = noteCount > 0 && hasMeta
+                let isChecked = pushAll ? true : pushSelectedItems.contains(item.id)
+
+                VStack(spacing: 0) {
+                    Button {
+                        guard !pushAll else { return }  // non-interactive in push-all mode
+                        guard canPush else { return }
+                        if isChecked {
+                            pushSelectedItems.remove(item.id)
+                            pushNotePerItem.removeValue(forKey: item.id)
+                        } else {
+                            pushSelectedItems.insert(item.id)
+                            if noteCount == 1 {
+                                pushNotePerItem[item.id] = LocalNoteStore.shared.notes(for: item.id).first?.id
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 10) {
+                            if pushAll {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 17)).foregroundColor(.brandCyan.opacity(0.6))
+                            } else {
+                                Image(systemName: isChecked ? "checkmark.square.fill" : "square")
+                                    .font(.system(size: 17))
+                                    .foregroundColor(isChecked ? .brandCyan : .textTertiary)
+                            }
+                            Text("👤").font(.system(size: 15))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.name).font(.inter(13, weight: .semibold))
+                                    .foregroundColor(canPush ? .textPrimary : .textTertiary)
+                                HStack(spacing: 6) {
+                                    Text(noteCount == 0 ? "No notes" : "\(noteCount) note\(noteCount == 1 ? "" : "s")")
+                                        .font(.inter(11)).foregroundColor(.textTertiary)
+                                    if let meta = IntegrationStore.shared.integrationMetadata(for: item.id),
+                                       meta.integrationId == integration.id {
+                                        Text("·").font(.inter(11)).foregroundColor(.textTertiary)
+                                        Text("Pulled \(relativeDate(meta.lastSynced))")
+                                            .font(.inter(11)).foregroundColor(.textTertiary)
+                                    }
+                                }
+                            }
+                            Spacer()
+                        }
+                        .padding(.horizontal, 16).padding(.vertical, 11)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .opacity(canPush ? 1 : 0.35)
+
+                    // Inline note picker when item is checked/selected and has 2+ notes
+                    if isChecked && noteCount >= 2 {
+                        let notes = LocalNoteStore.shared.notes(for: item.id)
+                        VStack(spacing: 0) {
+                            Divider().background(Color.white.opacity(0.04))
+                            ForEach(notes) { note in
+                                let noteSelected = pushNotePerItem[item.id] == note.id
+                                Button {
+                                    pushNotePerItem[item.id] = note.id
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        Image(systemName: noteSelected ? "largecircle.fill.circle" : "circle")
+                                            .font(.system(size: 14))
+                                            .foregroundColor(noteSelected ? .brandCyan : .textTertiary)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(note.label)
+                                                .font(.inter(12, weight: .semibold)).foregroundColor(.textPrimary)
+                                            Text(note.text.prefix(60) + (note.text.count > 60 ? "…" : ""))
+                                                .font(.inter(10)).foregroundColor(.textTertiary).lineLimit(1)
+                                        }
+                                        Spacer()
+                                    }
+                                    .padding(.leading, 44).padding(.trailing, 16).padding(.vertical, 9)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                if note.id != notes.last?.id {
+                                    Divider().background(Color.white.opacity(0.04)).padding(.leading, 44)
+                                }
+                            }
+                        }
+                        .background(Color.white.opacity(0.03))
+                    }
+                }
+
+                if item.id != items.last?.id { Divider().background(Color.white.opacity(0.05)) }
             }
         }
     }
@@ -1218,7 +1773,10 @@ struct RequestTabView: View {
     private var listDropdownPill: some View {
         VStack(spacing: 0) {
             Button {
-                withAnimation(.easeInOut(duration: 0.15)) { showListDropdown.toggle() }
+                let opening = !showListDropdown
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    showListDropdown = opening; pill1Open = false; pill2Open = false; pill3Open = false
+                }
             } label: {
                 HStack(spacing: 10) {
                     if isLoadingLists {
@@ -1236,7 +1794,7 @@ struct RequestTabView: View {
                     }
                     Spacer()
                     Image(systemName: showListDropdown ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 11, weight: .semibold)).foregroundColor(.textTertiary)
+                        .font(.system(size: 13, weight: .semibold)).foregroundColor(.textTertiary)
                 }
                 .padding(.horizontal, 16).padding(.vertical, 12)
             }
@@ -1390,37 +1948,126 @@ struct RequestTabView: View {
     private func resetSelections() {
         selectedTarget = pullTargets.first?.id ?? ""
         selectedPushTarget = pushTargets.first?.id ?? ""
-        selectedContent = Set(pullContent.map(\.id))
+        selectedContent = []
+        contentCounts = [:]
         identifier = ""
         destMode = .newCollection
+        selectedExistingCollectionId = ""
         selectedListId = availableLists.first?.id ?? ""
+        requestError = nil
+        createdCollection = nil
+        existingPatientWarning = nil
+        pushCollectionId = ""
+        pushSelectedItems = []
+        pushNotePerItem = [:]
+        pushAll = false
+        pushSuccess = false
+    }
+
+    // Returns content types grouped, preserving server order within each group
+    private func contentGroups() -> [(String, [IntegrationOption])] {
+        var seen: Set<String> = []
+        var order: [String] = []
+        var map: [String: [IntegrationOption]] = [:]
+        for opt in pullContent {
+            let g = opt.group ?? "Other"
+            if !seen.contains(g) { seen.insert(g); order.append(g) }
+            map[g, default: []].append(opt)
+        }
+        return order.map { ($0, map[$0] ?? []) }
     }
 
     private func submitRequest() {
         guard canSubmit else { return }
+        createdCollection = nil
+        requestError = nil
+        existingPatientWarning = nil
         isRequesting = true
         Task {
             do {
                 if isPull {
-                    let listName = selectedListName.isEmpty ? nil : selectedListName
-                    let collectionName = listName ?? "\(integration.config.name) — \(shortDate())"
-                    _ = try await IntegrationStore.shared.pull(
+                    // Build counts map — only for selected items that have a defaultCount
+                    let counts: [String: Int] = Dictionary(uniqueKeysWithValues:
+                        pullContent
+                            .filter { selectedContent.contains($0.id) && $0.defaultCount != nil }
+                            .map { ($0.id, contentCounts[$0.id] ?? $0.defaultCount ?? 1) }
+                    )
+                    let response = try await IntegrationStore.shared.pull(
                         integrationId: integration.id,
                         entityId: selectedTarget,
-                        listId: showListPicker ? selectedListId : nil,
+                        listId: showListPicker && !selectedListId.isEmpty ? selectedListId : nil,
                         entityRecordId: identifier.isEmpty ? nil : identifier,
                         content: Array(selectedContent),
-                        collectionName: collectionName
+                        counts: counts.isEmpty ? nil : counts,
+                        collectionName: nil
                     )
+                    if response.success == false {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            requestError = response.message ?? "Request failed"
+                        }
+                    } else if response.collection?.items?.isEmpty == false {
+                        if destMode == .existing, !selectedExistingCollectionId.isEmpty {
+                            let col = IntegrationStore.shared.persistPullResult(
+                                response,
+                                integrationId: integration.id,
+                                collectionName: "",
+                                entityRecordId: identifier.isEmpty ? nil : identifier,
+                                existingCollectionId: selectedExistingCollectionId
+                            )
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { createdCollection = col }
+                        } else if destMode == .newCollection,
+                                  let existingCol = IntegrationStore.shared.existingCollectionName(
+                                    for: response, entityRecordId: identifier.isEmpty ? nil : identifier) {
+                            // Patient already exists — warn before creating a duplicate
+                            pendingPullResponse = response
+                            pendingEntityRecordId = identifier
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                existingPatientWarning = existingCol
+                            }
+                        } else {
+                            pendingPullResponse = response
+                            pendingCollectionName = integration.config.name
+                            pendingEntityRecordId = identifier
+                            showCollectionNameAlert = true
+                        }
+                    }
                 } else {
-                    _ = try await IntegrationStore.shared.push(
-                        integrationId: integration.id,
-                        noteText: "Note pushed from Scrivano",
-                        noteTitle: "Scrivano Note",
-                        metadata: identifier.isEmpty ? [:] : ["mrn": identifier]
-                    )
+                    if pushAll {
+                        // Push one note per item across the collection
+                        for item in itemsInPushCollection {
+                            let notes = LocalNoteStore.shared.notes(for: item.id)
+                            guard !notes.isEmpty,
+                                  IntegrationStore.shared.integrationMetadata(for: item.id) != nil
+                            else { continue }
+                            let noteId = pushNotePerItem[item.id] ?? notes.first?.id ?? ""
+                            guard let note = notes.first(where: { $0.id == noteId }) else { continue }
+                            _ = try await IntegrationStore.shared.push(
+                                integrationId: integration.id,
+                                itemId: item.id,
+                                noteText: note.text,
+                                noteTitle: note.label
+                            )
+                        }
+                    } else {
+                        // Push selected items — one note per item
+                        for itemId in pushSelectedItems {
+                            let notes = LocalNoteStore.shared.notes(for: itemId)
+                            guard !notes.isEmpty else { continue }
+                            let noteId = pushNotePerItem[itemId] ?? notes.first?.id ?? ""
+                            guard let note = notes.first(where: { $0.id == noteId }) else { continue }
+                            _ = try await IntegrationStore.shared.push(
+                                integrationId: integration.id,
+                                itemId: itemId,
+                                noteText: note.text,
+                                noteTitle: note.label
+                            )
+                        }
+                    }
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { pushSuccess = true }
                 }
             } catch {
+                let msg = error.localizedDescription
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { requestError = msg }
                 IntegrationStore.shared.appendLog(IntegrationLogEntry(
                     id: UUID().uuidString, integrationId: integration.id,
                     integrationName: integration.config.name,
@@ -1428,7 +2075,7 @@ struct RequestTabView: View {
                     targetLabel: isPull ? selectedTarget : selectedPushTarget,
                     contentLabels: Array(selectedContent),
                     destinationName: nil, resultSummary: nil,
-                    status: .error, errorMessage: error.localizedDescription, date: Date()
+                    status: .error, errorMessage: msg, date: Date()
                 ))
             }
             isRequesting = false
@@ -1438,6 +2085,14 @@ struct RequestTabView: View {
     private func shortDate() -> String {
         let f = DateFormatter(); f.dateStyle = .medium; f.timeStyle = .none
         return f.string(from: Date())
+    }
+
+    private func relativeDate(_ date: Date) -> String {
+        let seconds = Int(Date().timeIntervalSince(date))
+        if seconds < 60 { return "just now" }
+        if seconds < 3600 { return "\(seconds / 60)m ago" }
+        if seconds < 86400 { return "\(seconds / 3600)h ago" }
+        return "\(seconds / 86400)d ago"
     }
 }
 
