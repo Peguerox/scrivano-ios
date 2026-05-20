@@ -17,7 +17,7 @@ struct RecordingView: View {
 
     @Environment(\.dismiss) var dismiss
     @ObservedObject private var recorder = AudioRecorderManager.shared
-    @AppStorage("splittingInterval") private var splitInterval: Int = 1080
+    @AppStorage("splittingInterval") private var splitInterval: Int = 300
     @AppStorage("recorderFormat")    private var formatSetting: Int = 1
     @AppStorage("pocket_mode")       private var pocketMode: Bool = false
 

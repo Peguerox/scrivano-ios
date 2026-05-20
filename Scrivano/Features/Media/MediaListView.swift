@@ -103,11 +103,184 @@ final class AudioProcessor {
         return chunks
     }
 
+    // MARK: - Compression options (speed, mono, silence removal)
+
+    static func applyCompressionOptions(sourceURL: URL) async -> URL {
+        let speed   = UserDefaults.standard.integer(forKey: "compression_speed")   // 0=off 1=1.5x 2=2x
+        let mono    = UserDefaults.standard.bool(forKey: "compression_mono")
+        let silence = UserDefaults.standard.bool(forKey: "compression_silence")
+        guard speed > 0 || mono || silence else { return sourceURL }
+        var url = sourceURL
+        if silence  { url = (try? await stripSilence(from: url)) ?? url }
+        let factor: Double = speed == 2 ? 2.0 : speed == 1 ? 1.5 : 1.0
+        if factor > 1.0 || mono { url = (try? await reencodeAudio(sourceURL: url, speedFactor: factor, forceMono: mono)) ?? url }
+        return url
+    }
+
+    private static func reencodeAudio(sourceURL: URL, speedFactor: Double, forceMono: Bool) async throws -> URL {
+        let asset = AVURLAsset(url: sourceURL)
+        let duration = try await asset.load(.duration)
+        let audioTracks = try await asset.loadTracks(withMediaType: .audio)
+        guard let srcTrack = audioTracks.first else { return sourceURL }
+
+        // Build a composition — scale time range for speed change
+        let composition = AVMutableComposition()
+        guard let compTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else { return sourceURL }
+        try compTrack.insertTimeRange(CMTimeRange(start: .zero, duration: duration), of: srcTrack, at: .zero)
+        if speedFactor > 1.0 {
+            let scaled = CMTime(seconds: CMTimeGetSeconds(duration) / speedFactor, preferredTimescale: 600)
+            compTrack.scaleTimeRange(CMTimeRange(start: .zero, duration: duration), toDuration: scaled)
+        }
+
+        let tag = [speedFactor > 1.0 ? "spd" : nil, forceMono ? "mono" : nil].compactMap { $0 }.joined(separator: "_")
+        let outputURL = sourceURL.deletingPathExtension().appendingPathExtension("\(tag).m4a")
+        try? FileManager.default.removeItem(at: outputURL)
+
+        if forceMono {
+            // Reader → mono downmix → Writer (AVAssetReaderTrackOutput with AVNumberOfChannelsKey:1 auto-downmixes)
+            let compTracks = try await composition.loadTracks(withMediaType: .audio)
+            guard let compAudioTrack = compTracks.first else { return sourceURL }
+            let reader = try AVAssetReader(asset: composition)
+            let readerOut = AVAssetReaderTrackOutput(track: compAudioTrack, outputSettings: [
+                AVFormatIDKey: kAudioFormatLinearPCM,
+                AVLinearPCMBitDepthKey: 16,
+                AVLinearPCMIsFloatKey: false,
+                AVLinearPCMIsBigEndianKey: false,
+                AVLinearPCMIsNonInterleaved: false,
+                AVNumberOfChannelsKey: 1,
+                AVSampleRateKey: 44100.0
+            ])
+            reader.add(readerOut)
+            let writer = try AVAssetWriter(outputURL: outputURL, fileType: .m4a)
+            let writerIn = AVAssetWriterInput(mediaType: .audio, outputSettings: [
+                AVFormatIDKey: kAudioFormatMPEG4AAC,
+                AVSampleRateKey: 44100,
+                AVNumberOfChannelsKey: 1,
+                AVEncoderBitRateKey: 64_000
+            ])
+            writer.add(writerIn)
+            guard reader.startReading() else { return sourceURL }
+            writer.startWriting()
+            writer.startSession(atSourceTime: .zero)
+            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+                writerIn.requestMediaDataWhenReady(on: DispatchQueue(label: "scrivano.audio.mono")) {
+                    while writerIn.isReadyForMoreMediaData {
+                        guard let buf = readerOut.copyNextSampleBuffer() else {
+                            writerIn.markAsFinished(); cont.resume(); return
+                        }
+                        writerIn.append(buf)
+                    }
+                }
+            }
+            await writer.finishWriting()
+            return writer.status == .completed ? outputURL : sourceURL
+        } else {
+            // Speed only — export scaled composition
+            guard let session = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetAppleM4A) else { return sourceURL }
+            session.outputURL = outputURL; session.outputFileType = .m4a
+            await session.export()
+            return session.status == .completed ? outputURL : sourceURL
+        }
+    }
+
+    private static func stripSilence(from sourceURL: URL) async throws -> URL {
+        let asset = AVURLAsset(url: sourceURL)
+        let duration = try await asset.load(.duration)
+        let totalSeconds = CMTimeGetSeconds(duration)
+        let audioTracks = try await asset.loadTracks(withMediaType: .audio)
+        guard let track = audioTracks.first else { return sourceURL }
+
+        // Analyse audio at 16 kHz mono for speed
+        let analysisRate: Double = 16000
+        let reader = try AVAssetReader(asset: asset)
+        let readerOut = AVAssetReaderTrackOutput(track: track, outputSettings: [
+            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVLinearPCMBitDepthKey: 16,
+            AVLinearPCMIsFloatKey: false,
+            AVLinearPCMIsBigEndianKey: false,
+            AVLinearPCMIsNonInterleaved: false,
+            AVNumberOfChannelsKey: 1,
+            AVSampleRateKey: analysisRate
+        ])
+        reader.add(readerOut)
+        guard reader.startReading() else { return sourceURL }
+
+        var samples: [Int16] = []
+        samples.reserveCapacity(Int(totalSeconds * analysisRate) + 1000)
+        while let buf = readerOut.copyNextSampleBuffer() {
+            guard let block = CMSampleBufferGetDataBuffer(buf) else { continue }
+            let len = CMBlockBufferGetDataLength(block)
+            var chunk = [Int16](repeating: 0, count: len / 2)
+            CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: len, destination: &chunk)
+            samples.append(contentsOf: chunk)
+        }
+        guard !samples.isEmpty else { return sourceURL }
+
+        // 300ms windows, -46dB threshold, 150ms padding around voiced segments
+        let windowSamples = Int(analysisRate * 0.3)
+        let threshold: Float = 0.005
+        let paddingSec: Double = 0.15
+
+        var voiced: [(Double, Double)] = []
+        var i = 0
+        while i < samples.count {
+            let winEnd = min(i + windowSamples, samples.count)
+            let window = samples[i..<winEnd]
+            let sumSq = window.reduce(Float(0)) { acc, s in let f = Float(s) / 32768.0; return acc + f * f }
+            let rms = sqrt(sumSq / Float(window.count))
+            if rms >= threshold {
+                let startSec = max(0, Double(i) / analysisRate - paddingSec)
+                var j = i + windowSamples
+                while j < samples.count {
+                    let e2 = min(j + windowSamples, samples.count)
+                    let w2 = samples[j..<e2]
+                    let s2 = w2.reduce(Float(0)) { acc, s in let f = Float(s) / 32768.0; return acc + f * f }
+                    if sqrt(s2 / Float(w2.count)) < threshold { break }
+                    j += windowSamples
+                }
+                let endSec = min(totalSeconds, Double(j) / analysisRate + paddingSec)
+                if let last = voiced.last, startSec <= last.1 {
+                    voiced[voiced.count - 1].1 = max(last.1, endSec)
+                } else {
+                    voiced.append((startSec, endSec))
+                }
+                i = j
+            } else {
+                i += winEnd - i
+            }
+        }
+
+        guard !voiced.isEmpty else { return sourceURL }
+        let keptSecs = voiced.reduce(0.0) { $0 + $1.1 - $1.0 }
+        guard keptSecs < totalSeconds * 0.9 else { return sourceURL }  // <10% removed — not worth re-encoding
+
+        // Rebuild composition from voiced segments
+        let composition = AVMutableComposition()
+        guard let compTrack = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else { return sourceURL }
+        var insertAt = CMTime.zero
+        for (start, end) in voiced {
+            let range = CMTimeRange(start: CMTime(seconds: start, preferredTimescale: 44100),
+                                    end:   CMTime(seconds: end,   preferredTimescale: 44100))
+            try? compTrack.insertTimeRange(range, of: track, at: insertAt)
+            insertAt = insertAt + CMTime(seconds: end - start, preferredTimescale: 44100)
+        }
+
+        let outputURL = sourceURL.deletingPathExtension().appendingPathExtension("clean.m4a")
+        try? FileManager.default.removeItem(at: outputURL)
+        guard let session = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetAppleM4A) else { return sourceURL }
+        session.outputURL = outputURL; session.outputFileType = .m4a
+        await session.export()
+        return session.status == .completed ? outputURL : sourceURL
+    }
+
     static func prepare(entry: LocalRecordingEntry, displayName: String) async throws -> [(url: URL, duration: Double, name: String)] {
         var workingURL = entry.fileURL
         if workingURL.pathExtension.lowercased() != "m4a" && workingURL.pathExtension.lowercased() != "mp3" {
             workingURL = try await convertToM4A(sourceURL: workingURL)
         }
+
+        // Apply compression options (silence stripping, mono, speed) before splitting
+        workingURL = await applyCompressionOptions(sourceURL: workingURL)
 
         // Ensure display name extension matches the actual working file
         let workingExt = workingURL.pathExtension.lowercased().isEmpty ? "m4a" : workingURL.pathExtension.lowercased()
