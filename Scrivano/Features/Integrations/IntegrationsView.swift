@@ -2,9 +2,14 @@ import SwiftUI
 import SafariServices
 
 struct IntegrationsView: View {
+    var initialTab: IntTab = .request
+    var isRootPresentation: Bool = false  // true when opened directly from Dashboard
+
     @Environment(\.dismiss) var dismiss
     @ObservedObject private var store = IntegrationStore.shared
+    @ObservedObject private var langMgr = LanguageManager.shared
 
+    @AppStorage("lastSelectedIntegrationId") private var lastSelectedId: String = ""
     @State private var selectedId: String? = nil
     @State private var showDropdown = false
     @State private var showCatalogSheet = false
@@ -14,7 +19,7 @@ struct IntegrationsView: View {
     @State private var oauthResultSuccess: Bool = true
 
     private var selected: InstalledIntegration? {
-        guard let id = selectedId else { return store.installed.first }
+        guard let id = selectedId else { return nil }
         return store.installed.first(where: { $0.id == id })
     }
 
@@ -52,11 +57,14 @@ struct IntegrationsView: View {
             }
         }
         .onAppear {
-            if selectedId == nil { selectedId = store.installed.first?.id }
+            activeTab = initialTab
+            if selectedId == nil && !lastSelectedId.isEmpty {
+                // Restore last explicitly selected integration only
+                selectedId = store.installed.first(where: { $0.id == lastSelectedId })?.id
+            }
             Task {
                 await store.fetchCatalog()
-                // Load full config (with pull targets & content types) for selected integration
-                if let id = selectedId ?? store.installed.first?.id {
+                if let id = selectedId {
                     try? await store.fetchDetail(integrationId: id)
                 }
             }
@@ -65,8 +73,10 @@ struct IntegrationsView: View {
             if selectedId == nil { selectedId = store.installed.first?.id }
         }
         .onChange(of: selectedId) { id in
-            // Fetch full config whenever user switches integration
-            if let id { Task { try? await store.fetchDetail(integrationId: id) } }
+            if let id {
+                lastSelectedId = id
+                Task { try? await store.fetchDetail(integrationId: id) }
+            }
         }
         .sheet(item: $oauthURL) { url in
             SafariView(url: url)
@@ -91,10 +101,10 @@ struct IntegrationsView: View {
                 selectedId = integrationId
                 activeTab = .auth
                 oauthResultSuccess = true
-                oauthResultMessage = "Connected successfully"
+                oauthResultMessage = langMgr.t("integrations.connected")
             } else {
                 oauthResultSuccess = false
-                oauthResultMessage = errorMsg.isEmpty ? "Authentication failed" : errorMsg
+                oauthResultMessage = errorMsg.isEmpty ? langMgr.t("integrations.authFailed") : errorMsg
             }
 
             // Auto-hide banner after 4 seconds
@@ -117,11 +127,21 @@ struct IntegrationsView: View {
                     .clipShape(Circle())
             }
             Spacer()
-            Text("Integrations")
+            Text(langMgr.t("integrations.title"))
                 .font(.inter(16, weight: .heavy))
                 .foregroundColor(.textPrimary)
             Spacer()
-            Color.clear.frame(width: 36, height: 36)
+            Button {
+                if isRootPresentation { dismiss() }
+                else { NotificationCenter.default.post(name: .navigateToDashboard, object: nil) }
+            } label: {
+                Image(systemName: "house.fill")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.brandCyan)
+                    .frame(width: 36, height: 36)
+                    .background(Color.white.opacity(0.07))
+                    .clipShape(Circle())
+            }
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 12)
@@ -146,7 +166,7 @@ struct IntegrationsView: View {
                             Text(sel.config.name)
                                 .font(.inter(13, weight: .bold))
                                 .foregroundColor(.textPrimary)
-                            Text("\(sel.config.type.label) · \(sel.accountOrganization ?? "Not connected")")
+                            Text("\(sel.config.type.label) · \(sel.accountOrganization ?? LanguageManager.shared.t("integrations.auth.notConnected"))")
                                 .font(.inter(10))
                                 .foregroundColor(.textTertiary)
                         }
@@ -162,7 +182,7 @@ struct IntegrationsView: View {
                             .frame(width: 28, height: 28)
                             .background(Color.white.opacity(0.06))
                             .clipShape(RoundedRectangle(cornerRadius: 8))
-                        Text("No integration selected")
+                        Text(langMgr.t("integrations.noSelection"))
                             .font(.inter(13, weight: .semibold))
                             .foregroundColor(.textTertiary)
                         Spacer()
@@ -216,7 +236,7 @@ struct IntegrationsView: View {
                         Image(systemName: "plus.circle.fill")
                             .font(.system(size: 16))
                             .foregroundColor(.brandCyan)
-                        Text("Add Integration")
+                        Text(langMgr.t("integrations.addIntegration"))
                             .font(.inter(13, weight: .semibold))
                             .foregroundColor(.brandCyan)
                         Spacer()
@@ -297,12 +317,12 @@ struct IntegrationsView: View {
                     if let err = store.catalogError {
                         Text(err).font(.inter(12)).foregroundColor(.danger)
                             .multilineTextAlignment(.center).padding(.top, 24)
-                        Button("Retry") { Task { await store.fetchCatalog() } }
+                        Button(langMgr.t("integrations.result.tryAgain")) { Task { await store.fetchCatalog() } }
                             .font(.inter(13, weight: .bold)).foregroundColor(.brandCyan)
                     } else if store.isLoadingCatalog {
                         ProgressView().tint(.brandCyan).padding(.top, 32)
                     } else {
-                        Text("Install an integration to get started")
+                        Text(langMgr.t("integrations.catalog.browse"))
                             .font(.inter(13)).foregroundColor(.textSecondary)
                             .padding(.top, 24)
                     }
@@ -353,13 +373,14 @@ struct IntegrationsView: View {
 
 enum IntTab: CaseIterable {
     case auth, request, log
-    var label: String {
+    var labelKey: String {
         switch self {
-        case .auth:    return "Auth"
-        case .request: return "Request"
-        case .log:     return "Log"
+        case .auth:    return "integrations.tab.auth"
+        case .request: return "integrations.tab.request"
+        case .log:     return "integrations.tab.log"
         }
     }
+    var label: String { LanguageManager.shared.t(labelKey) }
 }
 
 // MARK: - ConnectionState colors
@@ -381,6 +402,7 @@ struct AuthTabView: View {
     let integration: InstalledIntegration
     var onOAuthURL: ((URL?) -> Void)? = nil
     @ObservedObject private var store = IntegrationStore.shared
+    @ObservedObject private var langMgr = LanguageManager.shared
     @State private var showDisconnectConfirm = false
     @State private var showUninstallConfirm = false
     @State private var isConnecting = false
@@ -429,7 +451,7 @@ struct AuthTabView: View {
                     Text(err).font(.inter(11)).foregroundColor(.danger).multilineTextAlignment(.center)
                 }
 
-                actionButton("Uninstall", style: .ghost, loading: isUninstalling) { showUninstallConfirm = true }
+                actionButton(langMgr.t("integrations.auth.uninstall"), style: .danger, loading: isUninstalling) { showUninstallConfirm = true }
 
                 CatalogPillView(onInstall: onOAuthURL)
                     .padding(.top, 8)
@@ -442,21 +464,21 @@ struct AuthTabView: View {
         .onAppear {
             baseUrl = integration.baseUrl ?? integration.config.baseUrlDefault ?? ""
         }
-        .confirmationDialog("Disconnect \(integration.config.name)?",
+        .confirmationDialog(String(format: langMgr.t("integrations.auth.disconnectConfirm"), integration.config.name),
                             isPresented: $showDisconnectConfirm, titleVisibility: .visible) {
-            Button("Disconnect", role: .destructive) { store.disconnect(id: integration.id) }
-            Button("Cancel", role: .cancel) {}
+            Button(langMgr.t("integrations.auth.disconnect"), role: .destructive) { store.disconnect(id: integration.id) }
+            Button(langMgr.t("common.cancel"), role: .cancel) {}
         }
-        .confirmationDialog("Uninstall \(integration.config.name)?",
+        .confirmationDialog(String(format: langMgr.t("integrations.auth.uninstallConfirm"), integration.config.name),
                             isPresented: $showUninstallConfirm, titleVisibility: .visible) {
-            Button("Uninstall", role: .destructive) {
+            Button(langMgr.t("integrations.auth.uninstall"), role: .destructive) {
                 isUninstalling = true
                 Task {
                     try? await store.uninstall(integrationId: integration.id)
                     isUninstalling = false
                 }
             }
-            Button("Cancel", role: .cancel) {}
+            Button(langMgr.t("common.cancel"), role: .cancel) {}
         }
     }
 
@@ -464,34 +486,34 @@ struct AuthTabView: View {
 
     @ViewBuilder
     private var connectedSection: some View {
-        infoCard(label: "Account") {
-            if let email = integration.accountEmail {
-                infoRow(label: "User", value: email)
+        // Build the list of rows to show so we can set isLast correctly
+        let rows: [(String, String, Bool, String?)] = {
+            var r: [(String, String, Bool, String?)] = []
+            if let email = integration.accountEmail        { r.append((langMgr.t("integrations.auth.user"),         email, false, nil)) }
+            if let org   = integration.accountOrganization { r.append((langMgr.t("integrations.auth.organization"), org,   false, nil)) }
+            if let date  = integration.lastAuthDate        { r.append((langMgr.t("integrations.auth.lastAuth"),     timeFmt.string(from: date), false, langMgr.t("integrations.auth.active"))) }
+            if let tok   = integration.tokenPreview        { r.append((langMgr.t("integrations.auth.token"),        tok,   true,  nil)) }
+            if let exp   = integration.tokenExpiry {
+                let hrs = max(0, Int(exp.timeIntervalSince(Date()) / 3600))
+                r.append((langMgr.t("integrations.auth.expires"), "\(dateTimeFmt.string(from: exp)) · \(hrs) hrs", false, nil))
             }
-            if let org = integration.accountOrganization {
-                infoRow(label: "Organization", value: org, isLast: false)
-            }
-            if let date = integration.lastAuthDate {
-                infoRow(label: "Last auth", value: timeFmt.string(from: date), badge: "Active", isLast: true)
+            return r
+        }()
+
+        if !rows.isEmpty {
+            infoCard(label: langMgr.t("integrations.auth.account")) {
+                ForEach(Array(rows.enumerated()), id: \.offset) { idx, row in
+                    infoRow(label: row.0, value: row.1, mono: row.2, badge: row.3, isLast: idx == rows.count - 1)
+                }
             }
         }
-        if integration.tokenPreview != nil || integration.tokenExpiry != nil {
-            infoCard(label: "Token") {
-                if let preview = integration.tokenPreview {
-                    infoRow(label: "Bearer", value: preview, mono: true, isLast: integration.tokenExpiry == nil)
-                }
-                if let expiry = integration.tokenExpiry {
-                    let hrs = max(0, Int(expiry.timeIntervalSince(Date()) / 3600))
-                    infoRow(label: "Expires", value: "\(dateTimeFmt.string(from: expiry)) · \(hrs) hrs", isLast: true)
-                }
-            }
-        }
+
         if authType.isOAuth {
-            actionButton("Reconnect via Browser", style: .ghost, loading: isConnecting) { triggerConnect() }
+            actionButton(langMgr.t("integrations.auth.reconnectBrowser"), style: .success, loading: isConnecting) { triggerConnect() }
         } else {
             credentialsForm(reconnect: true)
         }
-        actionButton("Disconnect", style: .danger) { showDisconnectConfirm = true }
+        actionButton(langMgr.t("integrations.auth.disconnect"), style: .ghost) { showDisconnectConfirm = true }
     }
 
     // MARK: - Disconnected section
@@ -501,11 +523,11 @@ struct AuthTabView: View {
         if authType.isOAuth {
             VStack(spacing: 14) {
                 Text(integration.connectionState == .expired ? "🔑" : "🔌").font(.system(size: 36))
-                Text(integration.connectionState == .expired ? "Session Expired" : "Not Connected")
+                Text(integration.connectionState == .expired ? langMgr.t("integrations.auth.sessionExpired") : langMgr.t("integrations.auth.notConnected"))
                     .font(.inter(15, weight: .bold)).foregroundColor(.textPrimary)
                 Text(integration.connectionState == .expired
-                     ? "Your session has expired. Reconnect to continue."
-                     : "You'll be taken to \(integration.config.name)'s login page.")
+                     ? langMgr.t("integrations.auth.sessionExpiredMsg")
+                     : String(format: langMgr.t("integrations.auth.oauthRedirect"), integration.config.name))
                     .font(.inter(13)).foregroundColor(.textSecondary).multilineTextAlignment(.center)
             }
             .padding(.vertical, 20)
@@ -513,13 +535,13 @@ struct AuthTabView: View {
             if integration.config.requiresBaseUrl {
                 baseUrlField
             }
-            actionButton("Connect via Browser", style: .primary, loading: isConnecting) { triggerConnect() }
+            actionButton(langMgr.t("integrations.auth.connectBrowser"), style: .primary, loading: isConnecting) { triggerConnect() }
         } else {
             VStack(spacing: 8) {
                 Text("🔑").font(.system(size: 32))
-                Text("Enter Credentials")
+                Text(langMgr.t("integrations.auth.enterCredentials"))
                     .font(.inter(15, weight: .bold)).foregroundColor(.textPrimary)
-                Text("Credentials are sent securely to the server and never stored on device.")
+                Text(langMgr.t("integrations.auth.credentialsNotice"))
                     .font(.inter(12)).foregroundColor(.textSecondary).multilineTextAlignment(.center)
             }
             .padding(.vertical, 12)
@@ -575,7 +597,7 @@ struct AuthTabView: View {
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
 
         let canSubmit = authType == .apiKey ? !credApiKey.isEmpty : (!credUsername.isEmpty && !credPassword.isEmpty)
-        actionButton(reconnect ? "Update Credentials" : "Connect",
+        actionButton(reconnect ? langMgr.t("integrations.auth.updateCredentials") : langMgr.t("integrations.auth.connect"),
                      style: .primary,
                      loading: isConnecting,
                      disabled: !canSubmit) {
@@ -645,13 +667,13 @@ struct AuthTabView: View {
                 .font(.inter(10, weight: .heavy))
                 .foregroundColor(.textTertiary)
                 .tracking(0.8)
-                .padding(.horizontal, 16)
-                .padding(.top, 12)
-                .padding(.bottom, 4)
+                .padding(.horizontal, 18)
+                .padding(.top, 14)
+                .padding(.bottom, 6)
             content()
         }
-        .background(Color.white.opacity(0.04))
-        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(Color.white.opacity(0.09), lineWidth: 1))
+        .background(Color.white.opacity(0.05))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(Color.white.opacity(0.1), lineWidth: 1))
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 
@@ -659,18 +681,19 @@ struct AuthTabView: View {
     private func infoRow(label: String, value: String, mono: Bool = false, badge: String? = nil, actionLabel: String? = nil, isLast: Bool = false) -> some View {
         HStack(spacing: 10) {
             Text(label)
-                .font(.inter(11, weight: .bold))
+                .font(.inter(12, weight: .bold))
                 .foregroundColor(.textTertiary)
-                .frame(width: 88, alignment: .leading)
+                .frame(width: 96, alignment: .leading)
             Text(value)
-                .font(mono ? .system(size: 11, design: .monospaced) : .inter(12.5, weight: .semibold))
+                .font(mono ? .system(size: 12, design: .monospaced) : .inter(13, weight: .semibold))
                 .foregroundColor(mono ? Color.brandCyan.opacity(0.85) : .textSecondary)
                 .lineLimit(1)
+                .truncationMode(.middle)
             Spacer()
             if let badge = badge {
                 Text(badge)
                     .font(.inter(10, weight: .heavy))
-                    .padding(.horizontal, 8).padding(.vertical, 2)
+                    .padding(.horizontal, 8).padding(.vertical, 3)
                     .background(Color(hex: "#4ade80").opacity(0.15))
                     .overlay(Capsule().stroke(Color(hex: "#4ade80").opacity(0.28), lineWidth: 1))
                     .clipShape(Capsule())
@@ -682,23 +705,29 @@ struct AuthTabView: View {
                     .foregroundColor(.brandCyan)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 11)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 13)
         if !isLast {
-            Divider().background(Color.white.opacity(0.05)).padding(.leading, 16)
+            Divider().background(Color.white.opacity(0.05)).padding(.leading, 18)
         }
     }
 
-    enum AuthButtonStyle { case ghost, danger, primary }
+    enum AuthButtonStyle { case ghost, danger, primary, success }
 
     @ViewBuilder
     private func actionButton(_ title: String, style: AuthButtonStyle, loading: Bool = false, disabled: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Group {
-                if loading { ProgressView().tint(style == .primary ? .white : .brandCyan).scaleEffect(0.8) }
-                else {
+                if loading {
+                    ProgressView().tint(style == .primary ? .white : style == .success ? Color(hex: "#4ade80") : .brandCyan).scaleEffect(0.8)
+                } else {
                     Text(title).font(.inter(13, weight: .bold))
-                        .foregroundColor(style == .danger ? Color(hex: "#f87171") : style == .primary ? .white : Color.white.opacity(0.6))
+                        .foregroundColor(
+                            style == .danger  ? Color(hex: "#f87171") :
+                            style == .primary ? .white :
+                            style == .success ? Color(hex: "#4ade80") :
+                            Color.white.opacity(0.6)
+                        )
                 }
             }
             .frame(maxWidth: .infinity).padding(.vertical, 13)
@@ -707,11 +736,19 @@ struct AuthTabView: View {
         .opacity(disabled && !loading ? 0.4 : 1)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(style == .danger ? Color(hex: "#f87171").opacity(0.08) :
-                      style == .primary ? Color.brandBlue.opacity(0.5) : Color.white.opacity(0.05))
+                .fill(
+                    style == .danger   ? Color(hex: "#f87171").opacity(0.08) :
+                    style == .primary  ? Color.brandBlue.opacity(0.5) :
+                    style == .success  ? Color(hex: "#4ade80").opacity(0.08) :
+                    Color.white.opacity(0.05)
+                )
                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(style == .danger ? Color(hex: "#f87171").opacity(0.2) :
-                            style == .primary ? Color.brandCyan.opacity(0.3) : Color.white.opacity(0.1), lineWidth: 1))
+                    .stroke(
+                        style == .danger   ? Color(hex: "#f87171").opacity(0.2) :
+                        style == .primary  ? Color.brandCyan.opacity(0.3) :
+                        style == .success  ? Color(hex: "#4ade80").opacity(0.25) :
+                        Color.white.opacity(0.1), lineWidth: 1
+                    ))
         )
     }
 }
@@ -721,13 +758,14 @@ struct AuthTabView: View {
 struct CatalogSheetView: View {
     var onInstall: ((URL?) -> Void)? = nil
     @Environment(\.dismiss) var dismiss
+    @ObservedObject private var langMgr = LanguageManager.shared
 
     var body: some View {
         ZStack {
             Color.phoneBg.ignoresSafeArea()
             VStack(spacing: 0) {
                 HStack {
-                    Text("Add Integration")
+                    Text(langMgr.t("integrations.catalog.title"))
                         .font(.inter(16, weight: .heavy))
                         .foregroundColor(.textPrimary)
                     Spacer()
@@ -759,6 +797,7 @@ struct CatalogPillView: View {
     var onInstall: ((URL?) -> Void)? = nil
     var startExpanded: Bool = false
     @ObservedObject private var store = IntegrationStore.shared
+    @ObservedObject private var langMgr = LanguageManager.shared
     @State private var isOpen = false
     @State private var searchText = ""
     @State private var installingId: String? = nil
@@ -785,10 +824,10 @@ struct CatalogPillView: View {
                 HStack(spacing: 10) {
                     Text("＋").font(.system(size: 16))
                     VStack(alignment: .leading, spacing: 1) {
-                        Text("Add integration")
+                        Text(langMgr.t("integrations.catalog.pill"))
                             .font(.inter(13, weight: .bold))
                             .foregroundColor(.textPrimary)
-                        Text("Browse available integrations")
+                        Text(langMgr.t("integrations.catalog.browse"))
                             .font(.inter(11))
                             .foregroundColor(.textTertiary)
                     }
@@ -816,7 +855,7 @@ struct CatalogPillView: View {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 14))
                             .foregroundColor(.textTertiary)
-                        TextField("Search integrations…", text: $searchText)
+                        TextField(langMgr.t("integrations.catalog.search"), text: $searchText)
                             .font(.inter(13))
                             .foregroundColor(.textPrimary)
                             .tint(.brandCyan)
@@ -833,7 +872,7 @@ struct CatalogPillView: View {
                     .padding(.vertical, 12)
 
                     if filteredCatalog.isEmpty {
-                        Text(store.installed.count == store.catalog.count ? "All integrations installed" : "No results")
+                        Text(store.installed.count == store.catalog.count ? langMgr.t("integrations.catalog.allInstalled") : langMgr.t("integrations.catalog.noResults"))
                             .font(.inter(12))
                             .foregroundColor(.textTertiary)
                             .padding(.vertical, 20)
@@ -1031,6 +1070,7 @@ struct RequestTabView: View {
     let integration: InstalledIntegration
     var onGoToCollection: ((ScrivanoCollection) -> Void)? = nil
     @ObservedObject private var store = IntegrationStore.shared
+    @ObservedObject private var langMgr = LanguageManager.shared
 
     @State private var mode: RequestMode = .pull
     @State private var pill1Open = false
@@ -1047,6 +1087,7 @@ struct RequestTabView: View {
     @State private var pushSelectedItems: Set<String> = []
     @State private var pushNotePerItem: [String: String] = [:]
     @State private var pushAll: Bool = false
+    @State private var pushConfig: SavedPushConfig = SavedPushConfig()
     @State private var pushSuccess = false
     @State private var isRequesting = false
     @State private var pendingPullResponse: PullResponse? = nil
@@ -1100,14 +1141,13 @@ struct RequestTabView: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: allSelected ? "checkmark.square.fill" : "square")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(allSelected ? .brandCyan : .textTertiary)
-                    Text(groupName.uppercased())
-                        .font(.inter(10, weight: .heavy)).foregroundColor(.textTertiary)
-                        .tracking(0.8)
-                    Spacer()
+                    Text(groupName)
+                        .font(.inter(13, weight: .bold)).foregroundColor(.textPrimary)
                 }
-                .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 2)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.horizontal, 16).padding(.top, 12).padding(.bottom, 4)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -1151,19 +1191,115 @@ struct RequestTabView: View {
         }
     }
 
+    private var availableNoteTypes: [NoteTypeOption] {
+        integration.config.noteTypes.isEmpty ? NoteTypeOption.fallback : integration.config.noteTypes
+    }
+
+    private var pushOptionsSummary: String {
+        var parts: [String] = [pushConfig.noteTypeDisplay]
+        if integration.config.supportedPushFormats.contains("pdf") {
+            parts.append(pushConfig.pushFormat == "pdf" ? langMgr.t("integrations.push.pdf") : langMgr.t("integrations.push.plainText"))
+        }
+        if integration.config.supportedNoteStatuses.contains("draft") {
+            parts.append(pushConfig.noteStatus == "draft" ? langMgr.t("integrations.push.draft") : langMgr.t("integrations.push.final"))
+        }
+        return parts.joined(separator: " · ")
+    }
+
+    @ViewBuilder
+    private var pushOptionsPicker: some View {
+        // Note Type section
+        sectionHeader(langMgr.t("integrations.push.noteType"))
+        ForEach(availableNoteTypes) { option in
+            Button {
+                pushConfig.noteTypeCode = option.id
+                pushConfig.noteTypeDisplay = option.display
+            } label: {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(option.display)
+                            .font(.inter(13, weight: .semibold)).foregroundColor(.textPrimary)
+                        Text(option.id).font(.inter(11)).foregroundColor(.textTertiary)
+                    }
+                    Spacer()
+                    if option.id == pushConfig.noteTypeCode {
+                        Image(systemName: "checkmark").font(.system(size: 12, weight: .bold)).foregroundColor(.brandCyan)
+                    }
+                }
+                .padding(.horizontal, 16).padding(.vertical, 11)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            if option.id != availableNoteTypes.last?.id { Divider().background(Color.white.opacity(0.05)) }
+        }
+
+        // Format section — only shown if integration supports PDF
+        let supportsPDF = integration.config.supportedPushFormats.contains("pdf")
+        if supportsPDF {
+            Divider().background(Color.brandCyan.opacity(0.08)).padding(.top, 4)
+            sectionHeader(langMgr.t("integrations.push.format"))
+            optionToggleRow(label: langMgr.t("integrations.push.plainText"), subtitle: langMgr.t("integrations.push.plainTextSub"), selected: pushConfig.pushFormat == "text") {
+                pushConfig.pushFormat = "text"
+            }
+            Divider().background(Color.white.opacity(0.05))
+            optionToggleRow(label: langMgr.t("integrations.push.pdf"), subtitle: langMgr.t("integrations.push.pdfSub"), selected: pushConfig.pushFormat == "pdf") {
+                pushConfig.pushFormat = "pdf"
+            }
+        }
+
+        // Status section — only shown if integration supports draft
+        let supportsDraft = integration.config.supportedNoteStatuses.contains("draft")
+        if supportsDraft {
+            Divider().background(Color.brandCyan.opacity(0.08)).padding(.top, 4)
+            sectionHeader(langMgr.t("integrations.push.status"))
+            optionToggleRow(label: langMgr.t("integrations.push.final"), subtitle: langMgr.t("integrations.push.finalSub"), selected: pushConfig.noteStatus == "final") {
+                pushConfig.noteStatus = "final"
+            }
+            Divider().background(Color.white.opacity(0.05))
+            optionToggleRow(label: langMgr.t("integrations.push.draft"), subtitle: langMgr.t("integrations.push.draftSub"), selected: pushConfig.noteStatus == "draft") {
+                pushConfig.noteStatus = "draft"
+            }
+        }
+    }
+
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title.uppercased())
+            .font(.inter(10, weight: .heavy)).foregroundColor(.textTertiary).tracking(0.8)
+            .padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 2)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func optionToggleRow(label: String, subtitle: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(label).font(.inter(13, weight: .semibold)).foregroundColor(.textPrimary)
+                    Text(subtitle).font(.inter(11)).foregroundColor(.textTertiary)
+                }
+                Spacer()
+                if selected {
+                    Image(systemName: "checkmark").font(.system(size: 12, weight: .bold)).foregroundColor(.brandCyan)
+                }
+            }
+            .padding(.horizontal, 16).padding(.vertical, 11)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
     private var pushItemSummary: String {
         if pushAll {
             let multiNoteCount = itemsInPushCollection.filter {
                 LocalNoteStore.shared.notes(for: $0.id).count >= 2
             }.count
-            return multiNoteCount > 0 ? "Select note for \(multiNoteCount) item\(multiNoteCount == 1 ? "" : "s")" : "All items"
+            return multiNoteCount > 0 ? String(format: langMgr.t("integrations.push.selectNoteFor"), multiNoteCount) : langMgr.t("integrations.push.allNotes")
         }
         let count = pushSelectedItems.count
-        if count == 0 { return "Select items" }
+        if count == 0 { return langMgr.t("integrations.push.selectItems") }
         if count == 1, let item = LocalItemStore.shared.items.first(where: { pushSelectedItems.contains($0.id) }) {
             return item.name
         }
-        return "\(count) items selected"
+        return String(format: langMgr.t("integrations.push.itemsSelected"), count)
     }
 
     // "Patient List" is only selectable when a list is chosen; otherwise only Specific Patient
@@ -1183,15 +1319,15 @@ struct RequestTabView: View {
     }
     private var pill2Summary: String {
         let checked = pullContent.filter { selectedContent.contains($0.id) }.map(\.label)
-        return checked.isEmpty ? "None — names only" : checked.joined(separator: ", ")
+        return checked.isEmpty ? langMgr.t("integrations.pull.namesOnly") : checked.joined(separator: ", ")
     }
     private var pill3Summary: String {
         if isPull {
-            if destMode == .newCollection { return "New collection" }
+            if destMode == .newCollection { return langMgr.t("integrations.pull.newCollection") }
             let name = LocalCollectionStore.shared.collections.first(where: { $0.id == selectedExistingCollectionId })?.name
-            return name ?? "Choose a collection"
+            return name ?? langMgr.t("integrations.pull.existingCollection")
         }
-        return "Select collection"
+        return langMgr.t("integrations.push.selectCollection")
     }
     private var canSubmit: Bool {
         guard integration.connectionState == .connected else { return false }
@@ -1240,7 +1376,7 @@ struct RequestTabView: View {
                         // List picker — always shown when integration uses a list source entity
                         if showListPicker { listDropdownPill }
 
-                        pill(icon: "📥", title: "Source", summary: pill1Summary,
+                        pill(icon: "📥", title: langMgr.t("integrations.pull.source"), summary: pill1Summary,
                              isOpen: pill1Open, disabled: false) {
                             let opening = !pill1Open
                             pill1Open = opening; pill2Open = false; pill3Open = false; showListDropdown = false
@@ -1257,7 +1393,7 @@ struct RequestTabView: View {
                             }
                         }
 
-                        pill(icon: "📋", title: "Content", summary: pill2Summary,
+                        pill(icon: "📋", title: langMgr.t("integrations.pull.content"), summary: pill2Summary,
                              isOpen: pill2Open, disabled: false) {
                             let opening = !pill2Open; pill1Open = false; pill2Open = opening; pill3Open = false; showListDropdown = false
                         } content: {
@@ -1266,35 +1402,41 @@ struct RequestTabView: View {
 
                     } else {
                         // Pill 1: Collection
-                        let selColName = LocalCollectionStore.shared.collections.first(where: { $0.id == pushCollectionId })?.name ?? "Select collection"
-                        pill(icon: "📁", title: "Collection", summary: selColName,
+                        let selColName = LocalCollectionStore.shared.collections.first(where: { $0.id == pushCollectionId })?.name ?? langMgr.t("integrations.push.selectCollection")
+                        pill(icon: "📁", title: langMgr.t("integrations.push.collection"), summary: selColName,
                              isOpen: pill1Open, disabled: false) {
                             pill1Open = !pill1Open; pill2Open = false; pill3Open = false
                         } content: { pushCollectionPicker }
 
                         // Pill 2: Items — shown whenever a collection is selected
                         if !pushCollectionId.isEmpty {
-                            pill(icon: "👤", title: "Items", summary: pushItemSummary,
+                            pill(icon: "👤", title: langMgr.t("integrations.push.items"), summary: pushItemSummary,
                                  isOpen: pill2Open, disabled: false) {
                                 pill2Open = !pill2Open; pill1Open = false; pill3Open = false
                             } content: { pushItemPicker }
                         }
+
+                        // Pill 3: Options (note type + format + status) — always shown in push mode
+                        pill(icon: "⚙️", title: langMgr.t("integrations.push.options"), summary: pushOptionsSummary,
+                             isOpen: pill3Open, disabled: false) {
+                            pill3Open = !pill3Open; pill1Open = false; pill2Open = false
+                        } content: { pushOptionsPicker }
                     }
 
                     if isPull {
-                        pill(icon: "📁", title: "Destination", summary: pill3Summary,
+                        pill(icon: "📁", title: langMgr.t("integrations.pull.destination"), summary: pill3Summary,
                              isOpen: pill3Open, disabled: false) {
                             let opening = !pill3Open
                             pill1Open = false; pill2Open = false; pill3Open = opening; showListDropdown = false
                         } content: {
-                            IntRadioRow(label: "New collection",
+                            IntRadioRow(label: langMgr.t("integrations.pull.newCollection"),
                                         subtitle: "\(integration.config.name) · \(shortDate())",
                                         icon: "✨", selected: destMode == .newCollection, isLast: false) {
                                 destMode = .newCollection
                             }
                             let collections = LocalCollectionStore.shared.collections
-                            IntRadioRow(label: "Existing collection",
-                                        subtitle: collections.isEmpty ? "No collections yet" : "Add to an existing collection",
+                            IntRadioRow(label: langMgr.t("integrations.pull.existingCollection"),
+                                        subtitle: collections.isEmpty ? langMgr.t("integrations.pull.noCollections") : langMgr.t("integrations.pull.addToExisting"),
                                         icon: "📁", selected: destMode == .existing, isLast: destMode != .existing) {
                                 if !collections.isEmpty { destMode = .existing }
                             }
@@ -1338,7 +1480,7 @@ struct RequestTabView: View {
                 Button { submitRequest() } label: {
                     Group {
                         if isRequesting { ProgressView().tint(.white) }
-                        else { Text("Request").font(.inter(15, weight: .bold)).foregroundColor(.white) }
+                        else { Text(langMgr.t("integrations.request.submit")).font(.inter(15, weight: .bold)).foregroundColor(.white) }
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 15)
@@ -1367,10 +1509,10 @@ struct RequestTabView: View {
                             .foregroundColor(Color(hex: "#fbbf24"))
                             .shadow(color: Color(hex: "#fbbf24").opacity(0.5), radius: 12)
                         VStack(spacing: 6) {
-                            Text("Patient Already Exists")
+                            Text(langMgr.t("integrations.alert.patientExists"))
                                 .font(.inter(18, weight: .heavy))
                                 .foregroundColor(.textPrimary)
-                            Text("MRN \(identifier) was already pulled into \"\(existingCol)\". Add to that collection instead?")
+                            Text(String(format: langMgr.t("integrations.alert.patientExistsMsg"), identifier, existingCol))
                                 .font(.inter(13))
                                 .foregroundColor(.textSecondary)
                                 .multilineTextAlignment(.center)
@@ -1394,7 +1536,7 @@ struct RequestTabView: View {
                                     }
                                 }
                             } label: {
-                                Text("Add to \"\(existingCol)\"")
+                                Text(String(format: langMgr.t("integrations.alert.addToExisting"), existingCol))
                                     .font(.inter(14, weight: .bold))
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
@@ -1410,7 +1552,7 @@ struct RequestTabView: View {
                                 pendingCollectionName = integration.config.name
                                 showCollectionNameAlert = true
                             } label: {
-                                Text("Create New Anyway")
+                                Text(langMgr.t("integrations.alert.createNew"))
                                     .font(.inter(13, weight: .semibold))
                                     .foregroundColor(.textTertiary)
                             }
@@ -1421,7 +1563,7 @@ struct RequestTabView: View {
                                     pendingPullResponse = nil
                                 }
                             } label: {
-                                Text("Cancel")
+                                Text(langMgr.t("common.cancel"))
                                     .font(.inter(13, weight: .semibold))
                                     .foregroundColor(.textTertiary)
                             }
@@ -1450,10 +1592,10 @@ struct RequestTabView: View {
                             .foregroundColor(Color(hex: "#4ade80"))
                             .shadow(color: Color(hex: "#4ade80").opacity(0.6), radius: 12)
                         VStack(spacing: 6) {
-                            Text(destMode == .existing ? "Items Added" : "Collection Created")
+                            Text(langMgr.t(destMode == .existing ? "integrations.result.itemsAdded" : "integrations.result.collectionCreated"))
                                 .font(.inter(18, weight: .heavy))
                                 .foregroundColor(.textPrimary)
-                            Text("\"\(col.name)\" is ready in your dashboard")
+                            Text(String(format: langMgr.t("integrations.result.collectionReady"), col.name))
                                 .font(.inter(13))
                                 .foregroundColor(.textSecondary)
                                 .multilineTextAlignment(.center)
@@ -1462,7 +1604,7 @@ struct RequestTabView: View {
                             Button { onGoToCollection?(col) } label: {
                                 HStack(spacing: 8) {
                                     Image(systemName: "arrow.right.circle.fill")
-                                    Text("Go to Dashboard")
+                                    Text(langMgr.t("integrations.result.goToDashboard"))
                                         .font(.inter(14, weight: .bold))
                                 }
                                 .foregroundColor(.white)
@@ -1474,7 +1616,7 @@ struct RequestTabView: View {
                             }
                             .buttonStyle(.plain)
                             Button { createdCollection = nil } label: {
-                                Text("Stay Here")
+                                Text(langMgr.t("integrations.result.stayHere"))
                                     .font(.inter(13, weight: .semibold))
                                     .foregroundColor(.textTertiary)
                             }
@@ -1508,16 +1650,16 @@ struct RequestTabView: View {
                             .foregroundColor(Color(hex: "#4ade80"))
                             .shadow(color: Color(hex: "#4ade80").opacity(0.6), radius: 12)
                         VStack(spacing: 6) {
-                            Text("Note Pushed")
+                            Text(langMgr.t("integrations.result.notePushed"))
                                 .font(.inter(18, weight: .heavy))
                                 .foregroundColor(.textPrimary)
-                            Text("Your note was sent to the EHR successfully.")
+                            Text(langMgr.t("integrations.result.notePushedMsg"))
                                 .font(.inter(13))
                                 .foregroundColor(.textSecondary)
                                 .multilineTextAlignment(.center)
                         }
                         Button { pushSuccess = false } label: {
-                            Text("Done")
+                            Text(langMgr.t("integrations.result.done"))
                                 .font(.inter(14, weight: .bold))
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
@@ -1550,7 +1692,7 @@ struct RequestTabView: View {
                             .foregroundColor(.danger)
                             .shadow(color: Color.danger.opacity(0.6), radius: 12)
                         VStack(spacing: 6) {
-                            Text("Request Failed")
+                            Text(langMgr.t("integrations.result.failed"))
                                 .font(.inter(18, weight: .heavy))
                                 .foregroundColor(.textPrimary)
                             Text(err)
@@ -1560,7 +1702,7 @@ struct RequestTabView: View {
                         }
                         VStack(spacing: 10) {
                             Button { requestError = nil; submitRequest() } label: {
-                                Text("Try Again")
+                                Text(langMgr.t("integrations.result.tryAgain"))
                                     .font(.inter(14, weight: .bold))
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
@@ -1570,7 +1712,7 @@ struct RequestTabView: View {
                             }
                             .buttonStyle(.plain)
                             Button { requestError = nil } label: {
-                                Text("Dismiss")
+                                Text(langMgr.t("common.dismiss"))
                                     .font(.inter(13, weight: .semibold))
                                     .foregroundColor(.textTertiary)
                             }
@@ -1592,14 +1734,18 @@ struct RequestTabView: View {
             selectedTarget = pullTargets.first?.id ?? ""
             selectedPushTarget = pushTargets.first?.id ?? ""
             selectedContent = []
+            pushConfig = IntegrationStore.shared.loadPushConfig(integrationId: integration.id)
             if let entity = listSourceEntity {
                 fetchLists(entityId: entity)
             }
         }
-        .alert("Name this collection", isPresented: $showCollectionNameAlert) {
-            TextField("Collection name", text: $pendingCollectionName)
+        .onChange(of: pushConfig) { newConfig in
+            IntegrationStore.shared.savePushConfig(newConfig, integrationId: integration.id)
+        }
+        .alert(langMgr.t("integrations.alert.nameCollection"), isPresented: $showCollectionNameAlert) {
+            TextField(langMgr.t("integrations.alert.collectionPlaceholder"), text: $pendingCollectionName)
                 .autocorrectionDisabled()
-            Button("Save") {
+            Button(langMgr.t("integrations.alert.save")) {
                 if let response = pendingPullResponse {
                     let name = pendingCollectionName.isEmpty ? integration.config.name : pendingCollectionName
                     let col = IntegrationStore.shared.persistPullResult(
@@ -1612,9 +1758,9 @@ struct RequestTabView: View {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { createdCollection = col }
                 }
             }
-            Button("Cancel", role: .cancel) { pendingPullResponse = nil }
+            Button(langMgr.t("common.cancel"), role: .cancel) { pendingPullResponse = nil }
         } message: {
-            Text("Items will be saved to a new collection in your dashboard.")
+            Text(langMgr.t("integrations.alert.saveMsg"))
         }
     }
 
@@ -1634,7 +1780,7 @@ struct RequestTabView: View {
     @ViewBuilder
     private var pushCollectionPicker: some View {
         if pushableCollections.isEmpty {
-            Text("No collections with synced items — pull data first")
+            Text(langMgr.t("integrations.push.noCollections"))
                 .font(.inter(12)).foregroundColor(.textTertiary)
                 .padding(.horizontal, 16).padding(.vertical, 14)
         } else {
@@ -1666,7 +1812,7 @@ struct RequestTabView: View {
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "arrow.up.doc.fill").font(.system(size: 14)).foregroundColor(.brandCyan)
-                    Text("Push all notes from collection")
+                    Text(langMgr.t("integrations.push.allNotes"))
                         .font(.inter(13, weight: .semibold)).foregroundColor(.brandCyan)
                     Spacer()
                     if pushAll {
@@ -1688,12 +1834,12 @@ struct RequestTabView: View {
         } : itemsInPushCollection
 
         if items.isEmpty {
-            Text(pushAll ? "No pushable items in this collection — pull data first" : "No items in this collection")
+            Text(pushAll ? langMgr.t("integrations.push.noPushable") : langMgr.t("integrations.push.noItems"))
                 .font(.inter(12)).foregroundColor(.textTertiary)
                 .padding(.horizontal, 16).padding(.vertical, 14)
         } else {
             if pushAll {
-                Text("Select which note to push for items with multiple notes")
+                Text(langMgr.t("integrations.push.selectNoteInstructions"))
                     .font(.inter(11)).foregroundColor(.textTertiary)
                     .padding(.horizontal, 16).padding(.top, 10).padding(.bottom, 4)
             }
@@ -1731,12 +1877,12 @@ struct RequestTabView: View {
                                 Text(item.name).font(.inter(13, weight: .semibold))
                                     .foregroundColor(canPush ? .textPrimary : .textTertiary)
                                 HStack(spacing: 6) {
-                                    Text(noteCount == 0 ? "No notes" : "\(noteCount) note\(noteCount == 1 ? "" : "s")")
+                                    Text(noteCount == 0 ? langMgr.t("integrations.push.noNotes") : "\(noteCount) note\(noteCount == 1 ? "" : "s")")
                                         .font(.inter(11)).foregroundColor(.textTertiary)
                                     if let meta = IntegrationStore.shared.integrationMetadata(for: item.id),
                                        meta.integrationId == integration.id {
                                         Text("·").font(.inter(11)).foregroundColor(.textTertiary)
-                                        Text("Pulled \(relativeDate(meta.lastSynced))")
+                                        Text(String(format: langMgr.t("integrations.push.pulledDate"), relativeDate(meta.lastSynced)))
                                             .font(.inter(11)).foregroundColor(.textTertiary)
                                     }
                                 }
@@ -1802,16 +1948,14 @@ struct RequestTabView: View {
                 HStack(spacing: 10) {
                     if isLoadingLists {
                         ProgressView().scaleEffect(0.7).tint(.brandCyan)
+                            .frame(width: 20, height: 20)
                     } else {
-                        Image(systemName: "list.bullet")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.brandCyan)
+                        Text("📋").font(.system(size: 16))
                     }
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("List").font(.inter(11, weight: .heavy)).foregroundColor(.textTertiary).tracking(0.8)
-                        Text(selectedListId.isEmpty ? "Select a list" : selectedListName)
-                            .font(.inter(13, weight: .semibold))
-                            .foregroundColor(selectedListId.isEmpty ? .textTertiary : .textPrimary)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(langMgr.t("integrations.pull.list")).font(.inter(13, weight: .bold)).foregroundColor(.textPrimary)
+                        Text(selectedListId.isEmpty ? langMgr.t("integrations.pull.selectList") : selectedListName)
+                            .font(.inter(11)).foregroundColor(.textTertiary)
                     }
                     Spacer()
                     Image(systemName: showListDropdown ? "chevron.up" : "chevron.down")
@@ -1824,7 +1968,7 @@ struct RequestTabView: View {
             if showListDropdown {
                 Divider().background(Color.white.opacity(0.07))
                 if availableLists.isEmpty {
-                    Text(isLoadingLists ? "Loading…" : "No lists available")
+                    Text(isLoadingLists ? langMgr.t("integrations.pull.loading") : langMgr.t("integrations.pull.noLists"))
                         .font(.inter(12)).foregroundColor(.textTertiary)
                         .padding(.vertical, 14)
                 } else {
@@ -1878,8 +2022,9 @@ struct RequestTabView: View {
     // MARK: - Segmented control
 
     private var segmentedControl: some View {
-        HStack(spacing: 3) {
-            ForEach(RequestMode.allCases, id: \.self) { m in
+        let modes = RequestMode.allCases.filter { $0 == .pull || integration.config.canPush }
+        return HStack(spacing: 3) {
+            ForEach(modes, id: \.self) { m in
                 Button {
                     mode = m
                     resetSelections()
@@ -2024,11 +2169,11 @@ struct RequestTabView: View {
                     )
                     if response.success == false {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                            requestError = response.message ?? "Request failed"
+                            requestError = response.message ?? LanguageManager.shared.t("integrations.result.failed")
                         }
                     } else if response.collection?.items?.isEmpty != false {
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                            requestError = "No items found. Try a different search or check that the patient exists in the system."
+                            requestError = LanguageManager.shared.t("integrations.result.noItems")
                         }
                     } else if response.collection?.items?.isEmpty == false {
                         if destMode == .existing, !selectedExistingCollectionId.isEmpty {
@@ -2057,8 +2202,29 @@ struct RequestTabView: View {
                         }
                     }
                 } else {
+                    let delayNs = UInt64(integration.config.rateLimitMs ?? 0) * 1_000_000
+                    let maxLen = integration.config.maxNoteLength
+
+                    func pushNote(itemId: String, note: LocalNoteEntry) async throws {
+                        if let max = maxLen, note.text.count > max {
+                            throw NSError(domain: "push", code: 400, userInfo: [
+                                NSLocalizedDescriptionKey: String(format: LanguageManager.shared.t("integrations.result.noteExceedsLimit"), note.label, max, note.text.count)
+                            ])
+                        }
+                        _ = try await IntegrationStore.shared.push(
+                            integrationId: integration.id,
+                            itemId: itemId,
+                            noteText: note.text,
+                            noteTitle: note.label,
+                            noteTypeCode: pushConfig.noteTypeCode,
+                            noteTypeDisplay: pushConfig.noteTypeDisplay,
+                            noteStatus: pushConfig.noteStatus,
+                            pushFormat: pushConfig.pushFormat
+                        )
+                        if delayNs > 0 { try await Task.sleep(nanoseconds: delayNs) }
+                    }
+
                     if pushAll {
-                        // Push one note per item across the collection
                         for item in itemsInPushCollection {
                             let notes = LocalNoteStore.shared.notes(for: item.id)
                             guard !notes.isEmpty,
@@ -2066,26 +2232,15 @@ struct RequestTabView: View {
                             else { continue }
                             let noteId = pushNotePerItem[item.id] ?? notes.first?.id ?? ""
                             guard let note = notes.first(where: { $0.id == noteId }) else { continue }
-                            _ = try await IntegrationStore.shared.push(
-                                integrationId: integration.id,
-                                itemId: item.id,
-                                noteText: note.text,
-                                noteTitle: note.label
-                            )
+                            try await pushNote(itemId: item.id, note: note)
                         }
                     } else {
-                        // Push selected items — one note per item
                         for itemId in pushSelectedItems {
                             let notes = LocalNoteStore.shared.notes(for: itemId)
                             guard !notes.isEmpty else { continue }
                             let noteId = pushNotePerItem[itemId] ?? notes.first?.id ?? ""
                             guard let note = notes.first(where: { $0.id == noteId }) else { continue }
-                            _ = try await IntegrationStore.shared.push(
-                                integrationId: integration.id,
-                                itemId: itemId,
-                                noteText: note.text,
-                                noteTitle: note.label
-                            )
+                            try await pushNote(itemId: itemId, note: note)
                         }
                     }
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { pushSuccess = true }
@@ -2113,17 +2268,18 @@ struct RequestTabView: View {
     }
 
     private func relativeDate(_ date: Date) -> String {
+        let lm = LanguageManager.shared
         let seconds = Int(Date().timeIntervalSince(date))
-        if seconds < 60 { return "just now" }
-        if seconds < 3600 { return "\(seconds / 60)m ago" }
-        if seconds < 86400 { return "\(seconds / 3600)h ago" }
-        return "\(seconds / 86400)d ago"
+        if seconds < 60 { return lm.t("integrations.date.justNow") }
+        if seconds < 3600 { return String(format: lm.t("integrations.date.minutesAgo"), seconds / 60) }
+        if seconds < 86400 { return String(format: lm.t("integrations.date.hoursAgo"), seconds / 3600) }
+        return String(format: lm.t("integrations.date.daysAgo"), seconds / 86400)
     }
 }
 
 enum RequestMode: CaseIterable {
     case pull, push
-    var label: String { self == .pull ? "Pull" : "Push" }
+    var label: String { self == .pull ? LanguageManager.shared.t("integrations.request.pull") : LanguageManager.shared.t("integrations.request.push") }
 }
 
 enum DestMode { case newCollection, existing }
@@ -2133,6 +2289,7 @@ enum DestMode { case newCollection, existing }
 struct LogTabView: View {
     let integrationId: String
     @ObservedObject private var store = IntegrationStore.shared
+    @ObservedObject private var langMgr = LanguageManager.shared
 
     private var entries: [IntegrationLogEntry] { store.logEntries(for: integrationId) }
 
@@ -2142,10 +2299,10 @@ struct LogTabView: View {
                 if entries.isEmpty {
                     VStack(spacing: 12) {
                         Text("📋").font(.system(size: 36)).padding(.top, 48)
-                        Text("No requests yet")
+                        Text(langMgr.t("integrations.log.empty"))
                             .font(.inter(14, weight: .bold))
                             .foregroundColor(.textPrimary)
-                        Text("Pull and push activity will appear here")
+                        Text(langMgr.t("integrations.log.emptyHint"))
                             .font(.inter(12))
                             .foregroundColor(.textSecondary)
                     }
@@ -2199,7 +2356,7 @@ struct LogTabView: View {
                 Text(relativeDate(entry.date))
                     .font(.inter(10))
                     .foregroundColor(.textTertiary)
-                Text(entry.action == .pull ? "Pull" : "Push")
+                Text(entry.action == .pull ? langMgr.t("integrations.request.pull") : langMgr.t("integrations.request.push"))
                     .font(.inter(9, weight: .heavy))
                     .padding(.horizontal, 7).padding(.vertical, 2)
                     .background(entry.action == .pull
@@ -2229,9 +2386,10 @@ struct LogTabView: View {
     }
 
     private func relativeDate(_ date: Date) -> String {
-        let diff = Date().timeIntervalSince(date)
-        if diff < 3600 { return "\(Int(diff/60))m ago" }
-        if diff < 86400 { return "\(Int(diff/3600))h ago" }
+        let diff = Int(Date().timeIntervalSince(date))
+        if diff < 60 { return langMgr.t("integrations.date.justNow") }
+        if diff < 3600 { return String(format: langMgr.t("integrations.date.minutesAgo"), diff / 60) }
+        if diff < 86400 { return String(format: langMgr.t("integrations.date.hoursAgo"), diff / 3600) }
         let f = DateFormatter(); f.dateStyle = .medium; f.timeStyle = .none
         return f.string(from: date)
     }

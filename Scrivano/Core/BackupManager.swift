@@ -578,4 +578,5 @@ extension Notification.Name {
     static let scrivanoOpenBackupFile  = Notification.Name("scrivano.openBackupFile")
     static let integrationOAuthCallback     = Notification.Name("scrivano.integrationOAuthCallback")
     static let integrationCollectionCreated = Notification.Name("scrivano.integrationCollectionCreated")
+    static let navigateToDashboard          = Notification.Name("scrivano.navigateToDashboard")
 }

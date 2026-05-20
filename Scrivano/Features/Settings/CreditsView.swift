@@ -16,7 +16,13 @@ struct CreditsView: View {
         ZStack {
             Color.phoneBg.ignoresSafeArea()
             VStack(spacing: 0) {
-                SubScreenBar(title: "Plans", accentColor: .brandCyan, onBack: { dismiss() })
+                SubScreenBar(
+                    title: "Plans",
+                    accentColor: .brandCyan,
+                    onBack: { dismiss() },
+                    trailingSystemIcon: "house.fill",
+                    onTrailing: { NotificationCenter.default.post(name: .navigateToDashboard, object: nil) }
+                )
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 0) {
                         balanceCard.padding(.top, 14)

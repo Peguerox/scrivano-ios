@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct AutomationView: View {
+    var isRootPresentation: Bool = false
+
     @EnvironmentObject var langMgr: LanguageManager
     @Environment(\.dismiss) var dismiss
     @AppStorage("auto_transcription")   private var autoTranscription = true
@@ -122,6 +124,7 @@ struct AutomationView: View {
     @AppStorage("auto_merge")                   private var autoMerge = true
     @AppStorage("auto_upload")                  private var autoUpload = false
     @AppStorage("auto_note_prompts_encoded")    private var autoNotePromptsEncoded: String = ""
+    @AppStorage("showAutomationIcon")           private var showAutomationIcon = false
 
     @State private var expandedStage: Int? = nil
     @State private var showPromptPicker = false
@@ -135,7 +138,16 @@ struct AutomationView: View {
             Color.phoneBg.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                SubScreenBar(title: langMgr.t("settings.automation.title"), accentColor: .brandCyan, onBack: { dismiss() })
+                SubScreenBar(
+                    title: langMgr.t("settings.automation.title"),
+                    accentColor: .brandCyan,
+                    onBack: { dismiss() },
+                    trailingSystemIcon: "house.fill",
+                    onTrailing: {
+                        if isRootPresentation { dismiss() }
+                        else { NotificationCenter.default.post(name: .navigateToDashboard, object: nil) }
+                    }
+                )
 
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 14) {
@@ -276,6 +288,32 @@ struct AutomationView: View {
                                 autoUpload = false
                             }
                         }
+
+                        // Dashboard shortcut toggle
+                        HStack(spacing: 12) {
+                            Circle().fill(Color.brandBlue).frame(width: 10, height: 10)
+                                .shadow(color: Color.brandBlue.opacity(0.5), radius: 6)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(langMgr.t("automation.showOnDashboard"))
+                                    .font(.inter(14, weight: .bold))
+                                    .foregroundColor(.textPrimary)
+                                Text(langMgr.t("automation.showOnDashboard.desc"))
+                                    .font(.inter(11))
+                                    .foregroundColor(.textTertiary)
+                            }
+                            Spacer()
+                            Text("🤖")
+                                .font(.system(size: 18))
+                            Toggle("", isOn: $showAutomationIcon)
+                                .labelsHidden()
+                                .tint(.brandBlue)
+                                .scaleEffect(0.85)
+                        }
+                        .padding(.horizontal, 16).padding(.vertical, 14)
+                        .background(Color.white.opacity(0.04))
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.07), lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .padding(.horizontal, 14)
 
                         Spacer().frame(height: 40)
                     }

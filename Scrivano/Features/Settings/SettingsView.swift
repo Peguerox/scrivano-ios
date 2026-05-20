@@ -397,6 +397,9 @@ struct SettingsView: View {
         }
         .fullScreenCover(isPresented: $showAPIKey) { APIKeyView().environmentObject(auth) }
         .fullScreenCover(isPresented: $showLanguage) { LanguagePickerView() }
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToDashboard)) { _ in
+            dismiss()
+        }
     }
 
     // MARK: - Account Hero

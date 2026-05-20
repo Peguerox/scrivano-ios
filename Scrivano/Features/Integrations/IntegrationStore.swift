@@ -385,14 +385,35 @@ final class IntegrationStore: ObservableObject {
 
     // MARK: - Push
 
+    // MARK: - Push config persistence
+
+    func savePushConfig(_ config: SavedPushConfig, integrationId: String) {
+        if let data = try? JSONEncoder().encode(config) {
+            UserDefaults.standard.set(data, forKey: "pushConfig.\(integrationId)")
+        }
+    }
+
+    func loadPushConfig(integrationId: String) -> SavedPushConfig {
+        guard let data = UserDefaults.standard.data(forKey: "pushConfig.\(integrationId)"),
+              let config = try? JSONDecoder().decode(SavedPushConfig.self, from: data)
+        else { return SavedPushConfig() }
+        return config
+    }
+
     func push(integrationId: String,
               itemId: String,
               noteText: String,
-              noteTitle: String) async throws -> ActionResponse {
+              noteTitle: String,
+              noteTypeCode: String? = nil,
+              noteTypeDisplay: String? = nil,
+              noteStatus: String? = nil,
+              pushFormat: String? = nil) async throws -> ActionResponse {
 
-        // Send back the exact metadata received during pull — Epic needs ehr_encounter_id etc.
         let metadata = integrationMetadata(for: itemId)?.rawFields ?? [:]
-        let body = PushRequest(noteText: noteText, noteTitle: noteTitle, metadata: metadata)
+        let body = PushRequest(noteText: noteText, noteTitle: noteTitle,
+                               noteTypeCode: noteTypeCode, noteTypeDisplay: noteTypeDisplay,
+                               noteStatus: noteStatus, pushFormat: pushFormat,
+                               metadata: metadata)
         let response = try await api.request(
             path: "/api/integrations/\(integrationId)/push",
             method: "POST",

@@ -195,6 +195,7 @@ struct SubScreenBar: View {
     var backIcon: String = "chevron.left"
     var onBack: (() -> Void)?
     var trailingIcon: String? = nil
+    var trailingSystemIcon: String? = nil
     var onTrailing: (() -> Void)? = nil
 
     var body: some View {
@@ -216,7 +217,17 @@ struct SubScreenBar: View {
                 .truncationMode(.tail)
                 .frame(maxWidth: .infinity)
 
-            if let icon = trailingIcon {
+            if let sysIcon = trailingSystemIcon {
+                Button(action: { onTrailing?() }) {
+                    Image(systemName: sysIcon)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(accentColor)
+                        .frame(width: 36, height: 36)
+                        .background(Color.white.opacity(0.07))
+                        .overlay(Circle().stroke(Color.white.opacity(0.1), lineWidth: 1))
+                        .clipShape(Circle())
+                }
+            } else if let icon = trailingIcon {
                 Button(action: { onTrailing?() }) {
                     Text(icon)
                         .font(.system(size: 15))

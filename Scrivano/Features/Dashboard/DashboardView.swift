@@ -12,6 +12,7 @@ struct DashboardView: View {
     @ObservedObject private var recorder = AudioRecorderManager.shared
     @ObservedObject private var notesMgr = NoteGenerationManager.shared
     @ObservedObject private var taskQueue = TaskQueueManager.shared
+    @ObservedObject private var integrationStore = IntegrationStore.shared
     @State private var showSettings = false
     @State private var showCollections = false
     @State private var showNewItem = false
@@ -77,6 +78,13 @@ struct DashboardView: View {
     // Prompt database
     @State private var showPromptDatabase          = false
 
+    // Integration shortcut
+    @State private var showIntegrations            = false
+
+    // Automation shortcut
+    @AppStorage("showAutomationIcon")   private var showAutomationIcon = false
+    @State private var showAutomation = false
+
     enum ViewMode { case card, list }
     enum SortOrder { case insertion, az, za }
     @State private var sortOrder: SortOrder = .insertion
@@ -139,6 +147,12 @@ struct DashboardView: View {
                 .fullScreenCover(isPresented: $showPromptDatabase) {
                     PromptsView(context: .browse)
                 }
+                .fullScreenCover(isPresented: $showIntegrations) {
+                    IntegrationsView(initialTab: .request, isRootPresentation: true)
+                }
+                .fullScreenCover(isPresented: $showAutomation) {
+                    AutomationView(isRootPresentation: true)
+                }
                 .fullScreenCover(isPresented: $showProcessItemsPrompts, onDismiss: {
                     showProcessItemsMode = false
                     processItemsSelected.removeAll()
@@ -200,6 +214,13 @@ struct DashboardView: View {
             .onChange(of: recorder.lastSavedItemId) { _ in vm.refreshLocalCounts() }
             .onChange(of: notesMgr.completedItemIds) { _ in
                 vm.refreshFromLocalStores()
+                if autoUpload {
+                    if taskQueue.isProcessing || taskQueue.pendingCount > 0 {
+                        pendingAutoSubmit = true
+                    } else {
+                        Task { await submitCollection() }
+                    }
+                }
             }
             .onChange(of: taskQueue.isProcessing) { isProcessing in
                 if !isProcessing && pendingAutoSubmit {
@@ -569,9 +590,8 @@ struct DashboardView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .integrationCollectionCreated)) { note in
             if let id = note.userInfo?["collectionId"] as? String {
-                // Dismiss the Settings + Integrations stack
-                showSettings = false
-                // Give the dismissal animation time to complete, then select the collection
+                if showSettings { showSettings = false }
+                if showIntegrations { showIntegrations = false }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     vm.refreshFromLocalStores()
                     if let col = vm.collections.first(where: { $0.id == id }) {
@@ -1427,6 +1447,33 @@ struct DashboardView: View {
         .padding(.top, 6)
     }
 
+    @ViewBuilder
+    private var integrationFABIcon: some View {
+        let connected = integrationStore.installed
+        if connected.count == 1, let single = connected.first {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(LinearGradient(
+                        colors: [Color(hex: single.config.logoColorStart), Color(hex: single.config.logoColorEnd)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .frame(width: 38, height: 38)
+                    .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color.white.opacity(0.15), lineWidth: 1))
+                Text(single.config.logoEmoji)
+                    .font(.system(size: 18))
+            }
+            .frame(width: 38, height: 38)
+        } else {
+            Image(systemName: "link")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundColor(Color.white.opacity(0.75))
+                .frame(width: 38, height: 38)
+                .background(Color.white.opacity(0.07))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+    }
+
     private var bottomBar: some View {
         VStack(spacing: 0) {
             Rectangle()
@@ -1483,35 +1530,67 @@ struct DashboardView: View {
                 .padding(.horizontal, 10)
             } else {
                 // ── Normal FAB ──
-                HStack {
-                    Spacer()
-                    Button {
-                        sessionWarmTask = Task.detached(priority: .userInitiated) {
-                            let s = AVAudioSession.sharedInstance()
-                            try? s.setCategory(.record, mode: .default)
-                            try? s.setActive(true)
+                ZStack {
+                    // Scrivano button — always centered
+                    HStack {
+                        Spacer()
+                        Button {
+                            sessionWarmTask = Task.detached(priority: .userInitiated) {
+                                let s = AVAudioSession.sharedInstance()
+                                try? s.setCategory(.record, mode: .default)
+                                try? s.setActive(true)
+                            }
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                showRecordCard = true
+                            }
+                        } label: {
+                            ZStack {
+                                Circle()
+                                    .fill(LinearGradient(colors: [Color(hex: "#081526"), Color(hex: "#030c1a")],
+                                                         startPoint: .topLeading, endPoint: .bottomTrailing))
+                                    .frame(width: 66, height: 66)
+                                    .overlay(Circle().stroke(Color.brandCyan.opacity(0.45), lineWidth: 2))
+                                    .shadow(color: Color.brandCyan.opacity(0.5), radius: 10)
+                                Image("ScrivanoLogo")
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 66, height: 66)
+                                    .clipShape(Circle())
+                                    .shadow(color: Color.brandCyan.opacity(0.8), radius: 6)
+                            }
+                            .frame(width: 66, height: 66)
                         }
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                            showRecordCard = true
-                        }
-                    } label: {
-                        ZStack {
-                            Circle()
-                                .fill(LinearGradient(colors: [Color(hex: "#081526"), Color(hex: "#030c1a")],
-                                                     startPoint: .topLeading, endPoint: .bottomTrailing))
-                                .frame(width: 66, height: 66)
-                                .overlay(Circle().stroke(Color.brandCyan.opacity(0.45), lineWidth: 2))
-                                .shadow(color: Color.brandCyan.opacity(0.5), radius: 10)
-                            Image("ScrivanoLogo")
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 66, height: 66)
-                                .clipShape(Circle())
-                                .shadow(color: Color.brandCyan.opacity(0.8), radius: 6)
-                        }
-                        .frame(width: 66, height: 66)
+                        Spacer()
                     }
-                    Spacer()
+
+                    // Automation shortcut — bottom left
+                    if showAutomationIcon {
+                        HStack {
+                            Button { showAutomation = true } label: {
+                                Text("🤖")
+                                    .font(.system(size: 20))
+                                    .frame(width: 38, height: 38)
+                                    .background(Color.white.opacity(0.07))
+                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                            }
+                            .shadow(color: Color.brandCyan.opacity(0.5), radius: 12)
+                            .padding(.leading, 18)
+                            Spacer()
+                        }
+                    }
+
+                    // Integration shortcut — bottom right, aligned with top bar buttons
+                    if !integrationStore.installed.isEmpty {
+                        HStack {
+                            Spacer()
+                            Button { showIntegrations = true } label: {
+                                integrationFABIcon
+                            }
+                            .shadow(color: Color.brandCyan.opacity(0.5), radius: 12)
+                            .padding(.trailing, 18)
+                        }
+                    }
                 }
                 .padding(.top, 20)
                 .padding(.bottom, 6)

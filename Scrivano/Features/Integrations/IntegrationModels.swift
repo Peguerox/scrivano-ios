@@ -21,6 +21,12 @@ struct IntegrationConfig: Codable, Identifiable, Hashable {
     let identifierLabel: String?
     let identifierPlaceholder: String?
     let listSourceEntity: String?          // if set, browse endpoint must be called first
+    let noteTypes: [NoteTypeOption]        // from server; empty = use fallback
+    let canPush: Bool
+    let supportedPushFormats: [String]     // [] = text only; ["text","pdf"] = both
+    let supportedNoteStatuses: [String]    // [] = final only; ["draft","final"] = both
+    let maxNoteLength: Int?
+    let rateLimitMs: Int?
     var installed: Bool
 
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
@@ -132,13 +138,15 @@ struct ServerIntegrationListItem: Codable {
     let logoUrl: String?
     let version: String?
     let installed: Bool?
-    let status: String?           // "active" | "pending_auth" | "error"
+    let status: String?
     let lastSyncedAt: String?
+    let noteTypes: [ServerNoteType]?
 
     enum CodingKeys: String, CodingKey {
         case id, name, description, version, installed, status
         case logoUrl       = "logo_url"
         case lastSyncedAt  = "last_synced_at"
+        case noteTypes     = "note_types"
     }
 
     /// Converts list item to a minimal config; full config fetched separately via GET /api/integrations/{id}
@@ -162,6 +170,12 @@ struct ServerIntegrationListItem: Codable {
             identifierLabel: nil,
             identifierPlaceholder: nil,
             listSourceEntity: nil,
+            noteTypes: (noteTypes ?? []).map { NoteTypeOption(id: $0.code, display: $0.display) },
+            canPush: true,
+            supportedPushFormats: [],
+            supportedNoteStatuses: [],
+            maxNoteLength: nil,
+            rateLimitMs: nil,
             installed: installed ?? false
         )
     }
@@ -224,6 +238,12 @@ struct ServerIntegrationDetail: Codable {
             identifierLabel: entities.first(where: { $0.requiresId == true })?.idLabel,
             identifierPlaceholder: entities.first(where: { $0.requiresId == true })?.idLabel,
             listSourceEntity: capabilities?.listSourceEntity,
+            noteTypes: (capabilities?.noteTypes ?? []).map { NoteTypeOption(id: $0.code, display: $0.display) },
+            canPush: capabilities?.canPush ?? true,
+            supportedPushFormats: capabilities?.pushFormats ?? [],
+            supportedNoteStatuses: capabilities?.noteStatuses ?? [],
+            maxNoteLength: capabilities?.maxNoteLength,
+            rateLimitMs: capabilities?.rateLimitMs,
             installed: installed ?? false
         )
     }
@@ -245,10 +265,15 @@ struct ServerAuth: Codable {
 
 struct ServerCapabilities: Codable {
     let entities: [ServerEntity]?
-    let contentTypeGroups: [ServerContentTypeGroup]?   // new format
-    let contentTypes: [ServerContentTypeItem]?          // old flat format (fallback)
+    let contentTypeGroups: [ServerContentTypeGroup]?
+    let contentTypes: [ServerContentTypeItem]?
     let canPush: Bool?
     let listSourceEntity: String?
+    let noteTypes: [ServerNoteType]?
+    let pushFormats: [String]?
+    let noteStatuses: [String]?
+    let maxNoteLength: Int?
+    let rateLimitMs: Int?
 
     enum CodingKeys: String, CodingKey {
         case entities
@@ -256,7 +281,17 @@ struct ServerCapabilities: Codable {
         case contentTypes      = "content_types"
         case canPush           = "can_push"
         case listSourceEntity  = "list_source_entity"
+        case noteTypes         = "note_types"
+        case pushFormats       = "push_formats"
+        case noteStatuses      = "note_statuses"
+        case maxNoteLength     = "max_note_length"
+        case rateLimitMs       = "rate_limit_ms"
     }
+}
+
+struct ServerNoteType: Codable {
+    let code: String
+    let display: String
 }
 
 struct ServerContentTypeGroup: Codable {
@@ -391,14 +426,46 @@ struct PullTranscript: Codable {
 
 // MARK: - Push
 
+struct NoteTypeOption: Codable, Identifiable {
+    let id: String      // LOINC code
+    let display: String
+
+    // Fallback used when the server doesn't provide note_types
+    static let fallback: [NoteTypeOption] = [
+        NoteTypeOption(id: "11506-3", display: "Progress Note"),
+        NoteTypeOption(id: "11488-4", display: "Consultation Note"),
+        NoteTypeOption(id: "18842-5", display: "Discharge Summary"),
+        NoteTypeOption(id: "34117-2", display: "History & Physical"),
+        NoteTypeOption(id: "28570-0", display: "Operative Note"),
+        NoteTypeOption(id: "18748-4", display: "Radiology Report"),
+    ]
+
+    static let defaultOption = NoteTypeOption(id: "11506-3", display: "Progress Note")
+}
+
+struct SavedPushConfig: Codable, Equatable {
+    var noteTypeCode: String    = "11506-3"
+    var noteTypeDisplay: String = "Progress Note"
+    var pushFormat: String      = "text"    // "text" | "pdf"
+    var noteStatus: String      = "final"   // "final" | "draft"
+}
+
 struct PushRequest: Encodable {
     let noteText: String
     let noteTitle: String
+    let noteTypeCode: String?
+    let noteTypeDisplay: String?
+    let noteStatus: String?
+    let pushFormat: String?
     let metadata: [String: String]
 
     enum CodingKeys: String, CodingKey {
-        case noteText  = "note_text"
-        case noteTitle = "note_title"
+        case noteText        = "note_text"
+        case noteTitle       = "note_title"
+        case noteTypeCode    = "note_type_code"
+        case noteTypeDisplay = "note_type_display"
+        case noteStatus      = "note_status"
+        case pushFormat      = "push_format"
         case metadata
     }
 }
