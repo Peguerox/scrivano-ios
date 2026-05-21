@@ -290,6 +290,9 @@ final class TranscriptionManager: ObservableObject {
             for result in preparationResults {
                 guard !Task.isCancelled else { break }
                 guard let entry = recordings.first(where: { $0.id == result.recordingId }) else {
+                    // Entry not found — remove from queue and mark failed so it doesn't block allDone.
+                    queuedRecordingIds.remove(result.recordingId)
+                    failedRecordingIds.insert(result.recordingId)
                     appLog("  ✗ No entry for \(result.recordingId)", level: .error); continue
                 }
 
@@ -445,29 +448,6 @@ final class TranscriptionManager: ObservableObject {
                         sendCompletionNotification(title: "Transcription Ready", body: "'\(item.name)' transcribed.")
                         lastSavedItemId = item.id
                         transcriptSaveCounter += 1
-                        if UserDefaults.standard.bool(forKey: "auto_note") {
-                            let allRecs = LocalRecordingStore.shared.recordings(for: item.id)
-                            // A recording counts as "done" only if it is the current one, OR if it has
-                            // already been transcribed/failed AND is not still queued in this batch.
-                            // Checking queuedRecordingIds prevents stale UserDefaults entries from
-                            // triggering the note before a re-queued recording has actually finished.
-                            let allDone = !allRecs.isEmpty && allRecs.allSatisfy { rec in
-                                rec.id == result.recordingId ||
-                                (!queuedRecordingIds.contains(rec.id) &&
-                                 (transcribedRecordingIds.contains(rec.id) || failedRecordingIds.contains(rec.id)))
-                            }
-                            let rec = AudioRecorderManager.shared
-                            let sameItemRecording = (rec.isRecording || rec.isPaused) && rec.currentItemId == item.id
-                            if allDone && !sameItemRecording {
-                                let capturedId = item.id; let capturedName = item.name
-                                let ngm = NoteGenerationManager.shared
-                                guard !ngm.queuedItemIds.contains(capturedId) && ngm.processingItemId != capturedId else { break }
-                                ngm.markQueued(itemId: capturedId, transcriptIds: [])
-                                TaskQueueManager.shared.enqueue { await NoteGenerationManager.shared.runAutoNote(for: capturedId, itemName: capturedName) }
-                            } else {
-                                appLog("  Auto-note deferred — \(allRecs.filter { $0.id != result.recordingId && (!transcribedRecordingIds.contains($0.id) || queuedRecordingIds.contains($0.id)) && !failedRecordingIds.contains($0.id) }.count) recording(s) not yet done or same-item recording active")
-                            }
-                        }
                     }
 
                     if anyChunkSucceeded {
@@ -485,6 +465,31 @@ final class TranscriptionManager: ObservableObject {
                     transcribingError = nil
                 }
                 transcribingRecordingId = nil
+            }
+
+            // Post-loop auto-note check: fires after ALL recordings in this job are tracked.
+            // Moved here from inside the loop to avoid the `break` anti-pattern and to correctly
+            // handle the case where the last recording fails (no transcript saved → check was skipped).
+            if !Task.isCancelled && UserDefaults.standard.bool(forKey: "auto_note") {
+                let allRecs = LocalRecordingStore.shared.recordings(for: item.id)
+                let allDone = !allRecs.isEmpty && allRecs.allSatisfy { rec in
+                    !queuedRecordingIds.contains(rec.id) &&
+                    (transcribedRecordingIds.contains(rec.id) || failedRecordingIds.contains(rec.id))
+                }
+                let recMgr = AudioRecorderManager.shared
+                let sameItemRecording = (recMgr.isRecording || recMgr.isPaused) && recMgr.currentItemId == item.id
+                if allDone && !sameItemRecording {
+                    let capturedId = item.id; let capturedName = item.name
+                    let ngm = NoteGenerationManager.shared
+                    if !ngm.queuedItemIds.contains(capturedId) && ngm.processingItemId != capturedId {
+                        appLog("  Auto-note triggered for '\(capturedName)'", level: .success)
+                        ngm.markQueued(itemId: capturedId, transcriptIds: [])
+                        TaskQueueManager.shared.enqueue { await NoteGenerationManager.shared.runAutoNote(for: capturedId, itemName: capturedName) }
+                    }
+                } else if !allDone {
+                    let undone = allRecs.filter { queuedRecordingIds.contains($0.id) || (!transcribedRecordingIds.contains($0.id) && !failedRecordingIds.contains($0.id)) }.count
+                    appLog("  Auto-note deferred — \(undone) recording(s) still pending for '\(item.name)'")
+                }
             }
 
             guard !Task.isCancelled else {
@@ -641,26 +646,6 @@ final class TranscriptionManager: ObservableObject {
                 if anyChunkSucceeded {
                     transcribedRecordingIds.insert(result.recordingId)
                     UserDefaults.standard.set(Array(transcribedRecordingIds), forKey: "transcribedRecordingIds")
-                    if UserDefaults.standard.bool(forKey: "auto_note") {
-                        let allRecs = LocalRecordingStore.shared.recordings(for: item.id)
-                        // Same guard as runTranscribeJob: a recording already in transcribedRecordingIds
-                        // from a previous session must not count as done if it is still queued in this batch.
-                        let allDone = !allRecs.isEmpty && allRecs.allSatisfy { rec in
-                            !queuedRecordingIds.contains(rec.id) &&
-                            (transcribedRecordingIds.contains(rec.id) || failedRecordingIds.contains(rec.id))
-                        }
-                        let rec = AudioRecorderManager.shared
-                        let sameItemRecording = (rec.isRecording || rec.isPaused) && rec.currentItemId == item.id
-                        if allDone && !sameItemRecording {
-                            let capturedId = item.id; let capturedName = item.name
-                            let ngm = NoteGenerationManager.shared
-                            guard !ngm.queuedItemIds.contains(capturedId) && ngm.processingItemId != capturedId else { break }
-                            ngm.markQueued(itemId: capturedId, transcriptIds: [])
-                            TaskQueueManager.shared.enqueue { await NoteGenerationManager.shared.runAutoNote(for: capturedId, itemName: capturedName) }
-                        } else {
-                            appLog("  Auto-note deferred — \(allRecs.filter { queuedRecordingIds.contains($0.id) || (!transcribedRecordingIds.contains($0.id) && !failedRecordingIds.contains($0.id)) }.count) recording(s) not yet done or same-item recording active")
-                        }
-                    }
                 } else {
                     failedRecordingIds.insert(result.recordingId)
                 }
@@ -670,6 +655,30 @@ final class TranscriptionManager: ObservableObject {
                 transcribingError = nil
             }
             transcribingRecordingId = nil
+        }
+
+        // Post-loop auto-note check: same logic as runTranscribeJob — moved outside the loop
+        // to avoid `break` skipping transcribedRecordingIds.insert and to handle failed-last-recording.
+        if !Task.isCancelled && UserDefaults.standard.bool(forKey: "auto_note") {
+            let allRecs = LocalRecordingStore.shared.recordings(for: item.id)
+            let allDone = !allRecs.isEmpty && allRecs.allSatisfy { rec in
+                !queuedRecordingIds.contains(rec.id) &&
+                (transcribedRecordingIds.contains(rec.id) || failedRecordingIds.contains(rec.id))
+            }
+            let recMgr = AudioRecorderManager.shared
+            let sameItemRecording = (recMgr.isRecording || recMgr.isPaused) && recMgr.currentItemId == item.id
+            if allDone && !sameItemRecording {
+                let capturedId = item.id; let capturedName = item.name
+                let ngm = NoteGenerationManager.shared
+                if !ngm.queuedItemIds.contains(capturedId) && ngm.processingItemId != capturedId {
+                    appLog("  Auto-note triggered for '\(capturedName)'", level: .success)
+                    ngm.markQueued(itemId: capturedId, transcriptIds: [])
+                    TaskQueueManager.shared.enqueue { await NoteGenerationManager.shared.runAutoNote(for: capturedId, itemName: capturedName) }
+                }
+            } else if !allDone {
+                let undone = allRecs.filter { queuedRecordingIds.contains($0.id) || (!transcribedRecordingIds.contains($0.id) && !failedRecordingIds.contains($0.id)) }.count
+                appLog("  Auto-note deferred — \(undone) recording(s) still pending for '\(item.name)'")
+            }
         }
     }
 
