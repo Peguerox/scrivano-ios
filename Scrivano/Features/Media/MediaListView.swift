@@ -137,7 +137,6 @@ final class AudioProcessor {
         try? FileManager.default.removeItem(at: outputURL)
 
         if forceMono {
-            // Reader → mono downmix → Writer (AVAssetReaderTrackOutput with AVNumberOfChannelsKey:1 auto-downmixes)
             let compTracks = try await composition.loadTracks(withMediaType: .audio)
             guard let compAudioTrack = compTracks.first else { return sourceURL }
             let reader = try AVAssetReader(asset: composition)
@@ -194,7 +193,7 @@ final class AudioProcessor {
         let analysisRate: Double = 16000
         let reader = try AVAssetReader(asset: asset)
         let readerOut = AVAssetReaderTrackOutput(track: track, outputSettings: [
-            AVFormatIDKey: kAudioFormatLinearPCM,
+            AVFormatIDKey: Int(kAudioFormatLinearPCM),
             AVLinearPCMBitDepthKey: 16,
             AVLinearPCMIsFloatKey: false,
             AVLinearPCMIsBigEndianKey: false,
@@ -210,9 +209,15 @@ final class AudioProcessor {
         while let buf = readerOut.copyNextSampleBuffer() {
             guard let block = CMSampleBufferGetDataBuffer(buf) else { continue }
             let len = CMBlockBufferGetDataLength(block)
-            var chunk = [Int16](repeating: 0, count: len / 2)
-            CMBlockBufferCopyDataBytes(block, atOffset: 0, dataLength: len, destination: &chunk)
-            samples.append(contentsOf: chunk)
+            var dataPointer: UnsafeMutablePointer<CChar>? = nil
+            var dataLength = 0
+            var totalLength = 0
+            let status = CMBlockBufferGetDataPointer(block, atOffset: 0, lengthAtOffsetOut: &dataLength, totalLengthOut: &totalLength, dataPointerOut: &dataPointer)
+            guard status == kCMBlockBufferNoErr, let ptr = dataPointer else { continue }
+            let sampleCount = len / MemoryLayout<Int16>.size
+            ptr.withMemoryRebound(to: Int16.self, capacity: sampleCount) { p16 in
+                samples.append(contentsOf: UnsafeBufferPointer(start: p16, count: sampleCount))
+            }
         }
         guard !samples.isEmpty else { return sourceURL }
 
@@ -275,43 +280,48 @@ final class AudioProcessor {
 
     static func prepare(entry: LocalRecordingEntry, displayName: String) async throws -> [(url: URL, duration: Double, name: String)] {
         var workingURL = entry.fileURL
-        if workingURL.pathExtension.lowercased() != "m4a" && workingURL.pathExtension.lowercased() != "mp3" {
+        if workingURL.pathExtension.lowercased() != "m4a" {
             workingURL = try await convertToM4A(sourceURL: workingURL)
         }
 
         // Apply compression options (silence stripping, mono, speed) before splitting
         workingURL = await applyCompressionOptions(sourceURL: workingURL)
 
-        // Ensure display name extension matches the actual working file
-        let workingExt = workingURL.pathExtension.lowercased().isEmpty ? "m4a" : workingURL.pathExtension.lowercased()
         let nameBase: String = {
             if let dotIdx = displayName.lastIndex(of: ".") {
                 return String(displayName[displayName.startIndex..<dotIdx])
             }
             return displayName
         }()
-        let correctedName = "\(nameBase).\(workingExt)"
+        let correctedName = "\(nameBase).m4a"
+
+        // Load actual duration from the (possibly compressed) file
+        let actualDuration: Double = await {
+            let a = AVURLAsset(url: workingURL)
+            if let d = try? await a.load(.duration) { return CMTimeGetSeconds(d) }
+            return entry.durationSeconds
+        }()
 
         // Determine effective max duration — tighten if file exceeds size limit
         var effectiveMaxDuration = maxDurationSeconds
         let fileSize = (try? FileManager.default.attributesOfItem(atPath: workingURL.path)[.size] as? Int64) ?? 0
-        if fileSize > maxFileSizeBytes && entry.durationSeconds > 0 {
-            let bytesPerSecond = Double(fileSize) / entry.durationSeconds
+        if fileSize > maxFileSizeBytes && actualDuration > 0 {
+            let bytesPerSecond = Double(fileSize) / actualDuration
             let sizeLimitedDuration = floor(Double(maxFileSizeBytes) / bytesPerSecond)
             effectiveMaxDuration = min(effectiveMaxDuration, max(sizeLimitedDuration, 60))
         }
 
-        let needsSplit = entry.durationSeconds > effectiveMaxDuration || fileSize > maxFileSizeBytes
+        let needsSplit = actualDuration > effectiveMaxDuration || fileSize > maxFileSizeBytes
         if needsSplit {
             let chunks = try await split(sourceURL: workingURL, maxDuration: effectiveMaxDuration)
             return chunks.enumerated().map { i, url in
                 let dur = i == chunks.count - 1
-                    ? max(entry.durationSeconds - Double(i) * effectiveMaxDuration, 1)
+                    ? max(actualDuration - Double(i) * effectiveMaxDuration, 1)
                     : effectiveMaxDuration
                 return (url: url, duration: dur, name: "\(nameBase)_part\(i + 1).m4a")
             }
         }
-        return [(url: workingURL, duration: entry.durationSeconds, name: correctedName)]
+        return [(url: workingURL, duration: actualDuration, name: correctedName)]
     }
 }
 
@@ -392,6 +402,7 @@ struct MediaListView: View {
     @State private var mediaQueue: [LocalRecordingEntry] = []
     @State private var queuedIds: Set<String> = []
     @State private var activeQueueItem: LocalRecordingEntry? = nil
+    @State private var queuePreparationResults: [AudioValidationResult] = []
 
     // Player
     @State private var playerRecording: LocalRecordingEntry? = nil
@@ -703,10 +714,21 @@ struct MediaListView: View {
                                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showProcessConfirm = false }
                                 let audioQueue = localRecordings.filter { selected.contains($0.id) }
                                 guard !audioQueue.isEmpty else { return }
+                                // Validate ALL recordings upfront so the preparation card, if needed,
+                                // shows once before any processing starts — not mid-queue after the first file finishes.
+                                let allResults = audioQueue.map { AudioProcessor.validate(entry: $0, displayName: displayName(for: $0)) }
+                                queuePreparationResults = allResults
+                                preparationResults = allResults
                                 queuedIds = Set(audioQueue.map(\.id))
                                 mediaQueue = audioQueue
                                 TranscriptionManager.shared.queuedRecordingIds.formUnion(queuedIds)
-                                processQueueNext()
+                                let hasFormatIssues = allResults.contains { $0.needsConversion }
+                                let hasIssues = allResults.contains { !$0.isReady }
+                                if hasIssues && hasFormatIssues {
+                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showPreparation = true }
+                                } else {
+                                    processQueueNext()
+                                }
                             } label: {
                                 Text(langMgr.t("dashboard.record.continue"))
                                     .font(.inter(14, weight: .bold))
@@ -843,6 +865,11 @@ struct MediaListView: View {
                             HStack(spacing: 10) {
                                 Button {
                                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showPreparation = false }
+                                    // Abort the queue if the user cancels the preparation card.
+                                    mediaQueue.removeAll()
+                                    queuedIds.removeAll()
+                                    queuePreparationResults.removeAll()
+                                    activeQueueItem = nil
                                 } label: {
                                     Text(langMgr.t("common.cancel"))
                                         .font(.inter(14, weight: .semibold))
@@ -854,7 +881,12 @@ struct MediaListView: View {
                                 }
                                 Button {
                                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showPreparation = false }
-                                    startTranscription()
+                                    // Queue mode: start the pre-built queue. Single mode: transcribe directly.
+                                    if !mediaQueue.isEmpty {
+                                        processQueueNext()
+                                    } else {
+                                        startTranscription()
+                                    }
                                 } label: {
                                     Text(langMgr.t("dashboard.record.continue"))
                                         .font(.inter(14, weight: .bold))
@@ -1220,7 +1252,14 @@ struct MediaListView: View {
         queuedIds.remove(next.id)
         activeQueueItem = next
         selected = [next.id]
-        validateAndProceed()
+        // Use the pre-computed result for this recording (validated before the queue started).
+        // This prevents the preparation card from appearing mid-queue for files that need conversion.
+        if let precomputed = queuePreparationResults.first(where: { $0.recordingId == next.id }) {
+            preparationResults = [precomputed]
+            startTranscription()
+        } else {
+            validateAndProceed()
+        }
     }
 
     // MARK: - Preparation row

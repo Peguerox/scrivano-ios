@@ -40,12 +40,15 @@ struct ScrivanoApp: App {
         BackgroundTaskManager.registerHandler()
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, _ in }
         UserDefaults.standard.register(defaults: [
-            "recorderQuality":   1,    // Medium
-            "recorderFormat":    1,    // WAV
-            "recorderBitDepth":  0,    // 16 bit
-            "splittingInterval": 1070, // 17:50 — safe buffer under Vercel 4.5 MB upload limit
-            "auto_transcription": true,
-            "auto_conversion":    true
+            "recorderQuality":     1,     // Medium
+            "recorderFormat":      1,     // WAV
+            "recorderBitDepth":    0,     // 16 bit
+            "splittingInterval":   300,   // 5 min
+            "auto_transcription":  true,
+            "auto_conversion":     true,
+            "compression_speed":   0,     // Normal
+            "compression_mono":    false,
+            "compression_silence": false
         ])
     }
 

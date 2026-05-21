@@ -7,7 +7,6 @@ struct RecorderSettingsView: View {
     @State private var showPocketExplanation = false
     @AppStorage("recorderQuality")  private var quality: Int = 1    // 0=Low 1=Med 2=High 3=Max
     @AppStorage("recorderFormat")   private var format: Int = 1     // 0=M4A 1=WAV
-    @AppStorage("recorderBitDepth") private var bitDepth: Int = 0   // 0=16 1=24 2=32
     @AppStorage("splittingInterval")  private var splitInterval: Int = 300
     @AppStorage("auto_conversion")    private var autoConversion: Bool = true
     @AppStorage("compression_speed")  private var compressionSpeed: Int = 0   // 0=off 1=1.5x 2=2x
@@ -23,20 +22,13 @@ struct RecorderSettingsView: View {
     ]}
 
     private let formatLabels = ["M4A", "WAV"]
-    private let depthLabels  = ["16 bit", "24 bit", "32 bit"]
 
-    // Estimated file size based on format / quality / bit depth
+    // Estimated file size — WAV always 16 bit
     private var sizeHint: String {
         if format == 0 {
             return ["~8 MB/hr", "~16 MB/hr", "~22 MB/hr", "~30 MB/hr"][quality]
         }
-        let sizes = [
-            ["~55 MB/hr", "~83 MB/hr",  "~110 MB/hr"],
-            ["~150 MB/hr","~230 MB/hr", "~305 MB/hr"],
-            ["~305 MB/hr","~455 MB/hr", "~610 MB/hr"],
-            ["~660 MB/hr","~990 MB/hr", "~1.3 GB/hr"]
-        ]
-        return sizes[quality][bitDepth]
+        return ["~55 MB/hr", "~150 MB/hr", "~305 MB/hr", "~660 MB/hr"][quality]
     }
 
     private func formatLimit(mbPerHour: Double) -> String {
@@ -53,13 +45,7 @@ struct RecorderSettingsView: View {
     }
 
     private var limitLabelWAV: String {
-        let rates: [[Double]] = [
-            [55,  83,  110],
-            [150, 230, 305],
-            [305, 455, 610],
-            [660, 990, 1300]
-        ]
-        return formatLimit(mbPerHour: rates[quality][bitDepth])
+        formatLimit(mbPerHour: [55.0, 150.0, 305.0, 660.0][quality])
     }
 
     private var splitOptions: [(label: String, sublabel: String, seconds: Int)] {[
@@ -67,7 +53,8 @@ struct RecorderSettingsView: View {
         ("5 min",                          "300s",   300),
         ("10 min",                         "600s",   600),
         ("15 min",                         "900s",   900),
-        ("18 min",                         "1070s",  1070),
+        ("20 min",                         "1200s",  1200),
+        ("25 min",                         "1500s",  1500),
         ("30 min",                         "1800s",  1800),
         (langMgr.t("recorder.split.hour"), "3600s",  3600)
     ]}
@@ -116,85 +103,6 @@ struct RecorderSettingsView: View {
                             .padding(.horizontal, 14).padding(.vertical, 12)
                         }
 
-                        // ── Bit Depth (WAV only) ───────────────────────────
-                        SectionLabel(text: langMgr.t("recorder.section.bitDepth"))
-                        settingsGroup {
-                            VStack(spacing: 10) {
-                                segmentedControl(options: depthLabels, selected: $bitDepth)
-                                    .opacity(format == 0 ? 0.3 : 1)
-                                    .allowsHitTesting(format != 0)
-                                Text(format == 0
-                                     ? langMgr.t("recorder.bitDepth.wavOnly")
-                                     : "\(depthLabels[bitDepth]) · \(sizeHint)")
-                                    .font(.inter(11))
-                                    .foregroundColor(.textQuaternary)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                            .padding(.horizontal, 14).padding(.vertical, 12)
-                        }
-
-                        // ── Splitting Interval ─────────────────────────────
-                        SectionLabel(text: langMgr.t("recorder.section.splitting"))
-                        settingsGroup {
-                            VStack(spacing: 12) {
-                                // Top row: None + first 3 time options
-                                HStack(spacing: 6) {
-                                    ForEach(splitOptions.prefix(4), id: \.seconds) { opt in
-                                        splitPill(opt)
-                                    }
-                                }
-                                // Bottom row: remaining 3 options
-                                HStack(spacing: 6) {
-                                    ForEach(splitOptions.suffix(3), id: \.seconds) { opt in
-                                        splitPill(opt)
-                                    }
-                                    // invisible spacer pill to keep alignment
-                                    Color.clear.frame(maxWidth: .infinity).frame(height: 52)
-                                }
-                                HStack(spacing: 6) {
-                                    Image(systemName: splitInterval > 0 ? "scissors" : "infinity")
-                                        .font(.system(size: 10, weight: .semibold))
-                                    Text(splitInterval > 0
-                                         ? langMgr.t("recorder.split.autoSaves")
-                                         : langMgr.t("recorder.split.noSplit"))
-                                        .font(.inter(11))
-                                }
-                                .foregroundColor(.textQuaternary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-
-                                // Warning: always show the size-based split info
-                                HStack(alignment: .top, spacing: 10) {
-                                    Image(systemName: "exclamationmark.triangle.fill")
-                                        .font(.system(size: 13))
-                                        .foregroundColor(Color(hex: "#f59e0b"))
-                                    Text(langMgr.t("recorder.split.sizeWarning").replacingOccurrences(of: "%@", with: format == 0 || autoConversion ? limitLabelM4A : limitLabelWAV))
-                                        .font(.inter(11, weight: .medium))
-                                        .foregroundColor(Color(hex: "#fbbf24"))
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                .padding(12)
-                                .background(Color(hex: "#f59e0b").opacity(0.08))
-                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(hex: "#f59e0b").opacity(0.25), lineWidth: 1))
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-
-                                // Lock notice
-                                HStack(alignment: .top, spacing: 10) {
-                                    Image(systemName: "lock.fill")
-                                        .font(.system(size: 12))
-                                        .foregroundColor(Color.white.opacity(0.3))
-                                    Text("Other intervals are locked. 5 min is required to avoid transcription truncation with the current AI provider.")
-                                        .font(.inter(11))
-                                        .foregroundColor(Color.white.opacity(0.3))
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                .padding(12)
-                                .background(Color.white.opacity(0.03))
-                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.white.opacity(0.06), lineWidth: 1))
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                            }
-                            .padding(.horizontal, 14).padding(.vertical, 14)
-                        }
-
                         // ── Compression Options ────────────────────────────
                         SectionLabel(text: "Compression Options")
                         settingsGroup {
@@ -226,8 +134,8 @@ struct RecorderSettingsView: View {
                                     Text(compressionSpeed == 0
                                         ? "Audio sent at original speed."
                                         : compressionSpeed == 1
-                                            ? "Audio sped up 1.5× before upload. Reduces cost ~33%. Test on your audio first."
-                                            : "Audio sped up 2× before upload. Halves cost. Use with caution on accented or medical speech.")
+                                            ? "Speeds up audio 1.5× before upload. Reduces transcription cost ~33%."
+                                            : "Speeds up audio 2× before upload. Significantly reduces cost. Use with caution on low quality audio or heavy accents — may reduce accuracy.")
                                         .font(.inter(11))
                                         .foregroundColor(.textTertiary)
                                         .fixedSize(horizontal: false, vertical: true)
@@ -242,7 +150,7 @@ struct RecorderSettingsView: View {
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text("Convert to Mono")
                                                 .font(.inter(13, weight: .semibold)).foregroundColor(.textPrimary)
-                                            Text("Reduces file size ~50%. No accuracy loss for speech.")
+                                            Text("Reduces file size ~50%. Increases transcription speed but may increase cost. May reduce accuracy.")
                                                 .font(.inter(11)).foregroundColor(.textTertiary)
                                         }
                                         Spacer()
@@ -259,7 +167,7 @@ struct RecorderSettingsView: View {
                                         VStack(alignment: .leading, spacing: 2) {
                                             Text("Strip Silence")
                                                 .font(.inter(13, weight: .semibold)).foregroundColor(.textPrimary)
-                                            Text("Removes silent gaps before upload. Reduces cost and eliminates hallucinations on silence.")
+                                            Text("Removes silent gaps before upload. Moderately reduces cost. May reduce accuracy.")
                                                 .font(.inter(11)).foregroundColor(.textTertiary)
                                         }
                                         Spacer()
@@ -268,6 +176,52 @@ struct RecorderSettingsView: View {
                                 }
                                 .padding(.horizontal, 14).padding(.vertical, 13)
                             }
+                        }
+
+                        // ── Splitting Interval ─────────────────────────────
+                        SectionLabel(text: langMgr.t("recorder.section.splitting"))
+                        settingsGroup {
+                            VStack(spacing: 12) {
+                                // Row 1: None, 5, 10, 15
+                                HStack(spacing: 6) {
+                                    ForEach(splitOptions.prefix(4), id: \.seconds) { opt in
+                                        splitPill(opt)
+                                    }
+                                }
+                                // Row 2: 20, 25, 30, 1 hour
+                                HStack(spacing: 6) {
+                                    ForEach(splitOptions.suffix(4), id: \.seconds) { opt in
+                                        splitPill(opt)
+                                    }
+                                }
+                                HStack(spacing: 6) {
+                                    Image(systemName: splitInterval > 0 ? "scissors" : "infinity")
+                                        .font(.system(size: 10, weight: .semibold))
+                                    Text(splitInterval > 0
+                                         ? langMgr.t("recorder.split.autoSaves")
+                                         : langMgr.t("recorder.split.noSplit"))
+                                        .font(.inter(11))
+                                }
+                                .foregroundColor(.textQuaternary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+
+                                // Warning: always show the size-based split info
+                                HStack(alignment: .top, spacing: 10) {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .font(.system(size: 13))
+                                        .foregroundColor(Color(hex: "#f59e0b"))
+                                    Text(langMgr.t("recorder.split.sizeWarning").replacingOccurrences(of: "%@", with: format == 0 || autoConversion ? limitLabelM4A : limitLabelWAV))
+                                        .font(.inter(11, weight: .medium))
+                                        .foregroundColor(Color(hex: "#fbbf24"))
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                .padding(12)
+                                .background(Color(hex: "#f59e0b").opacity(0.08))
+                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(hex: "#f59e0b").opacity(0.25), lineWidth: 1))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                            }
+                            .padding(.horizontal, 14).padding(.vertical, 14)
                         }
 
                         Spacer().frame(height: 40)
@@ -356,42 +310,28 @@ struct RecorderSettingsView: View {
 
     private func splitPill(_ opt: (label: String, sublabel: String, seconds: Int)) -> some View {
         let isSelected = splitInterval == opt.seconds
-        let isLocked = opt.seconds != 300  // only 5 min allowed while OpenAI truncation is unresolved
         return Button {
-            guard !isLocked else { return }
             withAnimation(.easeInOut(duration: 0.15)) { splitInterval = opt.seconds }
         } label: {
             VStack(spacing: 2) {
-                if isLocked {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(Color.white.opacity(0.2))
-                }
                 Text(opt.label)
                     .font(.inter(13, weight: .bold))
-                    .foregroundColor(isLocked ? Color.white.opacity(0.2) : (isSelected ? .white : .textTertiary))
+                    .foregroundColor(isSelected ? .white : .textTertiary)
                 Text(opt.sublabel)
                     .font(.inter(9, weight: .medium))
-                    .foregroundColor(Color.white.opacity(isLocked ? 0.1 : (isSelected ? 0.6 : 0.2)))
+                    .foregroundColor(Color.white.opacity(isSelected ? 0.6 : 0.2))
             }
             .frame(maxWidth: .infinity)
             .frame(height: 52)
-            .background(
-                isLocked
-                ? LinearGradient(colors: [Color.white.opacity(0.02), Color.white.opacity(0.02)], startPoint: .leading, endPoint: .trailing)
-                : (isSelected
-                    ? LinearGradient(colors: [Color.brandBlue, Color.brandNavy], startPoint: .topLeading, endPoint: .bottomTrailing)
-                    : LinearGradient(colors: [Color.white.opacity(0.05), Color.white.opacity(0.05)], startPoint: .leading, endPoint: .trailing))
+            .background(isSelected
+                ? LinearGradient(colors: [Color.brandBlue, Color.brandNavy], startPoint: .topLeading, endPoint: .bottomTrailing)
+                : LinearGradient(colors: [Color.white.opacity(0.05), Color.white.opacity(0.05)], startPoint: .leading, endPoint: .trailing)
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: 11)
-                    .stroke(isLocked ? Color.white.opacity(0.03) : (isSelected ? Color.brandCyan.opacity(0.5) : Color.white.opacity(0.06)), lineWidth: 1)
-            )
+            .overlay(RoundedRectangle(cornerRadius: 11).stroke(isSelected ? Color.brandCyan.opacity(0.5) : Color.white.opacity(0.06), lineWidth: 1))
             .clipShape(RoundedRectangle(cornerRadius: 11))
-            .shadow(color: isSelected && !isLocked ? Color.brandBlue.opacity(0.4) : .clear, radius: 8, y: 3)
+            .shadow(color: isSelected ? Color.brandBlue.opacity(0.4) : .clear, radius: 8, y: 3)
         }
         .buttonStyle(.plain)
-        .allowsHitTesting(!isLocked)
     }
 
     private func segmentedControl(options: [String], selected: Binding<Int>) -> some View {
