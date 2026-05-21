@@ -1103,6 +1103,7 @@ struct RequestTabView: View {
     @State private var selectedListId: String = ""
     @State private var isLoadingLists = false
     @State private var showListDropdown = false
+    @FocusState private var identifierFocused: Bool
 
     private var isPull: Bool { mode == .pull }
     private var pullTargets: [IntegrationOption] { integration.config.pullTargets }
@@ -1365,6 +1366,7 @@ struct RequestTabView: View {
 
     var body: some View {
         ZStack(alignment: .bottom) {
+            ScrollViewReader { proxy in
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
                     segmentedControl
@@ -1473,28 +1475,38 @@ struct RequestTabView: View {
                     Spacer().frame(height: 110)
                 }
             }
-
-            VStack(spacing: 0) {
-                LinearGradient(colors: [Color.phoneBg.opacity(0), Color.phoneBg], startPoint: .top, endPoint: .bottom)
-                    .frame(height: 32)
-                Button { submitRequest() } label: {
-                    Group {
-                        if isRequesting { ProgressView().tint(.white) }
-                        else { Text(langMgr.t("integrations.request.submit")).font(.inter(15, weight: .bold)).foregroundColor(.white) }
+            .onChange(of: identifierFocused) { focused in
+                if focused {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        withAnimation { proxy.scrollTo("identifierField", anchor: .center) }
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 15)
-                    .background(LinearGradient(colors: [Color(hex: "#1e8ae0"), Color(hex: "#0d5faa")],
-                                               startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
-                .buttonStyle(.plain)
-                .disabled(isRequesting || !canSubmit)
-                .opacity(canSubmit ? 1 : 0.5)
-                .padding(.horizontal, 18)
-                .padding(.bottom, 28)
             }
-            .background(Color.phoneBg)
+            } // ScrollViewReader
+
+            if !identifierFocused {
+                VStack(spacing: 0) {
+                    LinearGradient(colors: [Color.phoneBg.opacity(0), Color.phoneBg], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 32)
+                    Button { submitRequest() } label: {
+                        Group {
+                            if isRequesting { ProgressView().tint(.white) }
+                            else { Text(langMgr.t("integrations.request.submit")).font(.inter(15, weight: .bold)).foregroundColor(.white) }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 15)
+                        .background(LinearGradient(colors: [Color(hex: "#1e8ae0"), Color(hex: "#0d5faa")],
+                                                   startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isRequesting || !canSubmit)
+                    .opacity(canSubmit ? 1 : 0.5)
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 28)
+                }
+                .background(Color.phoneBg)
+            }
 
             // MARK: - Centered overlays
 
@@ -2100,6 +2112,7 @@ struct RequestTabView: View {
                 .font(.inter(10, weight: .heavy)).foregroundColor(Color.brandCyan.opacity(0.7)).tracking(0.8)
             TextField("Enter \(label)…", text: $identifier)
                 .font(.inter(14, weight: .medium)).foregroundColor(.textPrimary).tint(.brandCyan)
+                .focused($identifierFocused)
                 .padding(.horizontal, 13).padding(.vertical, 10)
                 .background(Color.black.opacity(0.3))
                 .overlay(RoundedRectangle(cornerRadius: 11).stroke(Color.brandCyan.opacity(0.3), lineWidth: 1.5))
@@ -2107,6 +2120,7 @@ struct RequestTabView: View {
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
         .background(Color.brandBlue.opacity(0.06))
+        .id("identifierField")
     }
 
     // MARK: - Helpers
