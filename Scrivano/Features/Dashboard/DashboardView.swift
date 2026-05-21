@@ -210,6 +210,7 @@ struct DashboardView: View {
                 itemsList
                 bottomBar
             }
+            .ignoresSafeArea(.keyboard)
             .onAppear { withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) { fabPulse = true } }
             .onChange(of: recorder.lastSavedItemId) { _ in vm.refreshLocalCounts() }
             .onChange(of: notesMgr.completedItemIds) { _ in
