@@ -205,20 +205,6 @@ struct RecorderSettingsView: View {
                                 .foregroundColor(.textQuaternary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                                // Warning: always show the size-based split info
-                                HStack(alignment: .top, spacing: 10) {
-                                    Image(systemName: "exclamationmark.triangle.fill")
-                                        .font(.system(size: 13))
-                                        .foregroundColor(Color(hex: "#f59e0b"))
-                                    Text(langMgr.t("recorder.split.sizeWarning").replacingOccurrences(of: "%@", with: format == 0 || autoConversion ? limitLabelM4A : limitLabelWAV))
-                                        .font(.inter(11, weight: .medium))
-                                        .foregroundColor(Color(hex: "#fbbf24"))
-                                        .fixedSize(horizontal: false, vertical: true)
-                                }
-                                .padding(12)
-                                .background(Color(hex: "#f59e0b").opacity(0.08))
-                                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(hex: "#f59e0b").opacity(0.25), lineWidth: 1))
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
 
                             }
                             .padding(.horizontal, 14).padding(.vertical, 14)

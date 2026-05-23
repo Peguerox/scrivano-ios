@@ -46,7 +46,7 @@ enum AudioProcessorError: Error, LocalizedError {
 }
 
 final class AudioProcessor {
-    static let maxDurationSeconds: Double = 1080       // 18:00
+    static let maxDurationSeconds: Double = 300        // 5:00 — hard cap per chunk regardless of recording interval
     static let maxFileSizeBytes:   Int64  =  4_500_000 // 4.5 MB — Vercel upload limit
 
     static func validate(entry: LocalRecordingEntry, displayName: String) -> AudioValidationResult {

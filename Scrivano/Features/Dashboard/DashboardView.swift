@@ -58,6 +58,11 @@ struct DashboardView: View {
     @State private var showProcessItemsPrompts = false
     @State private var pendingAutoSubmit = false
 
+    // Delete Items mode
+    @State private var showDeleteItemsMode = false
+    @State private var deleteItemsSelected = Set<String>()
+    @State private var showDeleteItemsConfirm = false
+
     // Rename / Delete collection
     @State private var showDeleteCollectionCard    = false
     @State private var showRenameCollectionCard    = false
@@ -235,6 +240,7 @@ struct DashboardView: View {
             collectionsOverlay
             collectionCards
             processBar
+            deleteBar
             submitResultCard
             createListCard
             renameCollectionCard
@@ -674,6 +680,78 @@ struct DashboardView: View {
         }
     }
 
+    @ViewBuilder
+    private var deleteBar: some View {
+        if showDeleteItemsMode {
+            VStack {
+                Spacer()
+                VStack(spacing: 8) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "trash.fill")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(.danger)
+                        Text(deleteItemsSelected.isEmpty
+                             ? "Select items to delete"
+                             : "\(deleteItemsSelected.count) item\(deleteItemsSelected.count == 1 ? "" : "s") selected")
+                            .font(.inter(12, weight: .semibold))
+                            .foregroundColor(.textQuaternary)
+                    }
+                    HStack(spacing: 10) {
+                        Button {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                deleteItemsSelected.removeAll()
+                                showDeleteItemsMode = false
+                            }
+                        } label: {
+                            Text("Cancel")
+                                .font(.inter(14, weight: .semibold)).foregroundColor(.textSecondary)
+                                .frame(maxWidth: .infinity).padding(.vertical, 13)
+                                .background(Color.white.opacity(0.07)).clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                        Button {
+                            showDeleteItemsConfirm = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "trash.fill")
+                                    .font(.system(size: 13, weight: .semibold))
+                                Text(deleteItemsSelected.isEmpty ? "Delete" : "Delete \(deleteItemsSelected.count)")
+                                    .font(.inter(14, weight: .bold))
+                            }
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity).padding(.vertical, 13)
+                            .background(Color.danger.opacity(deleteItemsSelected.isEmpty ? 0.25 : 0.75))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .opacity(deleteItemsSelected.isEmpty ? 0.4 : 1.0)
+                        }
+                        .disabled(deleteItemsSelected.isEmpty)
+                        .confirmationDialog(
+                            "Delete \(deleteItemsSelected.count) item\(deleteItemsSelected.count == 1 ? "" : "s")?",
+                            isPresented: $showDeleteItemsConfirm,
+                            titleVisibility: .visible
+                        ) {
+                            Button("Delete", role: .destructive) {
+                                let toDelete = displayedItems.filter { deleteItemsSelected.contains($0.id) }
+                                for item in toDelete { vm.deleteItem(item) }
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+                                    deleteItemsSelected.removeAll()
+                                    showDeleteItemsMode = false
+                                }
+                            }
+                            Button("Cancel", role: .cancel) {}
+                        } message: {
+                            Text("This will permanently delete the selected items and all their content.")
+                        }
+                    }
+                }
+                .padding(.horizontal, 18).padding(.vertical, 14).padding(.bottom, 10)
+                .background(.ultraThinMaterial)
+                .overlay(Rectangle().fill(Color.white.opacity(0.08)).frame(height: 1), alignment: .top)
+            }
+            .zIndex(30)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+    }
+
     private func transcribeProcessSelected() {
         let selected = displayedItems.filter { processItemsSelected.contains($0.id) }
         let pairs: [(item: Item, results: [AudioValidationResult], recordings: [LocalRecordingEntry])] = selected.compactMap { item in
@@ -1086,7 +1164,10 @@ struct DashboardView: View {
             localNoteCount: vm.localNoteCounts[item.id],
             vm: vm,
             onTap: {
-                if showProcessItemsMode {
+                if showDeleteItemsMode {
+                    if deleteItemsSelected.contains(item.id) { deleteItemsSelected.remove(item.id) }
+                    else { deleteItemsSelected.insert(item.id) }
+                } else if showProcessItemsMode {
                     guard eligible else { return }
                     if processItemsSelected.contains(item.id) { processItemsSelected.remove(item.id) }
                     else { processItemsSelected.insert(item.id) }
@@ -1095,7 +1176,7 @@ struct DashboardView: View {
                 }
             },
             onStageTap: { stage in
-                guard !showProcessItemsMode else { return }
+                guard !showProcessItemsMode && !showDeleteItemsMode else { return }
                 selectedItem = item; vm.navigateTo(stage: stage, item: item)
             },
             onImportAudioTapped: {
@@ -1110,8 +1191,8 @@ struct DashboardView: View {
                 vm.triggerTextDocImport = true
                 vm.navigateTo(stage: .text, item: item)
             },
-            isInProcessMode: showProcessItemsMode,
-            isProcessSelected: processItemsSelected.contains(item.id),
+            isInProcessMode: showProcessItemsMode || showDeleteItemsMode,
+            isProcessSelected: processItemsSelected.contains(item.id) || deleteItemsSelected.contains(item.id),
             onRenameRequested: { renameItem = item; renameItemText = item.name },
             onClearAllRequested: { clearConfirmItem = item }
         )
@@ -1424,6 +1505,11 @@ struct DashboardView: View {
                         }
                         showDeleteCollectionCard = true
                     } label: { Label(langMgr.t("dashboard.deleteCollectionMenu"), systemImage: "trash") }
+                    Button(role: .destructive) {
+                        deleteItemsSelected.removeAll()
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { showDeleteItemsMode = true }
+                    } label: { Label("Delete Items", systemImage: "trash.fill") }
+                    .disabled(displayedItems.isEmpty)
                 }
                 Section(langMgr.t("dashboard.section.utilities")) {
                     Button { showPromptDatabase = true } label: { Label(langMgr.t("settings.promptDatabase.title"), systemImage: "cylinder.split.1x2") }

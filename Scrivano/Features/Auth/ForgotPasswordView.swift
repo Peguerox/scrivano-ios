@@ -138,7 +138,7 @@ struct ForgotPasswordView: View {
                                     .padding(.bottom, 4)
 
                                 if codeSent {
-                                    ScrivanoTextField(label: "Enter Code Here", text: $code, placeholder: "000000", keyboardType: .numberPad)
+                                    ScrivanoTextField(label: "Enter Code Here", text: $code, placeholder: "000000")
                                     if let err = auth.errorMessage {
                                         Text(err)
                                             .font(.inter(12))

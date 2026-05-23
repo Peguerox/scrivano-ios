@@ -168,7 +168,7 @@ struct VerifyCodeView: View {
                             TextField("", text: Binding(
                                 get: { code },
                                 set: { newVal in
-                                    let filtered = String(newVal.filter { $0.isLetter || $0.isNumber }.prefix(6))
+                                    let filtered = String(newVal.prefix(6))
                                     for i in 0..<6 {
                                         digits[i] = i < filtered.count
                                             ? String(filtered[filtered.index(filtered.startIndex, offsetBy: i)])
@@ -177,7 +177,7 @@ struct VerifyCodeView: View {
                                 }
                             ))
                             .keyboardType(.default)
-                            .autocapitalization(.allCharacters)
+                            .autocapitalization(.none)
                             .autocorrectionDisabled()
                             .focused($inputFocused)
                             .frame(width: 1, height: 1)

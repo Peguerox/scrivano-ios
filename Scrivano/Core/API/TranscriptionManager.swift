@@ -104,7 +104,7 @@ final class TranscriptionManager: ObservableObject {
 
             var workingEntry = entry
 
-            // ── Step 1: Convert to M4A if needed ────────────────────────────
+            // ── Step 1: Convert to M4A permanently if needed ────────────────
             let origExt = workingEntry.fileURL.pathExtension.lowercased()
             if origExt != "m4a" && origExt != "mp3" && FileManager.default.fileExists(atPath: workingEntry.fileURL.path) {
                 do {
@@ -124,110 +124,32 @@ final class TranscriptionManager: ObservableObject {
                 }
             }
 
-            // ── Step 2: Split if needed — persist chunks as real entries ────
-            let fileSize = (try? FileManager.default.attributesOfItem(
-                atPath: workingEntry.fileURL.path)[.size] as? Int64) ?? 0
-
-            // Read actual duration from the file (stored durationSeconds may be wrong)
-            var actualDuration: Double = workingEntry.durationSeconds
+            // ── Step 2: Heal corrupted durationSeconds ───────────────────────
             if FileManager.default.fileExists(atPath: workingEntry.fileURL.path) {
                 let asset = AVURLAsset(url: workingEntry.fileURL)
                 if let cmDur = try? await asset.load(.duration) {
                     let d = CMTimeGetSeconds(cmDur)
-                    if d > 0 { actualDuration = d }
-                }
-            }
-            // Heal corrupted durationSeconds so the upload header and display are correct
-            if actualDuration != workingEntry.durationSeconds && actualDuration > 0 {
-                var healed = workingEntry
-                healed.durationSeconds = actualDuration
-                await MainActor.run { LocalRecordingStore.shared.update(healed) }
-                workingEntry = healed
-            }
-
-            let needsSplit = actualDuration >= AudioProcessor.maxDurationSeconds
-                          || fileSize > AudioProcessor.maxFileSizeBytes
-
-            var entriesToProcess: [LocalRecordingEntry] = [workingEntry]
-
-            if needsSplit && FileManager.default.fileExists(atPath: workingEntry.fileURL.path) {
-                appLog("Auto-split needed: \(actualDuration)s / \(fileSize) bytes", level: .info)
-                do {
-                    // Tighten max duration if file is also too large
-                    var effectiveMax = AudioProcessor.maxDurationSeconds
-                    if fileSize > AudioProcessor.maxFileSizeBytes && actualDuration > 0 {
-                        let bps = Double(fileSize) / actualDuration
-                        let sizeLimited = floor(Double(AudioProcessor.maxFileSizeBytes) / bps)
-                        effectiveMax = min(effectiveMax, max(sizeLimited, 60))
+                    if d > 0 && d != workingEntry.durationSeconds {
+                        var healed = workingEntry
+                        healed.durationSeconds = d
+                        await MainActor.run { LocalRecordingStore.shared.update(healed) }
+                        workingEntry = healed
                     }
-
-                    let chunkURLs = try await AudioProcessor.split(
-                        sourceURL: workingEntry.fileURL, maxDuration: effectiveMax)
-
-                    if chunkURLs.count > 1 {
-                        // Capture original index BEFORE any deletion — used for chunk naming
-                        let allRecordingsBefore = LocalRecordingStore.shared.recordings(for: item.id)
-                        let origIndex = (allRecordingsBefore.firstIndex(where: { $0.id == workingEntry.id }) ?? 0) + 1
-
-                        var newEntries: [LocalRecordingEntry] = []
-                        for (i, url) in chunkURLs.enumerated() {
-                            // Load actual duration from each chunk file — don't trust stored/calculated values
-                            var chunkDur: Double = actualDuration / Double(chunkURLs.count)
-                            let chunkAsset = AVURLAsset(url: url)
-                            if let cmDur = try? await chunkAsset.load(.duration) {
-                                let d = CMTimeGetSeconds(cmDur)
-                                if d > 0 { chunkDur = d }
-                            }
-                            let chunkLabel = "Audio-\(item.name)-\(String(format: "%02d", origIndex))-split-\(String(format: "%02d", i + 1))"
-                            let newEntry = LocalRecordingEntry(
-                                id: UUID().uuidString,
-                                itemId: item.id,
-                                relativePath: LocalRecordingStore.relativePath(of: url),
-                                createdAt: workingEntry.createdAt.addingTimeInterval(Double(i)),
-                                durationSeconds: chunkDur,
-                                label: chunkLabel
-                            )
-                            LocalRecordingStore.shared.add(newEntry)
-                            newEntries.append(newEntry)
-                            appLog("  Chunk \(i+1)/\(chunkURLs.count): \(chunkLabel) (\(Int(chunkDur))s)", level: .success)
-                        }
-                        // Safety: only delete original once ALL chunk files are confirmed on disk
-                        let allChunksOnDisk = chunkURLs.allSatisfy { FileManager.default.fileExists(atPath: $0.path) }
-                        if allChunksOnDisk {
-                            LocalRecordingStore.shared.delete(id: workingEntry.id)
-                            LocalRecordingStore.shared.deleteFile(at: workingEntry.fileURL)
-                            appLog("  Original removed — \(newEntries.count) chunks confirmed on disk", level: .success)
-                        } else {
-                            appLog("  WARNING: not all chunks confirmed on disk — original preserved", level: .warning)
-                        }
-                        entriesToProcess = newEntries
-                    }
-                } catch {
-                    appLog("Auto-split failed: \(error.localizedDescription) — proceeding with original", level: .warning)
                 }
             }
 
-            // ── Step 3: Queue each entry (chunks or the single file) ─────────
-            // Mark all as queued upfront so hourglass shows for each
-            entriesToProcess.forEach { self.queuedRecordingIds.insert($0.id) }
-
-            for entryToTranscribe in entriesToProcess {
-                guard !Task.isCancelled else { break }
-                let currentRecordings = LocalRecordingStore.shared.recordings(for: item.id)
-                let ext = entryToTranscribe.fileURL.pathExtension.isEmpty ? "m4a" : entryToTranscribe.fileURL.pathExtension
-                let displayName: String
-                if entryToTranscribe.label?.contains("-split-") == true {
-                    // Split chunk — label already has the correct name (Audio-name-01-split-01)
-                    displayName = "\(entryToTranscribe.label ?? "Audio").\(ext)"
-                } else {
-                    let index = (currentRecordings.firstIndex(where: { $0.id == entryToTranscribe.id }) ?? 0) + 1
-                    displayName = "Audio-\(item.name)-\(String(format: "%02d", index)).\(ext)"
-                }
-                appLog("Auto-trigger: \(displayName)")
-                self.transcribingItemName = item.name
-                let result = AudioProcessor.validate(entry: entryToTranscribe, displayName: displayName)
-                await self.runTranscriptions(item: item, preparationResults: [result], recordings: currentRecordings)
-            }
+            // ── Step 3: Transcription pipeline ──────────────────────────────
+            // prepare() handles compress → temporary 5-min upload chunks → join → 1 transcript.
+            // No permanent split — the recording stays as 1 entry in the media list.
+            self.queuedRecordingIds.insert(workingEntry.id)
+            let currentRecordings = LocalRecordingStore.shared.recordings(for: item.id)
+            let ext = workingEntry.fileURL.pathExtension.isEmpty ? "m4a" : workingEntry.fileURL.pathExtension
+            let index = (currentRecordings.firstIndex(where: { $0.id == workingEntry.id }) ?? 0) + 1
+            let displayName = "Audio-\(item.name)-\(String(format: "%02d", index)).\(ext)"
+            appLog("Auto-trigger: \(displayName)")
+            self.transcribingItemName = item.name
+            let result = AudioProcessor.validate(entry: workingEntry, displayName: displayName)
+            await self.runTranscriptions(item: item, preparationResults: [result], recordings: currentRecordings)
 
             self.transcribingItemName = nil
             self.transcribingStatus = ""
@@ -437,6 +359,15 @@ final class TranscriptionManager: ObservableObject {
                         }
                     }
 
+                    // Mark recording as done BEFORE incrementing transcriptSaveCounter so that
+                    // MediaListView's onChange(of: transcriptSaveCounter) sees the updated set.
+                    if anyChunkSucceeded {
+                        transcribedRecordingIds.insert(result.recordingId)
+                        UserDefaults.standard.set(Array(transcribedRecordingIds), forKey: "transcribedRecordingIds")
+                    } else {
+                        failedRecordingIds.insert(result.recordingId)
+                    }
+
                     // Save all collected sub-chunk texts as ONE transcript in the correct order
                     if !collectedTexts.isEmpty {
                         let combinedText = collectedTexts.joined(separator: "\n")
@@ -448,13 +379,6 @@ final class TranscriptionManager: ObservableObject {
                         sendCompletionNotification(title: "Transcription Ready", body: "'\(item.name)' transcribed.")
                         lastSavedItemId = item.id
                         transcriptSaveCounter += 1
-                    }
-
-                    if anyChunkSucceeded {
-                        transcribedRecordingIds.insert(result.recordingId)
-                        UserDefaults.standard.set(Array(transcribedRecordingIds), forKey: "transcribedRecordingIds")
-                    } else {
-                        failedRecordingIds.insert(result.recordingId)
                     }
                     appLog("  Row done: \(result.displayName)", level: .success)
 
@@ -631,6 +555,15 @@ final class TranscriptionManager: ObservableObject {
                     }
                 }
 
+                // Mark recording as done BEFORE incrementing transcriptSaveCounter so that
+                // any queue-advancement observer sees the updated set when onChange fires.
+                if anyChunkSucceeded {
+                    transcribedRecordingIds.insert(result.recordingId)
+                    UserDefaults.standard.set(Array(transcribedRecordingIds), forKey: "transcribedRecordingIds")
+                } else {
+                    failedRecordingIds.insert(result.recordingId)
+                }
+
                 // Save all chunks as ONE combined transcript — same behaviour as single-item path
                 if !collectedTexts.isEmpty {
                     let combinedText = collectedTexts.joined(separator: "\n")
@@ -641,13 +574,6 @@ final class TranscriptionManager: ObservableObject {
                     sendCompletionNotification(title: "Transcription Ready", body: "'\(item.name)' transcribed.")
                     lastSavedItemId = item.id
                     transcriptSaveCounter += 1
-                }
-
-                if anyChunkSucceeded {
-                    transcribedRecordingIds.insert(result.recordingId)
-                    UserDefaults.standard.set(Array(transcribedRecordingIds), forKey: "transcribedRecordingIds")
-                } else {
-                    failedRecordingIds.insert(result.recordingId)
                 }
             } catch {
                 transcribingError = error.localizedDescription
