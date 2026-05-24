@@ -97,9 +97,23 @@ struct HelpView: View {
                             url: "https://www.instagram.com/scrivanosocial/"
                         )
 
-                        Spacer().frame(height: 40)
+                        Spacer().frame(height: 14)
                     }
                 }
+
+                // Fixed version badge — always visible at the bottom
+                let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+                let build   = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
+                HStack(spacing: 6) {
+                    Text("Scrivano \(version) · Build \(build)")
+                        .font(.inter(11, weight: .medium))
+                        .foregroundColor(.textPrimary)
+                }
+                .padding(.horizontal, 14).padding(.vertical, 7)
+                .background(Color.brandCyan.opacity(0.06))
+                .overlay(RoundedRectangle(cornerRadius: 20).stroke(Color.brandCyan.opacity(0.12), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: 20))
+                .padding(.top, 44).padding(.bottom, 8)
             }
         }
         .navigationBarHidden(true)

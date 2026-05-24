@@ -262,6 +262,11 @@ enum AppTranslations {
             "dashboard.recording":              "Recording",
             "dashboard.back":                   "← Back",
             "dashboard.processingItem":         "Processing \"%@\"",
+            "dashboard.deleteItemsMenu":        "Delete Items",
+            "dashboard.deleteItems.hint":       "Select items to delete",
+            "dashboard.deleteCount":            "Delete %d",
+            "dashboard.deleteItemsConfirm":     "Delete %d item(s)?",
+            "dashboard.deleteItemsMsg":         "This will permanently delete the selected items and all their content.",
 
             // Recording
             "recording.discard":            "Discard Recording?",
@@ -889,6 +894,11 @@ enum AppTranslations {
             "dashboard.recording":              "Grabando",
             "dashboard.back":                   "← Atrás",
             "dashboard.processingItem":         "Procesando \"%@\"",
+            "dashboard.deleteItemsMenu":        "Eliminar Items",
+            "dashboard.deleteItems.hint":       "Selecciona items para eliminar",
+            "dashboard.deleteCount":            "Eliminar %d",
+            "dashboard.deleteItemsConfirm":     "¿Eliminar %d item(s)?",
+            "dashboard.deleteItemsMsg":         "Esto eliminará permanentemente los items seleccionados y todo su contenido.",
 
             // Recording
             "recording.discard":            "¿Descartar Grabación?",

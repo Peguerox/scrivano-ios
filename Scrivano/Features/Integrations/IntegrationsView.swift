@@ -69,9 +69,6 @@ struct IntegrationsView: View {
                 }
             }
         }
-        .onChange(of: store.installed.count) { _ in
-            if selectedId == nil { selectedId = store.installed.first?.id }
-        }
         .onChange(of: selectedId) { id in
             if let id {
                 lastSelectedId = id

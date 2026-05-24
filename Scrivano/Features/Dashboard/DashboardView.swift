@@ -691,8 +691,8 @@ struct DashboardView: View {
                             .font(.system(size: 11, weight: .bold))
                             .foregroundColor(.danger)
                         Text(deleteItemsSelected.isEmpty
-                             ? "Select items to delete"
-                             : "\(deleteItemsSelected.count) item\(deleteItemsSelected.count == 1 ? "" : "s") selected")
+                             ? langMgr.t("dashboard.deleteItems.hint")
+                             : langMgr.t("dashboard.selectedCount").replacingOccurrences(of: "%d", with: "\(deleteItemsSelected.count)"))
                             .font(.inter(12, weight: .semibold))
                             .foregroundColor(.textQuaternary)
                     }
@@ -703,7 +703,7 @@ struct DashboardView: View {
                                 showDeleteItemsMode = false
                             }
                         } label: {
-                            Text("Cancel")
+                            Text(langMgr.t("common.cancel"))
                                 .font(.inter(14, weight: .semibold)).foregroundColor(.textSecondary)
                                 .frame(maxWidth: .infinity).padding(.vertical, 13)
                                 .background(Color.white.opacity(0.07)).clipShape(RoundedRectangle(cornerRadius: 14))
@@ -714,7 +714,9 @@ struct DashboardView: View {
                             HStack(spacing: 6) {
                                 Image(systemName: "trash.fill")
                                     .font(.system(size: 13, weight: .semibold))
-                                Text(deleteItemsSelected.isEmpty ? "Delete" : "Delete \(deleteItemsSelected.count)")
+                                Text(deleteItemsSelected.isEmpty
+                                     ? langMgr.t("common.delete")
+                                     : langMgr.t("dashboard.deleteCount").replacingOccurrences(of: "%d", with: "\(deleteItemsSelected.count)"))
                                     .font(.inter(14, weight: .bold))
                             }
                             .foregroundColor(.white)
@@ -725,11 +727,11 @@ struct DashboardView: View {
                         }
                         .disabled(deleteItemsSelected.isEmpty)
                         .confirmationDialog(
-                            "Delete \(deleteItemsSelected.count) item\(deleteItemsSelected.count == 1 ? "" : "s")?",
+                            String(format: langMgr.t("dashboard.deleteItemsConfirm"), deleteItemsSelected.count),
                             isPresented: $showDeleteItemsConfirm,
                             titleVisibility: .visible
                         ) {
-                            Button("Delete", role: .destructive) {
+                            Button(langMgr.t("common.delete"), role: .destructive) {
                                 let toDelete = displayedItems.filter { deleteItemsSelected.contains($0.id) }
                                 for item in toDelete { vm.deleteItem(item) }
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
@@ -737,9 +739,9 @@ struct DashboardView: View {
                                     showDeleteItemsMode = false
                                 }
                             }
-                            Button("Cancel", role: .cancel) {}
+                            Button(langMgr.t("common.cancel"), role: .cancel) {}
                         } message: {
-                            Text("This will permanently delete the selected items and all their content.")
+                            Text(langMgr.t("dashboard.deleteItemsMsg"))
                         }
                     }
                 }
@@ -1508,7 +1510,7 @@ struct DashboardView: View {
                     Button(role: .destructive) {
                         deleteItemsSelected.removeAll()
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { showDeleteItemsMode = true }
-                    } label: { Label("Delete Items", systemImage: "trash.fill") }
+                    } label: { Label(langMgr.t("dashboard.deleteItemsMenu"), systemImage: "trash.fill") }
                     .disabled(displayedItems.isEmpty)
                 }
                 Section(langMgr.t("dashboard.section.utilities")) {
