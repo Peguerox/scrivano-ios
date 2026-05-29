@@ -21,7 +21,6 @@ struct DashboardView: View {
     @State private var viewMode: ViewMode = .card
     @State private var showRecorder = false
     @State private var showRecordCard = false
-    @State private var fabPulse = false
     @State private var sessionWarmTask: Task<Void, Never>? = nil
 
 
@@ -216,7 +215,6 @@ struct DashboardView: View {
                 bottomBar
             }
             .ignoresSafeArea(.keyboard)
-            .onAppear { withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) { fabPulse = true } }
             .onChange(of: recorder.lastSavedItemId) { _ in vm.refreshLocalCounts() }
             .onChange(of: notesMgr.completedItemIds) { _ in
                 vm.refreshFromLocalStores()
@@ -1663,7 +1661,6 @@ struct DashboardView: View {
                                     .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                             }
-                            .shadow(color: Color.brandCyan.opacity(0.5), radius: 12)
                             .padding(.leading, 18)
                             Spacer()
                         }
@@ -1676,7 +1673,6 @@ struct DashboardView: View {
                             Button { showIntegrations = true } label: {
                                 integrationFABIcon
                             }
-                            .shadow(color: Color.brandCyan.opacity(0.5), radius: 12)
                             .padding(.trailing, 18)
                         }
                     }
@@ -1755,10 +1751,7 @@ struct DashboardView: View {
         if taskQueue.isProcessing && !showProcessItemsMode {
             HStack(spacing: 8) {
                 // Animated activity dot
-                Circle()
-                    .fill(Color.brandCyan)
-                    .frame(width: 6, height: 6)
-                    .opacity(fabPulse ? 1.0 : 0.3)
+                QueuePulsingDot()
 
                 // What's running now
                 if let name = transcriptionMgr.transcribingItemName {
@@ -2141,6 +2134,21 @@ final class DashboardViewModel: ObservableObject {
             UserDefaults.standard.removeObject(forKey: "activeCollectionId")
         }
         refreshFromLocalStores()
+    }
+}
+
+private struct QueuePulsingDot: View {
+    @State private var pulse = false
+    var body: some View {
+        Circle()
+            .fill(Color.brandCyan)
+            .frame(width: 6, height: 6)
+            .opacity(pulse ? 1.0 : 0.3)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) {
+                    pulse = true
+                }
+            }
     }
 }
 
