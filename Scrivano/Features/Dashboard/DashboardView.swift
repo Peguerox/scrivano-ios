@@ -1617,64 +1617,55 @@ struct DashboardView: View {
                 .padding(.horizontal, 10)
             } else {
                 // ── Normal FAB ──
-                ZStack {
-                    // Scrivano button — always centered
-                    HStack {
-                        Spacer()
-                        Button {
-                            sessionWarmTask = Task.detached(priority: .userInitiated) {
-                                let s = AVAudioSession.sharedInstance()
-                                try? s.setCategory(.record, mode: .default)
-                                try? s.setActive(true)
-                            }
-                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                showRecordCard = true
-                            }
-                        } label: {
-                            ZStack {
-                                Circle()
-                                    .fill(LinearGradient(colors: [Color(hex: "#081526"), Color(hex: "#030c1a")],
-                                                         startPoint: .topLeading, endPoint: .bottomTrailing))
-                                    .frame(width: 66, height: 66)
-                                    .overlay(Circle().stroke(Color.brandCyan.opacity(0.45), lineWidth: 2))
-                                    .shadow(color: Color.brandCyan.opacity(0.5), radius: 10)
-                                Image("ScrivanoLogo")
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 66, height: 66)
-                                    .clipShape(Circle())
-                                    .shadow(color: Color.brandCyan.opacity(0.8), radius: 6)
-                            }
-                            .frame(width: 66, height: 66)
+                HStack {
+                    Spacer()
+                    Button {
+                        sessionWarmTask = Task.detached(priority: .userInitiated) {
+                            let s = AVAudioSession.sharedInstance()
+                            try? s.setCategory(.record, mode: .default)
+                            try? s.setActive(true)
                         }
-                        Spacer()
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                            showRecordCard = true
+                        }
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(LinearGradient(colors: [Color(hex: "#081526"), Color(hex: "#030c1a")],
+                                                     startPoint: .topLeading, endPoint: .bottomTrailing))
+                                .frame(width: 66, height: 66)
+                                .overlay(Circle().stroke(Color.brandCyan.opacity(0.45), lineWidth: 2))
+                                .shadow(color: Color.brandCyan.opacity(0.5), radius: 10)
+                            Image("ScrivanoLogo")
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 66, height: 66)
+                                .clipShape(Circle())
+                                .shadow(color: Color.brandCyan.opacity(0.8), radius: 6)
+                        }
+                        .frame(width: 66, height: 66)
                     }
-
-                    // Automation shortcut — bottom left
+                    Spacer()
+                }
+                .overlay(alignment: .leading) {
                     if showAutomationIcon {
-                        HStack {
-                            Button { showAutomation = true } label: {
-                                Text("🤖")
-                                    .font(.system(size: 20))
-                                    .frame(width: 38, height: 38)
-                                    .background(Color.white.opacity(0.07))
-                                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                            }
-                            .padding(.leading, 18)
-                            Spacer()
+                        Button { showAutomation = true } label: {
+                            Text("🤖")
+                                .font(.system(size: 20))
+                                .frame(width: 38, height: 38)
+                                .background(Color.white.opacity(0.07))
+                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.1), lineWidth: 1))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
+                        .padding(.leading, 18)
                     }
-
-                    // Integration shortcut — bottom right, aligned with top bar buttons
+                }
+                .overlay(alignment: .trailing) {
                     if !integrationStore.installed.isEmpty {
-                        HStack {
-                            Spacer()
-                            Button { showIntegrations = true } label: {
-                                integrationFABIcon
-                            }
-                            .padding(.trailing, 18)
+                        Button { showIntegrations = true } label: {
+                            integrationFABIcon
                         }
+                        .padding(.trailing, 18)
                     }
                 }
                 .padding(.top, 20)

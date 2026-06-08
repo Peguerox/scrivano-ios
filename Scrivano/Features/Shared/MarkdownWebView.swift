@@ -254,7 +254,8 @@ struct MarkdownWebView: UIViewRepresentable {
         th,td { padding:9px 13px; text-align:left; border-bottom:1px solid rgba(255,255,255,0.08); }
         th { background:rgba(59,130,246,0.18); color:#fff; font-weight:700; font-size:0.85em;
              text-transform:uppercase; letter-spacing:0.04em; border-bottom:1px solid rgba(59,130,246,0.4); }
-        tr:nth-child(even) td { background:rgba(255,255,255,0.03); }
+        td { background:#060e1e; }
+        tr:nth-child(even) td { background:#0c1830; }
         tr:last-child td { border-bottom:none; }
         img { max-width:100%; height:auto; border-radius:10px; margin:0.6em 0; display:block; }
     """
@@ -304,6 +305,7 @@ struct MarkdownWebView: UIViewRepresentable {
         table { width:100%; border-collapse:collapse; font-size:0.9em; }
         th,td { padding:9px 13px; text-align:left; border:1px solid #e5e7eb; }
         th { background:#f9fafb; color:#111; font-weight:700; font-size:0.85em; }
+        td { background:#ffffff; }
         tr:nth-child(even) td { background:#f9fafb; }
         img { max-width:100%; height:auto; margin:0.8em 0; display:block; }
     """
