@@ -384,6 +384,7 @@ final class TranscriptionManager: ObservableObject {
 
                 } catch {
                     appLog("  ✗ Outer: \(error.localizedDescription)", level: .error)
+                    failedRecordingIds.insert(result.recordingId)
                     transcribingError = error.localizedDescription
                     try? await Task.sleep(nanoseconds: 2_500_000_000)
                     transcribingError = nil
@@ -576,6 +577,7 @@ final class TranscriptionManager: ObservableObject {
                     transcriptSaveCounter += 1
                 }
             } catch {
+                failedRecordingIds.insert(result.recordingId)
                 transcribingError = error.localizedDescription
                 try? await Task.sleep(nanoseconds: 2_500_000_000)
                 transcribingError = nil
