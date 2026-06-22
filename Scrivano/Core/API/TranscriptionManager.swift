@@ -359,6 +359,12 @@ final class TranscriptionManager: ObservableObject {
                         }
                     }
 
+                    // Delete temp files created by prepare() — chunks or single converted M4A.
+                    // Never delete the original recording file.
+                    for (url, _, _) in prepared where url.path != entry.fileURL.path {
+                        try? FileManager.default.removeItem(at: url)
+                    }
+
                     // Mark recording as done BEFORE incrementing transcriptSaveCounter so that
                     // MediaListView's onChange(of: transcriptSaveCounter) sees the updated set.
                     if anyChunkSucceeded {
@@ -554,6 +560,12 @@ final class TranscriptionManager: ObservableObject {
                         totalDuration += duration
                         anyChunkSucceeded = true
                     }
+                }
+
+                // Delete temp files created by prepare() — chunks or single converted M4A.
+                // Never delete the original recording file.
+                for (url, _, _) in prepared where url.path != entry.fileURL.path {
+                    try? FileManager.default.removeItem(at: url)
                 }
 
                 // Mark recording as done BEFORE incrementing transcriptSaveCounter so that

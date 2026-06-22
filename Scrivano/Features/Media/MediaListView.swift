@@ -284,8 +284,14 @@ final class AudioProcessor {
             workingURL = try await convertToM4A(sourceURL: workingURL)
         }
 
-        // Apply compression options (silence stripping, mono, speed) before splitting
+        // Apply compression options (silence stripping, mono, speed) before splitting.
+        // Track the pre-compression URL so we can delete the intermediate temp file if
+        // compression produced a new file (avoids orphaned temps on disk).
+        let preCompressionURL = workingURL
         workingURL = await applyCompressionOptions(sourceURL: workingURL)
+        if workingURL != preCompressionURL && preCompressionURL != entry.fileURL {
+            try? FileManager.default.removeItem(at: preCompressionURL)
+        }
 
         let nameBase: String = {
             if let dotIdx = displayName.lastIndex(of: ".") {
@@ -314,6 +320,10 @@ final class AudioProcessor {
         let needsSplit = actualDuration > effectiveMaxDuration || fileSize > maxFileSizeBytes
         if needsSplit {
             let chunks = try await split(sourceURL: workingURL, maxDuration: effectiveMaxDuration)
+            // Delete the pre-split working file — callers will delete the individual chunks after upload
+            if workingURL != entry.fileURL {
+                try? FileManager.default.removeItem(at: workingURL)
+            }
             return chunks.enumerated().map { i, url in
                 let dur = i == chunks.count - 1
                     ? max(actualDuration - Double(i) * effectiveMaxDuration, 1)
