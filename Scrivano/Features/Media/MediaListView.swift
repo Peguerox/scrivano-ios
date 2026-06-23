@@ -1034,7 +1034,8 @@ struct MediaListView: View {
                     onRenameRequested: {
                         let lbl = rec.label ?? ""
                         renameRecording = rec
-                        renameMediaText = lbl.hasSuffix(".m4a") ? String(lbl.dropLast(4)) : lbl
+                        let ext = rec.fileURL.pathExtension.lowercased()
+                        renameMediaText = lbl.hasSuffix(".\(ext)") ? String(lbl.dropLast(ext.count + 1)) : lbl
                     }
                 )
             }
@@ -1103,7 +1104,8 @@ struct MediaListView: View {
                     let trimmed = renameMediaText.trimmingCharacters(in: .whitespaces)
                     guard !trimmed.isEmpty else { return }
                     if var rec = renameRecording {
-                        rec.label = trimmed.hasSuffix(".m4a") ? trimmed : "\(trimmed).m4a"
+                        let ext = rec.fileURL.pathExtension.lowercased().isEmpty ? "m4a" : rec.fileURL.pathExtension.lowercased()
+                        rec.label = trimmed.hasSuffix(".\(ext)") ? trimmed : "\(trimmed).\(ext)"
                         LocalRecordingStore.shared.update(rec)
                         localRecordings = LocalRecordingStore.shared.recordings(for: item.id)
                         renameRecording = nil
