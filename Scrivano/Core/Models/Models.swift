@@ -77,9 +77,19 @@ struct LoginResponse: Codable {
 struct ScrivanoCollection: Codable, Identifiable {
     let id: String
     let name: String
+    let createdAt: Date
 
-    enum CodingKeys: String, CodingKey {
-        case id, name
+    init(id: String, name: String, createdAt: Date = Date()) {
+        self.id = id; self.name = name; self.createdAt = createdAt
+    }
+
+    enum CodingKeys: String, CodingKey { case id, name, createdAt }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id        = try c.decode(String.self, forKey: .id)
+        name      = try c.decode(String.self, forKey: .name)
+        createdAt = (try? c.decode(Date.self, forKey: .createdAt)) ?? .distantPast
     }
 }
 

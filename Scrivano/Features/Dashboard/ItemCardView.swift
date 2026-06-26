@@ -527,16 +527,20 @@ struct CollectionTopPanel: View {
     @State private var selected = Set<String>()
     @State private var showDeleteConfirm = false
     @AppStorage("showMyCollection") private var showMyCollection: Bool = true
+    @AppStorage("collectionSortOrder") private var sortOrder: String = "date"
 
     // Stable key for the "My Collection" default row
     private let defaultKey = "__my_collection"
 
-    // All rows: default first (if visible), then real collections
+    // All rows: default first (always), then real collections sorted by preference
     private var allRows: [(id: String, name: String, isDefault: Bool)] {
         let defaults: [(id: String, name: String, isDefault: Bool)] = showMyCollection
             ? [(id: defaultKey, name: "My Collection", isDefault: true)]
             : []
-        let rest = vm.collections.map { (id: $0.id, name: $0.name, isDefault: false) }
+        let sorted = sortOrder == "name"
+            ? vm.collections.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            : vm.collections.sorted { $0.createdAt < $1.createdAt }
+        let rest = sorted.map { (id: $0.id, name: $0.name, isDefault: false) }
         return defaults + rest
     }
 
@@ -548,6 +552,21 @@ struct CollectionTopPanel: View {
                     .font(.inter(17, weight: .heavy))
                     .foregroundColor(.textPrimary)
                 Spacer()
+                // Sort toggle
+                Button {
+                    sortOrder = sortOrder == "name" ? "date" : "name"
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: sortOrder == "name" ? "textformat.abc" : "calendar")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text(sortOrder == "name" ? "A–Z" : "Date")
+                            .font(.inter(11, weight: .semibold))
+                    }
+                    .foregroundColor(.textSecondary)
+                    .padding(.horizontal, 9).padding(.vertical, 5)
+                    .background(Color.white.opacity(0.06))
+                    .clipShape(Capsule())
+                }
                 if !selected.isEmpty {
                     Button {
                         let realSelected = selected.filter { $0 != defaultKey }

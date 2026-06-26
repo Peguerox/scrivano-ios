@@ -828,7 +828,7 @@ struct DashboardView: View {
                                 }
                                 return
                             }
-                            let renamed = ScrivanoCollection(id: active.id, name: trimmed)
+                            let renamed = ScrivanoCollection(id: active.id, name: trimmed, createdAt: active.createdAt)
                             LocalCollectionStore.shared.save(renamed)
                             LocalItemStore.shared.renameCollection(active.id, to: trimmed)
                             vm.activeCollection = renamed
@@ -1361,7 +1361,9 @@ struct DashboardView: View {
                                 }
                             } else {
                                 let c = ScrivanoCollection(id: UUID().uuidString, name: name)
-                                LocalCollectionStore.shared.save(c); vm.collections.append(c)
+                                LocalCollectionStore.shared.save(c)
+                                vm.collections.append(c)
+                                vm.selectCollection(c)
                             }
                         } label: {
                             Text(langMgr.t("common.create")).font(.inter(14, weight: .bold)).foregroundColor(.brandCyan)
