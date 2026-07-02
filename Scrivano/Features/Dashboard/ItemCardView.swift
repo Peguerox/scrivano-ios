@@ -526,6 +526,7 @@ struct CollectionTopPanel: View {
     var onRequestNewCollection: (String) -> Void
     @State private var selected = Set<String>()
     @State private var showDeleteConfirm = false
+    @State private var scrollToId: String? = nil
     @AppStorage("showMyCollection") private var showMyCollection: Bool = true
     @AppStorage("collectionSortOrder") private var sortOrder: String = "date"
 
@@ -620,22 +621,33 @@ struct CollectionTopPanel: View {
             .overlay(alignment: .bottom) { Divider().background(Color.white.opacity(0.07)) }
 
             // Collection rows
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 0) {
-                    ForEach(allRows, id: \.id) { row in
-                        let isActive = row.isDefault
-                            ? vm.activeCollection == nil
-                            : vm.activeCollection?.id == row.id
-                        let allStored = LocalItemStore.shared.all()
-                        let meta = row.isDefault
-                            ? "\(allStored.filter { $0.collectionId == nil || ($0.collectionId?.isEmpty ?? true) }.count) items"
-                            : "\(allStored.filter { $0.collectionId == row.id }.count) items"
-                        collRow(key: row.id, name: row.name, meta: meta, isActive: isActive, isDefault: row.isDefault)
+            ScrollViewReader { proxy in
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 0) {
+                        ForEach(allRows, id: \.id) { row in
+                            let isActive = row.isDefault
+                                ? vm.activeCollection == nil
+                                : vm.activeCollection?.id == row.id
+                            let allStored = LocalItemStore.shared.all()
+                            let meta = row.isDefault
+                                ? "\(allStored.filter { $0.collectionId == nil || ($0.collectionId?.isEmpty ?? true) }.count) items"
+                                : "\(allStored.filter { $0.collectionId == row.id }.count) items"
+                            collRow(key: row.id, name: row.name, meta: meta, isActive: isActive, isDefault: row.isDefault)
+                                .id(row.id)
+                        }
+                    }
+                    .padding(.vertical, 8)
+                }
+                .frame(maxHeight: 340)
+                .onChange(of: vm.activeCollection?.id) { newId in
+                    guard let newId else { return }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            proxy.scrollTo(newId, anchor: .center)
+                        }
                     }
                 }
-                .padding(.vertical, 8)
             }
-            .frame(maxHeight: 340)
         }
         .background(Color(hex: "#081221"))
         .overlay(alignment: .bottom) {
