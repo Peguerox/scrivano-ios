@@ -1364,6 +1364,7 @@ struct DashboardView: View {
                                 LocalCollectionStore.shared.save(c)
                                 vm.collections.append(c)
                                 vm.selectCollection(c)
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) { showCollections = false }
                             }
                         } label: {
                             Text(langMgr.t("common.create")).font(.inter(14, weight: .bold)).foregroundColor(.brandCyan)
