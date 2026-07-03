@@ -73,6 +73,11 @@ struct IntegrationsView: View {
         .onChange(of: selectedId) { id in
             if let id {
                 lastSelectedId = id
+                // Force auth tab if not connected
+                let integration = store.installed.first(where: { $0.id == id })
+                if integration?.connectionState != .connected {
+                    activeTab = .auth
+                }
                 Task { try? await store.fetchDetail(integrationId: id) }
             }
         }
@@ -276,18 +281,21 @@ struct IntegrationsView: View {
     // MARK: - Tabs
 
     private var tabBar: some View {
-        HStack(spacing: 0) {
+        let isConnected = selected?.connectionState == .connected
+        return HStack(spacing: 0) {
             ForEach(IntTab.allCases, id: \.self) { tab in
+                let locked = !isConnected && tab != .auth
                 Button {
+                    guard !locked else { return }
                     withAnimation(.easeInOut(duration: 0.15)) { activeTab = tab }
                 } label: {
                     VStack(spacing: 0) {
                         Text(tab.label)
                             .font(.inter(12, weight: .bold))
-                            .foregroundColor(activeTab == tab ? .brandCyan : .textTertiary)
+                            .foregroundColor(locked ? .textTertiary.opacity(0.35) : activeTab == tab ? .brandCyan : .textTertiary)
                             .padding(.vertical, 11)
                         Rectangle()
-                            .fill(activeTab == tab ? Color.brandCyan : Color.clear)
+                            .fill(activeTab == tab && !locked ? Color.brandCyan : Color.clear)
                             .frame(height: 2)
                     }
                 }
