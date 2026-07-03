@@ -743,41 +743,46 @@ struct AuthTabView: View {
 
     @ViewBuilder
     private func actionButton(_ title: String, style: AuthButtonStyle, loading: Bool = false, disabled: Bool = false, action: @escaping () -> Void) -> some View {
+        let fgColor: Color =
+            style == .danger  ? Color(hex: "#f87171") :
+            style == .primary ? Color.brandCyan :
+            style == .success ? Color(hex: "#4ade80") :
+            Color.white.opacity(0.6)
+        let bgColor: Color =
+            style == .danger  ? Color(hex: "#f87171").opacity(0.08) :
+            style == .primary ? Color.brandBlue.opacity(0.15) :
+            style == .success ? Color(hex: "#4ade80").opacity(0.08) :
+            Color.white.opacity(0.05)
+        let borderColor: Color =
+            style == .danger  ? Color(hex: "#f87171").opacity(0.2) :
+            style == .primary ? Color.brandCyan.opacity(0.3) :
+            style == .success ? Color(hex: "#4ade80").opacity(0.25) :
+            Color.white.opacity(0.1)
+
         Button(action: action) {
-            ZStack {
+            HStack(spacing: 10) {
                 if loading {
-                    ProgressView().tint(style == .primary ? .white : style == .success ? Color(hex: "#4ade80") : .brandCyan).scaleEffect(0.8)
-                } else {
-                    Text(title).font(.inter(13, weight: .bold))
-                        .foregroundColor(
-                            style == .danger  ? Color(hex: "#f87171") :
-                            style == .primary ? .white :
-                            style == .success ? Color(hex: "#4ade80") :
-                            Color.white.opacity(0.6)
-                        )
+                    ProgressView().tint(fgColor).scaleEffect(0.8)
+                        .frame(width: 16, height: 16)
                 }
+                Text(title)
+                    .font(.inter(13, weight: .bold))
+                    .foregroundColor(loading ? fgColor.opacity(0.5) : fgColor)
+                Spacer()
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: 44)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
         .disabled(loading || disabled)
         .opacity(disabled && !loading ? 0.4 : 1)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(
-                    style == .danger   ? Color(hex: "#f87171").opacity(0.08) :
-                    style == .primary  ? Color.brandBlue.opacity(0.5) :
-                    style == .success  ? Color(hex: "#4ade80").opacity(0.08) :
-                    Color.white.opacity(0.05)
-                )
-                .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(
-                        style == .danger   ? Color(hex: "#f87171").opacity(0.2) :
-                        style == .primary  ? Color.brandCyan.opacity(0.3) :
-                        style == .success  ? Color(hex: "#4ade80").opacity(0.25) :
-                        Color.white.opacity(0.1), lineWidth: 1
-                    ))
-        )
+        .background(Color.white.opacity(0.06))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .fill(bgColor))
+        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+            .stroke(borderColor, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 
