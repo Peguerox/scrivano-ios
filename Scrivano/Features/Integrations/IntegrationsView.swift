@@ -254,6 +254,7 @@ struct IntegrationsView: View {
 
                 Button {
                     withAnimation(.easeInOut(duration: 0.18)) { showDropdown = false }
+                    showCatalogSheet = true
                 } label: {
                     HStack(spacing: 10) {
                         Image(systemName: "plus.circle.fill")
@@ -479,9 +480,6 @@ struct AuthTabView: View {
                 }
 
                 actionButton(langMgr.t("integrations.auth.uninstall"), style: .danger, loading: isUninstalling) { showUninstallConfirm = true }
-
-                CatalogPillView(onInstall: { _, url in onOAuthURL?(url) })
-                    .padding(.top, 8)
 
                 Spacer().frame(height: 24)
             }
