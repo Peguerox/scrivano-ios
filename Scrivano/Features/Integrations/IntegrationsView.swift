@@ -78,7 +78,14 @@ struct IntegrationsView: View {
                 if integration?.connectionState != .connected {
                     activeTab = .auth
                 }
-                Task { try? await store.fetchDetail(integrationId: id) }
+                Task {
+                    try? await store.fetchDetail(integrationId: id)
+                    // Re-check after fetch in case server state came back as disconnected
+                    let updated = store.installed.first(where: { $0.id == id })
+                    if updated?.connectionState != .connected {
+                        activeTab = .auth
+                    }
+                }
             }
         }
         .sheet(item: $oauthURL, onDismiss: {
@@ -737,7 +744,7 @@ struct AuthTabView: View {
     @ViewBuilder
     private func actionButton(_ title: String, style: AuthButtonStyle, loading: Bool = false, disabled: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Group {
+            ZStack {
                 if loading {
                     ProgressView().tint(style == .primary ? .white : style == .success ? Color(hex: "#4ade80") : .brandCyan).scaleEffect(0.8)
                 } else {
@@ -750,7 +757,8 @@ struct AuthTabView: View {
                         )
                 }
             }
-            .frame(maxWidth: .infinity).padding(.vertical, 13)
+            .frame(maxWidth: .infinity)
+            .frame(height: 44)
         }
         .disabled(loading || disabled)
         .opacity(disabled && !loading ? 0.4 : 1)
