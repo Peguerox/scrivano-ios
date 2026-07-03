@@ -354,7 +354,33 @@ struct IntegrationsView: View {
                             .font(.inter(13)).foregroundColor(.textSecondary)
                             .padding(.top, 24)
                     }
-                    CatalogPillView(onInstall: { _, url in oauthURL = url })
+                    Button { showCatalogSheet = true } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 16))
+                                .foregroundColor(.brandCyan)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(langMgr.t("integrations.catalog.pill"))
+                                    .font(.inter(13, weight: .bold))
+                                    .foregroundColor(.textPrimary)
+                                Text(langMgr.t("integrations.catalog.browse"))
+                                    .font(.inter(11))
+                                    .foregroundColor(.textTertiary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(.textTertiary)
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .background(Color.white.opacity(0.06))
+                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
                 .padding(.horizontal, 18)
                 .padding(.bottom, 32)
