@@ -259,6 +259,7 @@ struct IntegrationsView: View {
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 12)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
