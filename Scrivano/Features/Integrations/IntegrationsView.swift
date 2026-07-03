@@ -177,8 +177,11 @@ struct IntegrationsView: View {
         VStack(spacing: 0) {
             // Selected row
             Button {
-                guard !store.installed.isEmpty else { return }
-                withAnimation(.easeInOut(duration: 0.18)) { showDropdown.toggle() }
+                if store.installed.isEmpty {
+                    showCatalogSheet = true
+                } else {
+                    withAnimation(.easeInOut(duration: 0.18)) { showDropdown.toggle() }
+                }
             } label: {
                 HStack(spacing: 10) {
                     if let sel = selected {
