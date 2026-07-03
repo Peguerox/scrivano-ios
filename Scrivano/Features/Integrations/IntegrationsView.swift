@@ -79,9 +79,14 @@ struct IntegrationsView: View {
             SafariView(url: url)
         }
         .sheet(isPresented: $showCatalogSheet) {
-            CatalogSheetView(onInstall: { url in
+            CatalogSheetView(onInstall: { integrationId, url in
                 showCatalogSheet = false
                 oauthURL = url
+                // Select the integration immediately even if OAuth not completed yet
+                if let integrationId {
+                    selectedId = integrationId
+                    activeTab = .auth
+                }
             })
         }
         .onReceive(NotificationCenter.default.publisher(for: .integrationOAuthCallback)) { note in
@@ -151,8 +156,11 @@ struct IntegrationsView: View {
         VStack(spacing: 0) {
             // Selected row
             Button {
-                guard !store.installed.isEmpty else { return }
-                withAnimation(.easeInOut(duration: 0.18)) { showDropdown.toggle() }
+                if store.installed.isEmpty {
+                    showCatalogSheet = true
+                } else {
+                    withAnimation(.easeInOut(duration: 0.18)) { showDropdown.toggle() }
+                }
             } label: {
                 HStack(spacing: 10) {
                     if let sel = selected {
@@ -187,6 +195,7 @@ struct IntegrationsView: View {
                 }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
 
@@ -323,7 +332,7 @@ struct IntegrationsView: View {
                             .font(.inter(13)).foregroundColor(.textSecondary)
                             .padding(.top, 24)
                     }
-                    CatalogPillView(onInstall: { url in oauthURL = url })
+                    CatalogPillView(onInstall: { _, url in oauthURL = url })
                 }
                 .padding(.horizontal, 18)
                 .padding(.bottom, 32)
@@ -450,7 +459,7 @@ struct AuthTabView: View {
 
                 actionButton(langMgr.t("integrations.auth.uninstall"), style: .danger, loading: isUninstalling) { showUninstallConfirm = true }
 
-                CatalogPillView(onInstall: onOAuthURL)
+                CatalogPillView(onInstall: { _, url in onOAuthURL?(url) })
                     .padding(.top, 8)
 
                 Spacer().frame(height: 24)
@@ -753,7 +762,7 @@ struct AuthTabView: View {
 // MARK: - CATALOG SHEET
 
 struct CatalogSheetView: View {
-    var onInstall: ((URL?) -> Void)? = nil
+    var onInstall: ((String?, URL?) -> Void)? = nil
     @Environment(\.dismiss) var dismiss
     @ObservedObject private var langMgr = LanguageManager.shared
 
@@ -791,7 +800,7 @@ struct CatalogSheetView: View {
 // MARK: - CATALOG PILL
 
 struct CatalogPillView: View {
-    var onInstall: ((URL?) -> Void)? = nil
+    var onInstall: ((String?, URL?) -> Void)? = nil
     var startExpanded: Bool = false
     @ObservedObject private var store = IntegrationStore.shared
     @ObservedObject private var langMgr = LanguageManager.shared
@@ -930,7 +939,7 @@ struct CatalogPillView: View {
                 do {
                     let oauthUrl = try await store.install(integrationId: config.id)
                     withAnimation { isOpen = false }
-                    onInstall?(oauthUrl)
+                    onInstall?(config.id, oauthUrl)
                 } catch {
                     installError = error.localizedDescription
                 }
