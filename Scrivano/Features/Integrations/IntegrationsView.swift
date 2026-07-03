@@ -15,6 +15,7 @@ struct IntegrationsView: View {
     @State private var showCatalogSheet = false
     @State private var activeTab: IntTab = .request
     @State private var oauthURL: URL? = nil
+    @State private var pendingOAuthIntegrationId: String? = nil
     @State private var oauthResultMessage: String? = nil
     @State private var oauthResultSuccess: Bool = true
 
@@ -75,14 +76,21 @@ struct IntegrationsView: View {
                 Task { try? await store.fetchDetail(integrationId: id) }
             }
         }
-        .sheet(item: $oauthURL) { url in
+        .sheet(item: $oauthURL, onDismiss: {
+            // Safari dismissed without deep-link callback — restore the pending integration
+            if let pendingId = pendingOAuthIntegrationId {
+                selectedId = pendingId
+                activeTab = .auth
+                pendingOAuthIntegrationId = nil
+            }
+        }) { url in
             SafariView(url: url)
         }
         .sheet(isPresented: $showCatalogSheet) {
             CatalogSheetView(onInstall: { integrationId, url in
                 showCatalogSheet = false
+                pendingOAuthIntegrationId = integrationId
                 oauthURL = url
-                // Select the integration immediately even if OAuth not completed yet
                 if let integrationId {
                     selectedId = integrationId
                     activeTab = .auth
@@ -95,7 +103,8 @@ struct IntegrationsView: View {
             let integrationId = info["integrationId"] as? String ?? ""
             let errorMsg = info["error"] as? String ?? ""
 
-            // Dismiss the Safari sheet
+            // Dismiss the Safari sheet — clear pending so onDismiss doesn't override
+            pendingOAuthIntegrationId = nil
             oauthURL = nil
 
             // Switch to the newly connected integration
@@ -156,11 +165,8 @@ struct IntegrationsView: View {
         VStack(spacing: 0) {
             // Selected row
             Button {
-                if store.installed.isEmpty {
-                    showCatalogSheet = true
-                } else {
-                    withAnimation(.easeInOut(duration: 0.18)) { showDropdown.toggle() }
-                }
+                guard !store.installed.isEmpty else { return }
+                withAnimation(.easeInOut(duration: 0.18)) { showDropdown.toggle() }
             } label: {
                 HStack(spacing: 10) {
                     if let sel = selected {
@@ -236,7 +242,6 @@ struct IntegrationsView: View {
 
                 Button {
                     withAnimation(.easeInOut(duration: 0.18)) { showDropdown = false }
-                    showCatalogSheet = true
                 } label: {
                     HStack(spacing: 10) {
                         Image(systemName: "plus.circle.fill")
