@@ -194,6 +194,21 @@ final class IntegrationStore: ObservableObject {
 
     // MARK: - Pull
 
+    // MARK: - Pull config persistence
+
+    func savePullConfig(_ config: SavedPullConfig, integrationId: String) {
+        if let data = try? JSONEncoder().encode(config) {
+            UserDefaults.standard.set(data, forKey: "pullConfig.\(integrationId)")
+        }
+    }
+
+    func loadPullConfig(integrationId: String) -> SavedPullConfig? {
+        guard let data = UserDefaults.standard.data(forKey: "pullConfig.\(integrationId)"),
+              let config = try? JSONDecoder().decode(SavedPullConfig.self, from: data)
+        else { return nil }
+        return config
+    }
+
     func pull(integrationId: String,
               entityId: String,
               listId: String?,
@@ -310,15 +325,26 @@ final class IntegrationStore: ObservableObject {
             // Collect non-fatal errors (e.g. 403 on labs in sandbox)
             if let errs = pullItem.errors { warnings.append(contentsOf: errs) }
 
-            // Save transcripts nested directly on the patient item
+            // Save transcripts — group by title so list-type content (Problem List,
+            // Medication List, etc.) becomes one transcript instead of one entry per item.
             if let transcripts = pullItem.transcripts {
+                var titleOrder: [String] = []
+                var titleMap: [String: [String]] = [:]
                 for transcript in transcripts {
                     guard let content = transcript.content, !content.isEmpty else { continue }
+                    let title = transcript.title ?? "Clinical Note"
+                    let groupKey = title.components(separatedBy: " — ").first?
+                        .trimmingCharacters(in: .whitespaces) ?? title
+                    if titleMap[groupKey] == nil { titleOrder.append(groupKey) }
+                    titleMap[groupKey, default: []].append(content)
+                }
+                for title in titleOrder {
+                    let merged = (titleMap[title] ?? []).joined(separator: "\n")
                     transcriptBatch.append(LocalTranscriptEntry(
                         id: UUID().uuidString,
                         itemId: itemId,
-                        label: transcript.title ?? "Clinical Note",
-                        text: content,
+                        label: title,
+                        text: merged,
                         durationSeconds: nil,
                         createdAt: Date()
                     ))

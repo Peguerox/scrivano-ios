@@ -27,6 +27,7 @@ struct IntegrationConfig: Codable, Identifiable, Hashable {
     let supportedNoteStatuses: [String]    // [] = final only; ["draft","final"] = both
     let maxNoteLength: Int?
     let rateLimitMs: Int?
+    let pushNoteSelection: String   // "manual" | "by_prompt"
     var installed: Bool
 
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
@@ -39,6 +40,7 @@ struct IntegrationOption: Codable, Identifiable {
     let subtitle: String
     var requiresId: Bool = false
     var idLabel: String? = nil
+    var idType: String? = nil   // "date" | "text"
     var group: String? = nil
     var defaultCount: Int? = nil
 }
@@ -176,6 +178,7 @@ struct ServerIntegrationListItem: Codable {
             supportedNoteStatuses: [],
             maxNoteLength: nil,
             rateLimitMs: nil,
+            pushNoteSelection: "manual",
             installed: installed ?? false
         )
     }
@@ -232,7 +235,7 @@ struct ServerIntegrationDetail: Codable {
             requiresBaseUrl: auth?.requiresBaseUrl ?? false,
             baseUrlLabel: auth?.baseUrlLabel,
             baseUrlDefault: auth?.baseUrlDefault,
-            pullTargets: entities.map { IntegrationOption(id: $0.id, label: $0.label, subtitle: $0.description ?? "", requiresId: $0.requiresId ?? false, idLabel: $0.idLabel) },
+            pullTargets: entities.map { IntegrationOption(id: $0.id, label: $0.label, subtitle: $0.description ?? "", requiresId: $0.requiresId ?? false, idLabel: $0.idLabel, idType: $0.idType) },
             pullContent: pullContent,
             pushTargets: [],
             identifierLabel: entities.first(where: { $0.requiresId == true })?.idLabel,
@@ -244,6 +247,7 @@ struct ServerIntegrationDetail: Codable {
             supportedNoteStatuses: capabilities?.noteStatuses ?? [],
             maxNoteLength: capabilities?.maxNoteLength,
             rateLimitMs: capabilities?.rateLimitMs,
+            pushNoteSelection: capabilities?.pushNoteSelection ?? "manual",
             installed: installed ?? false
         )
     }
@@ -274,18 +278,20 @@ struct ServerCapabilities: Codable {
     let noteStatuses: [String]?
     let maxNoteLength: Int?
     let rateLimitMs: Int?
+    let pushNoteSelection: String?
 
     enum CodingKeys: String, CodingKey {
         case entities
-        case contentTypeGroups = "content_type_groups"
-        case contentTypes      = "content_types"
-        case canPush           = "can_push"
-        case listSourceEntity  = "list_source_entity"
-        case noteTypes         = "note_types"
-        case pushFormats       = "push_formats"
-        case noteStatuses      = "note_statuses"
-        case maxNoteLength     = "max_note_length"
-        case rateLimitMs       = "rate_limit_ms"
+        case contentTypeGroups  = "content_type_groups"
+        case contentTypes       = "content_types"
+        case canPush            = "can_push"
+        case listSourceEntity   = "list_source_entity"
+        case noteTypes          = "note_types"
+        case pushFormats        = "push_formats"
+        case noteStatuses       = "note_statuses"
+        case maxNoteLength      = "max_note_length"
+        case rateLimitMs        = "rate_limit_ms"
+        case pushNoteSelection  = "push_note_selection"
     }
 }
 
@@ -316,11 +322,13 @@ struct ServerEntity: Codable {
     let description: String?
     let requiresId: Bool?
     let idLabel: String?
+    let idType: String?
 
     enum CodingKeys: String, CodingKey {
         case id, label, description
         case requiresId = "requires_id"
         case idLabel    = "id_label"
+        case idType     = "id_type"
     }
 }
 
@@ -364,6 +372,11 @@ struct InstallResponse: Codable {
 }
 
 // MARK: - Pull
+
+struct SavedPullConfig: Codable, Equatable {
+    var selectedContent: [String] = []
+    var contentCounts: [String: Int] = [:]
+}
 
 struct PullRequest: Encodable {
     let entityId: String

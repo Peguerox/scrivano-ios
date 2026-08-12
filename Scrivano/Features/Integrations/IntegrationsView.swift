@@ -1146,8 +1146,12 @@ struct RequestTabView: View {
     @State private var pushNotePerItem: [String: String] = [:]
     @State private var pushAll: Bool = false
     @State private var pushConfig: SavedPushConfig = SavedPushConfig()
+    @State private var selectedNoteTypeCodes: Set<String> = []
     @State private var pushSuccess = false
     @State private var isRequesting = false
+    @State private var selectedDate: Date = Date()
+    @State private var showDatePicker = false
+    @State private var pullPreferencesSaved = false
     @State private var pendingPullResponse: PullResponse? = nil
     @State private var pendingCollectionName: String = ""
     @State private var pendingEntityRecordId: String = ""
@@ -1164,9 +1168,43 @@ struct RequestTabView: View {
     @FocusState private var identifierFocused: Bool
 
     private var isPull: Bool { mode == .pull }
+    private var isPromptBased: Bool { integration.config.pushNoteSelection == "by_prompt" }
     private var pullTargets: [IntegrationOption] { integration.config.pullTargets }
     private var pushTargets: [IntegrationOption] { integration.config.pushTargets }
     private var pullContent: [IntegrationOption] { integration.config.pullContent }
+
+    // Maps eClinicals prompt label → (noteTypeCode, noteTypeDisplay)
+    private let promptNoteTypeMap: [String: (code: String, display: String)] = [
+        "eClinical progress":     ("11506-3", "Progress Note"),
+        "eClinical consultation": ("11488-4", "Consultation Note"),
+        "eClinical discharge":    ("18842-5", "Discharge Summary"),
+        "eClinical history":      ("34117-2", "History & Physical"),
+        "eClinical operative":    ("28570-0", "Operative Note"),
+        "eClinical radiology":    ("18748-4", "Radiology Report"),
+    ]
+
+    private func matchingNotes(for noteType: NoteTypeOption, in collectionId: String) -> [(LocalStoredItem, LocalNoteEntry)] {
+        let promptLabel = promptNoteTypeMap.first(where: { $0.value.code == noteType.id })?.key
+        guard let label = promptLabel else { return [] }
+        return LocalItemStore.shared.items.filter { $0.collectionId == collectionId }.compactMap { item -> (LocalStoredItem, LocalNoteEntry)? in
+            guard let note = LocalNoteStore.shared.notes(for: item.id)
+                .first(where: { $0.promptType.lowercased() == label.lowercased() }) else { return nil }
+            return (item, note)
+        }
+    }
+
+    private func autoSelectPromptNotes() {
+        selectedNoteTypeCodes = Set(
+            availableNoteTypes
+                .filter { !matchingNotes(for: $0, in: pushCollectionId).isEmpty }
+                .map(\.id)
+        )
+    }
+
+    private var promptNotesSummary: String {
+        let selected = availableNoteTypes.filter { selectedNoteTypeCodes.contains($0.id) }
+        return selected.isEmpty ? "Select note types to push" : selected.map(\.display).joined(separator: ", ")
+    }
     private var listSourceEntity: String? { integration.config.listSourceEntity }
 
     // Always show list picker when integration uses a list source entity
@@ -1194,7 +1232,7 @@ struct RequestTabView: View {
                 } else {
                     opts.forEach {
                         selectedContent.insert($0.id)
-                        if contentCounts[$0.id] == nil { contentCounts[$0.id] = $0.defaultCount ?? 1 }
+                        if contentCounts[$0.id] == nil { contentCounts[$0.id] = 1 }
                     }
                 }
             } label: {
@@ -1218,20 +1256,20 @@ struct RequestTabView: View {
                             selectedContent.remove(opt.id)
                         } else {
                             selectedContent.insert(opt.id)
-                            if contentCounts[opt.id] == nil { contentCounts[opt.id] = opt.defaultCount ?? 1 }
+                            if contentCounts[opt.id] == nil { contentCounts[opt.id] = 1 }
                         }
                     }
                     if selectedContent.contains(opt.id), opt.defaultCount != nil {
                         HStack(spacing: 0) {
                             Button {
-                                let v = contentCounts[opt.id] ?? opt.defaultCount ?? 1
+                                let v = contentCounts[opt.id] ?? 1
                                 if v > 1 { contentCounts[opt.id] = v - 1 }
                             } label: { Image(systemName: "minus").font(.system(size: 11, weight: .bold)).foregroundColor(.brandCyan).frame(width: 28, height: 28) }
                             .buttonStyle(.borderless)
-                            Text("\(contentCounts[opt.id] ?? opt.defaultCount ?? 1)")
+                            Text("\(contentCounts[opt.id] ?? 1)")
                                 .font(.inter(12, weight: .bold)).foregroundColor(.textPrimary).frame(minWidth: 24, alignment: .center)
                             Button {
-                                let v = contentCounts[opt.id] ?? opt.defaultCount ?? 1
+                                let v = contentCounts[opt.id] ?? 1
                                 contentCounts[opt.id] = v + 1
                             } label: { Image(systemName: "plus").font(.system(size: 11, weight: .bold)).foregroundColor(.brandCyan).frame(width: 28, height: 28) }
                             .buttonStyle(.borderless)
@@ -1372,9 +1410,12 @@ struct RequestTabView: View {
     }
 
     private var pill1Summary: String {
-        isPull
-            ? (pullTargets.first(where: { $0.id == selectedTarget })?.label ?? "Select option")
-            : (pushTargets.first(where: { $0.id == selectedPushTarget })?.label ?? "Select option")
+        if isPull {
+            let label = pullTargets.first(where: { $0.id == selectedTarget })?.label ?? "Select option"
+            if isDateIdentifier && !identifier.isEmpty { return "\(label) · \(identifier)" }
+            return label
+        }
+        return pushTargets.first(where: { $0.id == selectedPushTarget })?.label ?? "Select option"
     }
     private var pill2Summary: String {
         let checked = pullContent.filter { selectedContent.contains($0.id) }.map(\.label)
@@ -1401,6 +1442,9 @@ struct RequestTabView: View {
             // If existing collection chosen, require selection
             if destMode == .existing && selectedExistingCollectionId.isEmpty { return false }
             return true
+        }
+        if isPromptBased {
+            return !pushCollectionId.isEmpty && !selectedNoteTypeCodes.isEmpty
         }
         if pushAll {
             guard !pushCollectionId.isEmpty else { return false }
@@ -1446,7 +1490,14 @@ struct RequestTabView: View {
                                 IntRadioRow(label: opt.label, subtitle: opt.subtitle, icon: nil,
                                             selected: selectedTarget == opt.id,
                                             isLast: opt.id == pullTargets.last?.id) {
-                                    if !disabled { selectedTarget = opt.id; if !opt.requiresId { identifier = "" } }
+                                    if !disabled {
+                                        selectedTarget = opt.id
+                                        if !opt.requiresId {
+                                            identifier = ""
+                                        } else if opt.idType == "date" {
+                                            identifier = dateFmt.string(from: selectedDate)
+                                        }
+                                    }
                                 }
                                 .opacity(disabled ? 0.35 : 1)
                                 if selectedTarget == opt.id && opt.requiresId { identifierField }
@@ -1457,30 +1508,55 @@ struct RequestTabView: View {
                              isOpen: pill2Open, disabled: false) {
                             let opening = !pill2Open; pill1Open = false; pill2Open = opening; pill3Open = false; showListDropdown = false
                         } content: {
+                            Button {
+                                let config = SavedPullConfig(
+                                    selectedContent: Array(selectedContent),
+                                    contentCounts: contentCounts
+                                )
+                                IntegrationStore.shared.savePullConfig(config, integrationId: integration.id)
+                                pullPreferencesSaved = true
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                                    pullPreferencesSaved = false
+                                }
+                            } label: {
+                                HStack(spacing: 8) {
+                                    Image(systemName: pullPreferencesSaved ? "checkmark.circle.fill" : "bookmark.fill")
+                                        .font(.system(size: 13))
+                                    Text(pullPreferencesSaved ? "Saved!" : "Save as Default")
+                                        .font(.inter(13, weight: .bold))
+                                }
+                                .foregroundColor(pullPreferencesSaved ? Color(hex: "#4ade80") : .brandCyan)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            Divider().background(Color.brandCyan.opacity(0.08))
                             pullContentRows
                         }
 
                     } else {
-                        // Pill 1: Collection
+                        // Pill 1: Collection (same for both modes)
                         let selColName = LocalCollectionStore.shared.collections.first(where: { $0.id == pushCollectionId })?.name ?? langMgr.t("integrations.push.selectCollection")
                         pill(icon: "📁", title: langMgr.t("integrations.push.collection"), summary: selColName,
                              isOpen: pill1Open, disabled: false) {
                             pill1Open = !pill1Open; pill2Open = false; pill3Open = false
                         } content: { pushCollectionPicker }
 
-                        // Pill 2: Items — shown whenever a collection is selected
-                        if !pushCollectionId.isEmpty {
-                            pill(icon: "👤", title: langMgr.t("integrations.push.items"), summary: pushItemSummary,
-                                 isOpen: pill2Open, disabled: false) {
-                                pill2Open = !pill2Open; pill1Open = false; pill3Open = false
-                            } content: { pushItemPicker }
+                        pill(icon: isPromptBased ? "📝" : "👤",
+                             title: isPromptBased ? "Notes" : langMgr.t("integrations.push.items"),
+                             summary: isPromptBased ? promptNotesSummary : pushItemSummary,
+                             isOpen: pill2Open, disabled: false) {
+                            pill2Open = !pill2Open; pill1Open = false; pill3Open = false
+                        } content: {
+                            if isPromptBased { promptNotesPicker } else { pushItemPicker }
                         }
-
-                        // Pill 3: Options (note type + format + status) — always shown in push mode
-                        pill(icon: "⚙️", title: langMgr.t("integrations.push.options"), summary: pushOptionsSummary,
-                             isOpen: pill3Open, disabled: false) {
-                            pill3Open = !pill3Open; pill1Open = false; pill2Open = false
-                        } content: { pushOptionsPicker }
+                        if !isPromptBased {
+                            pill(icon: "⚙️", title: langMgr.t("integrations.push.options"), summary: pushOptionsSummary,
+                                 isOpen: pill3Open, disabled: false) {
+                                pill3Open = !pill3Open; pill1Open = false; pill2Open = false
+                            } content: { pushOptionsPicker }
+                        }
                     }
 
                     if isPull {
@@ -1542,8 +1618,7 @@ struct RequestTabView: View {
             }
             } // ScrollViewReader
 
-            if !identifierFocused {
-                VStack(spacing: 0) {
+            VStack(spacing: 0) {
                     LinearGradient(colors: [Color.phoneBg.opacity(0), Color.phoneBg], startPoint: .top, endPoint: .bottom)
                         .frame(height: 32)
                     Button { submitRequest() } label: {
@@ -1562,9 +1637,8 @@ struct RequestTabView: View {
                     .opacity(canSubmit ? 1 : 0.5)
                     .padding(.horizontal, 18)
                     .padding(.bottom, 28)
-                }
-                .background(Color.phoneBg)
             }
+            .background(Color.phoneBg)
 
             // MARK: - Centered overlays
 
@@ -1804,9 +1878,35 @@ struct RequestTabView: View {
             selectedTarget = pullTargets.first?.id ?? ""
             selectedPushTarget = pushTargets.first?.id ?? ""
             selectedContent = []
+            contentCounts = [:]
+            if let first = pullTargets.first, first.idType == "date" {
+                identifier = dateFmt.string(from: selectedDate)
+            }
             pushConfig = IntegrationStore.shared.loadPushConfig(integrationId: integration.id)
+            if let saved = IntegrationStore.shared.loadPullConfig(integrationId: integration.id) {
+                selectedContent = Set(saved.selectedContent)
+                contentCounts = saved.contentCounts
+            }
             if let entity = listSourceEntity {
                 fetchLists(entityId: entity)
+            }
+            if isPromptBased {
+                let col = pushableCollections.first
+                DispatchQueue.main.async {
+                    if pushCollectionId.isEmpty, let first = col {
+                        pushCollectionId = first.id
+                        autoSelectPromptNotes()
+                    }
+                }
+            }
+        }
+        .onChange(of: pushCollectionId) { _ in
+            if isPromptBased { autoSelectPromptNotes() }
+        }
+        .onChange(of: isPromptBased) { promptBased in
+            if promptBased && pushCollectionId.isEmpty, let first = pushableCollections.first {
+                pushCollectionId = first.id
+                autoSelectPromptNotes()
             }
         }
         .onChange(of: pushConfig) { newConfig in
@@ -1831,6 +1931,65 @@ struct RequestTabView: View {
             Button(langMgr.t("common.cancel"), role: .cancel) { pendingPullResponse = nil }
         } message: {
             Text(langMgr.t("integrations.alert.saveMsg"))
+        }
+    }
+
+    // MARK: - by_prompt note type picker
+
+    @ViewBuilder
+    private var promptNotesPicker: some View {
+        let allMatchingCodes = Set(availableNoteTypes.filter { !matchingNotes(for: $0, in: pushCollectionId).isEmpty }.map(\.id))
+        let allSelected = !allMatchingCodes.isEmpty && allMatchingCodes.isSubset(of: selectedNoteTypeCodes)
+        Button {
+            if allSelected { selectedNoteTypeCodes.subtract(allMatchingCodes) }
+            else { selectedNoteTypeCodes.formUnion(allMatchingCodes) }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "arrow.up.doc.fill").font(.system(size: 14)).foregroundColor(.brandCyan)
+                Text(langMgr.t("integrations.push.allNotes"))
+                    .font(.inter(13, weight: .semibold)).foregroundColor(.brandCyan)
+                Spacer()
+                if allSelected {
+                    Image(systemName: "checkmark.circle.fill").font(.system(size: 16)).foregroundColor(.brandCyan)
+                }
+            }
+            .padding(.horizontal, 16).padding(.vertical, 12)
+        }
+        .buttonStyle(.plain)
+        .opacity(allMatchingCodes.isEmpty ? 0.35 : 1)
+        Divider().background(Color.brandCyan.opacity(0.1))
+        ForEach(availableNoteTypes) { noteType in
+            let pairs = matchingNotes(for: noteType, in: pushCollectionId)
+            let hasMatch = !pairs.isEmpty
+            let isSelected = selectedNoteTypeCodes.contains(noteType.id)
+            Button {
+                guard hasMatch else { return }
+                if isSelected { selectedNoteTypeCodes.remove(noteType.id) }
+                else { selectedNoteTypeCodes.insert(noteType.id) }
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: isSelected ? "checkmark.square.fill" : (hasMatch ? "square" : "minus.circle"))
+                        .font(.system(size: 17))
+                        .foregroundColor(isSelected ? .brandCyan : .textTertiary)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(noteType.display)
+                            .font(.inter(13, weight: .semibold))
+                            .foregroundColor(.textPrimary)
+                        Text(hasMatch
+                             ? "\(pairs.count) note\(pairs.count == 1 ? "" : "s") · Ready to push"
+                             : "No matching note — generate this note type first")
+                            .font(.inter(11))
+                            .foregroundColor(hasMatch ? Color(hex: "#4ade80").opacity(0.8) : .textTertiary)
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 16).padding(.vertical, 13)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            if noteType.id != availableNoteTypes.last?.id {
+                Divider().background(Color.white.opacity(0.05))
+            }
         }
     }
 
@@ -1875,29 +2034,28 @@ struct RequestTabView: View {
                 .buttonStyle(.plain)
                 if col.id != pushableCollections.last?.id { Divider().background(Color.white.opacity(0.05)) }
             }
-            Divider().background(Color.brandCyan.opacity(0.1)).padding(.top, 4)
-            // Toggleable push-all
-            Button {
-                if !pushCollectionId.isEmpty { pushAll.toggle(); pushSelectedItems = []; pushNotePerItem = [:]; pill1Open = false }
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "arrow.up.doc.fill").font(.system(size: 14)).foregroundColor(.brandCyan)
-                    Text(langMgr.t("integrations.push.allNotes"))
-                        .font(.inter(13, weight: .semibold)).foregroundColor(.brandCyan)
-                    Spacer()
-                    if pushAll {
-                        Image(systemName: "checkmark.circle.fill").font(.system(size: 16)).foregroundColor(.brandCyan)
-                    }
-                }
-                .padding(.horizontal, 16).padding(.vertical, 12)
-            }
-            .buttonStyle(.plain)
-            .opacity(pushCollectionId.isEmpty ? 0.35 : 1)
         }
     }
 
     @ViewBuilder
     private var pushItemPicker: some View {
+        Button {
+            if !pushCollectionId.isEmpty { pushAll.toggle(); pushSelectedItems = []; pushNotePerItem = [:] }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "arrow.up.doc.fill").font(.system(size: 14)).foregroundColor(.brandCyan)
+                Text(langMgr.t("integrations.push.allNotes"))
+                    .font(.inter(13, weight: .semibold)).foregroundColor(.brandCyan)
+                Spacer()
+                if pushAll {
+                    Image(systemName: "checkmark.circle.fill").font(.system(size: 16)).foregroundColor(.brandCyan)
+                }
+            }
+            .padding(.horizontal, 16).padding(.vertical, 12)
+        }
+        .buttonStyle(.plain)
+        .opacity(pushCollectionId.isEmpty ? 0.35 : 1)
+        Divider().background(Color.brandCyan.opacity(0.1))
         let items = pushAll ? itemsInPushCollection.filter {
             IntegrationStore.shared.integrationMetadata(for: $0.id)?.integrationId == integration.id &&
             !LocalNoteStore.shared.notes(for: $0.id).isEmpty
@@ -2098,6 +2256,10 @@ struct RequestTabView: View {
                 Button {
                     mode = m
                     resetSelections()
+                    if m == .push, let first = pushableCollections.first {
+                        pushCollectionId = first.id
+                        if isPromptBased { autoSelectPromptNotes() }
+                    }
                 } label: {
                     Text(m.label)
                         .font(.inter(13, weight: .bold))
@@ -2162,23 +2324,57 @@ struct RequestTabView: View {
 
     // MARK: - Identifier field
 
+    private var isDateIdentifier: Bool {
+        pullTargets.first(where: { $0.id == selectedTarget })?.idType == "date"
+    }
+
+    private var dateFmt: DateFormatter {
+        let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"; return f
+    }
+
     private var identifierField: some View {
         let label = pullTargets.first(where: { $0.id == selectedTarget })?.idLabel
             ?? integration.config.identifierLabel ?? "ID"
+        let isDate = isDateIdentifier
         return VStack(alignment: .leading, spacing: 7) {
             Text(label.uppercased())
                 .font(.inter(10, weight: .heavy)).foregroundColor(Color.brandCyan.opacity(0.7)).tracking(0.8)
-            TextField("Enter \(label)…", text: $identifier)
-                .font(.inter(14, weight: .medium)).foregroundColor(.textPrimary).tint(.brandCyan)
-                .focused($identifierFocused)
-                .padding(.horizontal, 13).padding(.vertical, 10)
-                .background(Color.black.opacity(0.3))
-                .overlay(RoundedRectangle(cornerRadius: 11).stroke(Color.brandCyan.opacity(0.3), lineWidth: 1.5))
-                .clipShape(RoundedRectangle(cornerRadius: 11))
+            HStack(spacing: 0) {
+                TextField(isDate ? "MM/DD/YYYY" : "Enter \(label)…", text: $identifier)
+                    .font(.inter(14, weight: .medium)).foregroundColor(.textPrimary).tint(.brandCyan)
+                    .focused($identifierFocused)
+                    .keyboardType(isDate ? .numbersAndPunctuation : .default)
+                    .padding(.horizontal, 13).padding(.vertical, 10)
+                if isDate {
+                    Button {
+                        showDatePicker = true
+                    } label: {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.brandCyan)
+                            .frame(width: 42, height: 42)
+                            .background(Color.brandCyan.opacity(0.12))
+                    }
+                }
+            }
+            .background(Color.black.opacity(0.3))
+            .overlay(RoundedRectangle(cornerRadius: 11).stroke(Color.brandCyan.opacity(0.3), lineWidth: 1.5))
+            .clipShape(RoundedRectangle(cornerRadius: 11))
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
         .background(Color.brandBlue.opacity(0.06))
         .id("identifierField")
+        .onAppear {
+            if isDate && identifier.isEmpty {
+                identifier = dateFmt.string(from: selectedDate)
+            }
+        }
+        .sheet(isPresented: $showDatePicker) {
+            DatePickerSheet(selectedDate: $selectedDate, isPresented: $showDatePicker)
+        }
+        .onChange(of: selectedDate) { newDate in
+            if isDate { identifier = dateFmt.string(from: newDate) }
+        }
     }
 
     // MARK: - Helpers
@@ -2200,6 +2396,7 @@ struct RequestTabView: View {
         pushNotePerItem = [:]
         pushAll = false
         pushSuccess = false
+        selectedNoteTypeCodes = []
     }
 
     // Returns content types grouped, preserving server order within each group
@@ -2228,7 +2425,7 @@ struct RequestTabView: View {
                     let counts: [String: Int] = Dictionary(uniqueKeysWithValues:
                         pullContent
                             .filter { selectedContent.contains($0.id) && $0.defaultCount != nil }
-                            .map { ($0.id, contentCounts[$0.id] ?? $0.defaultCount ?? 1) }
+                            .map { ($0.id, contentCounts[$0.id] ?? 1) }
                     )
                     let response = try await IntegrationStore.shared.pull(
                         integrationId: integration.id,
@@ -2277,7 +2474,7 @@ struct RequestTabView: View {
                     let delayNs = UInt64(integration.config.rateLimitMs ?? 0) * 1_000_000
                     let maxLen = integration.config.maxNoteLength
 
-                    func pushNote(itemId: String, note: LocalNoteEntry) async throws {
+                    func pushNote(itemId: String, note: LocalNoteEntry, noteTypeCode: String? = nil, noteTypeDisplay: String? = nil) async throws {
                         if let max = maxLen, note.text.count > max {
                             throw NSError(domain: "push", code: 400, userInfo: [
                                 NSLocalizedDescriptionKey: String(format: LanguageManager.shared.t("integrations.result.noteExceedsLimit"), note.label, max, note.text.count)
@@ -2288,15 +2485,23 @@ struct RequestTabView: View {
                             itemId: itemId,
                             noteText: note.text,
                             noteTitle: note.label,
-                            noteTypeCode: pushConfig.noteTypeCode,
-                            noteTypeDisplay: pushConfig.noteTypeDisplay,
+                            noteTypeCode: noteTypeCode ?? pushConfig.noteTypeCode,
+                            noteTypeDisplay: noteTypeDisplay ?? pushConfig.noteTypeDisplay,
                             noteStatus: pushConfig.noteStatus,
                             pushFormat: pushConfig.pushFormat
                         )
                         if delayNs > 0 { try await Task.sleep(nanoseconds: delayNs) }
                     }
 
-                    if pushAll {
+                    if isPromptBased {
+                        for code in selectedNoteTypeCodes {
+                            guard let entry = promptNoteTypeMap.first(where: { $0.value.code == code }) else { continue }
+                            let pairs = matchingNotes(for: NoteTypeOption(id: code, display: entry.value.display), in: pushCollectionId)
+                            for (item, note) in pairs {
+                                try await pushNote(itemId: item.id, note: note, noteTypeCode: code, noteTypeDisplay: entry.value.display)
+                            }
+                        }
+                    } else if pushAll {
                         for item in itemsInPushCollection {
                             let notes = LocalNoteStore.shared.notes(for: item.id)
                             guard !notes.isEmpty,
@@ -2464,6 +2669,65 @@ struct LogTabView: View {
         if diff < 86400 { return String(format: langMgr.t("integrations.date.hoursAgo"), diff / 3600) }
         let f = DateFormatter(); f.dateStyle = .medium; f.timeStyle = .none
         return f.string(from: date)
+    }
+}
+
+// MARK: - Calendar date picker sheet
+
+struct DatePickerSheet: View {
+    @Binding var selectedDate: Date
+    @Binding var isPresented: Bool
+
+    var body: some View {
+        ZStack {
+            Color.phoneBg.ignoresSafeArea()
+            VStack(spacing: 0) {
+                HStack {
+                    Text("Select Date")
+                        .font(.inter(16, weight: .heavy))
+                        .foregroundColor(.textPrimary)
+                    Spacer()
+                    Button {
+                        isPresented = false
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.textTertiary)
+                            .frame(width: 32, height: 32)
+                            .background(Color.white.opacity(0.07))
+                            .clipShape(Circle())
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+                .padding(.bottom, 8)
+
+                DatePicker("", selection: $selectedDate, displayedComponents: .date)
+                    .datePickerStyle(.graphical)
+                    .labelsHidden()
+                    .tint(.brandCyan)
+                    .colorScheme(.dark)
+                    .padding(.horizontal, 12)
+
+                Button {
+                    isPresented = false
+                } label: {
+                    Text("Done")
+                        .font(.inter(15, weight: .bold))
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 15)
+                        .background(LinearGradient(colors: [Color(hex: "#1e8ae0"), Color(hex: "#0d5faa")],
+                                                   startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 20)
+            }
+        }
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
     }
 }
 
