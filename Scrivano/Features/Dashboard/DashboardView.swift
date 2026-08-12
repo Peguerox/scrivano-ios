@@ -2142,6 +2142,7 @@ private struct QueuePulsingDot: View {
                     pulse = true
                 }
             }
+            .onDisappear { pulse = false }
     }
 }
 

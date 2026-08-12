@@ -305,9 +305,10 @@ final class TranscriptionManager: ObservableObject {
                         var attempt = 0
                         var consecutiveErrors = 0
 
-                        pollLoop: while attempt < 120 {
+                        pollLoop: while attempt < 30 {
                             guard !Task.isCancelled else { break pollLoop }
-                            try? await Task.sleep(nanoseconds: 5_000_000_000)
+                            let delayNs = UInt64(min(3.0 * pow(1.5, Double(attempt)), 30.0) * 1_000_000_000)
+                            try? await Task.sleep(nanoseconds: delayNs)
                             guard !Task.isCancelled else { break pollLoop }
 
                             do {
@@ -328,7 +329,7 @@ final class TranscriptionManager: ObservableObject {
                                     transcribingError = poll.message ?? "Transcription failed."
                                     break pollLoop
                                 default:
-                                    transcribingStatus = "Transcribing \(name)… \(attempt * 5)s"
+                                    transcribingStatus = "Transcribing \(name)…"
                                 }
                             } catch APIClientError.unauthorized {
                                 appLog("  ✗ Session expired during poll", level: .error)
@@ -523,9 +524,10 @@ final class TranscriptionManager: ObservableObject {
                     var transcribedText: String? = nil
                     var attempt = 0; var consecutiveErrors = 0
 
-                    pollLoop: while attempt < 120 {
+                    pollLoop: while attempt < 30 {
                         guard !Task.isCancelled else { break pollLoop }
-                        try? await Task.sleep(nanoseconds: 5_000_000_000)
+                        let delayNs = UInt64(min(3.0 * pow(1.5, Double(attempt)), 30.0) * 1_000_000_000)
+                        try? await Task.sleep(nanoseconds: delayNs)
                         guard !Task.isCancelled else { break pollLoop }
                         do {
                             let poll = try await api.pollAudioResult(taskId: taskId)
@@ -539,7 +541,7 @@ final class TranscriptionManager: ObservableObject {
                                 appLog("[CREDITS] Charged: \(String(format: "%.4f", poll.data?.totalCost ?? 0)) | Balance: paid=\(String(format: "%.4f", poll.data?.credit ?? 0))  free=\(String(format: "%.4f", poll.data?.freeCredit ?? 0))", level: .info)
                                 break pollLoop
                             case "failed": transcribingError = poll.message ?? "Transcription failed."; break pollLoop
-                            default: transcribingStatus = "Transcribing \(name)… \(attempt * 5)s"
+                            default: transcribingStatus = "Transcribing \(name)…"
                             }
                         } catch APIClientError.unauthorized {
                             failedRecordingIds.insert(result.recordingId)
@@ -634,8 +636,9 @@ final class TranscriptionManager: ObservableObject {
                 appLog("  Resuming taskId=\(entry.taskId) → '\(entry.label)'")
                 var attempt = 0
                 var transcribedText: String? = nil
-                pollLoop: while attempt < 120 {
-                    try? await Task.sleep(nanoseconds: 5_000_000_000)
+                pollLoop: while attempt < 30 {
+                    let delayNs = UInt64(min(3.0 * pow(1.5, Double(attempt)), 30.0) * 1_000_000_000)
+                    try? await Task.sleep(nanoseconds: delayNs)
                     guard !Task.isCancelled else { break pollLoop }
                     do {
                         let poll = try await api.pollAudioResult(taskId: entry.taskId)

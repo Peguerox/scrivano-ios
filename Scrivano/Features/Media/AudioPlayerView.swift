@@ -196,7 +196,7 @@ final class AudioPlayerManager: ObservableObject {
         player?.rate = rate
         player?.play()
         isPlaying = true
-        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 0.333, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.currentTime = self?.player?.currentTime ?? 0
                 if self?.player?.isPlaying == false { self?.isPlaying = false; self?.timer?.invalidate() }

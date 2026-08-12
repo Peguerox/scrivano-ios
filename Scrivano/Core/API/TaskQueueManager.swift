@@ -146,9 +146,10 @@ final class BackgroundTaskManager {
             var attempt = 0
             var consecutiveErrors = 0
 
-            pollLoop: while attempt < 72 {  // max ~6 min (72 × 5s)
+            pollLoop: while attempt < 20 {  // max ~9 min with exponential backoff (3s→30s)
                 guard !Task.isCancelled else { break pollLoop }
-                do { try await Task.sleep(nanoseconds: 5_000_000_000) } catch { break pollLoop }
+                let delayNs = UInt64(min(3.0 * pow(1.5, Double(attempt)), 30.0) * 1_000_000_000)
+                do { try await Task.sleep(nanoseconds: delayNs) } catch { break pollLoop }
                 guard !Task.isCancelled else { break pollLoop }
 
                 do {
@@ -199,9 +200,10 @@ final class BackgroundTaskManager {
             var attempt = 0
             var consecutiveErrors = 0
 
-            pollLoop: while attempt < 72 {  // max ~6 min (72 × 5s)
+            pollLoop: while attempt < 20 {  // max ~9 min with exponential backoff (3s→30s)
                 guard !Task.isCancelled else { break pollLoop }
-                do { try await Task.sleep(nanoseconds: 5_000_000_000) } catch { break pollLoop }
+                let delayNs = UInt64(min(3.0 * pow(1.5, Double(attempt)), 30.0) * 1_000_000_000)
+                do { try await Task.sleep(nanoseconds: delayNs) } catch { break pollLoop }
                 guard !Task.isCancelled else { break pollLoop }
 
                 do {

@@ -858,6 +858,7 @@ private struct PulsingDot: View {
                     }
                 }
             }
+            .onDisappear { on = false }
     }
 }
 
@@ -1378,16 +1379,17 @@ final class AudioRecorderManager: NSObject, ObservableObject, AVAudioRecorderDel
                     self.performAutoSplit()
                     return
                 }
-                self.recorder?.updateMeters()
-                let level = self.recorder?.averagePower(forChannel: 0) ?? -60
-                // Log curve: compresses quiet noise, preserves loud peaks naturally
-                let raw = Float(max(0, min(1, (level + 60) / 60)))
-                let curved = pow(raw, 2.0)
-                // Peak-hold smoothing: rises instantly, decays slowly → no jitter
-                let smoothed = max(curved, self.smoothedLevel * 0.72)
-                self.smoothedLevel = smoothed
-                self.audioLevel = smoothed
-                EQLevelModel.shared.level = smoothed
+                // Skip meter updates in pocket mode — waveform not displayed, saves CPU
+                if !UserDefaults.standard.bool(forKey: "pocket_mode") {
+                    self.recorder?.updateMeters()
+                    let level = self.recorder?.averagePower(forChannel: 0) ?? -60
+                    let raw = Float(max(0, min(1, (level + 60) / 60)))
+                    let curved = pow(raw, 2.0)
+                    let smoothed = max(curved, self.smoothedLevel * 0.72)
+                    self.smoothedLevel = smoothed
+                    self.audioLevel = smoothed
+                    EQLevelModel.shared.level = smoothed
+                }
                 // File size — only every ~1s (every 4 ticks at 0.25s)
                 self.fileSizeTick += 1
                 if self.fileSizeTick >= 4 {
