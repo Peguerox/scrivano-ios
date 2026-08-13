@@ -885,7 +885,6 @@ final class NoteGenerationManager: ObservableObject {
         for entry in newEntries {
             resumingTaskIds.insert(entry.taskId)
             TaskQueueManager.shared.enqueue {
-                defer { await MainActor.run { self.resumingTaskIds.remove(entry.taskId) } }
                 var attempt = 0
                 pollLoop: while attempt < 20 {
                     guard !Task.isCancelled else {
@@ -939,6 +938,7 @@ final class NoteGenerationManager: ObservableObject {
                 }
                 // Timed out — remove so we don't retry forever
                 PendingNoteTaskStore.shared.remove(taskId: entry.taskId)
+                Task { @MainActor in self.resumingTaskIds.remove(entry.taskId) }
             }
         }
     }
