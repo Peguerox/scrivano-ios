@@ -92,10 +92,10 @@ struct ScrivanoApp: App {
             }
         }
         .onChange(of: taskQueue.isProcessing) { processing in
-            // Keep screen on while batch processing or recording — check both so stopping
-            // one doesn't re-enable the idle timer while the other is still active.
+            // Keep screen on only while recording — polling doesn't need the display
+            // and letting the screen lock allows the CPU to enter deep idle between polls.
             let stillRecording = AudioRecorderManager.shared.isRecording || AudioRecorderManager.shared.isPaused
-            UIApplication.shared.isIdleTimerDisabled = processing || stillRecording
+            UIApplication.shared.isIdleTimerDisabled = stillRecording
             // When processing finishes while in background, release the task token.
             if !processing && !AudioRecorderManager.shared.isRecording {
                 lifecycle.endBackgroundTask()
