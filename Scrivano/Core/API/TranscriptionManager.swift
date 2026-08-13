@@ -307,7 +307,7 @@ final class TranscriptionManager: ObservableObject {
 
                         pollLoop: while attempt < 30 {
                             guard !Task.isCancelled else { break pollLoop }
-                            let delayNs = UInt64(min(3.0 * pow(1.5, Double(attempt)), 30.0) * 1_000_000_000)
+                            let delayNs = UInt64(min(5.0 * pow(1.5, Double(attempt)), 30.0) * 1_000_000_000)
                             try? await Task.sleep(nanoseconds: delayNs)
                             guard !Task.isCancelled else { break pollLoop }
 
@@ -526,7 +526,7 @@ final class TranscriptionManager: ObservableObject {
 
                     pollLoop: while attempt < 30 {
                         guard !Task.isCancelled else { break pollLoop }
-                        let delayNs = UInt64(min(3.0 * pow(1.5, Double(attempt)), 30.0) * 1_000_000_000)
+                        let delayNs = UInt64(min(5.0 * pow(1.5, Double(attempt)), 30.0) * 1_000_000_000)
                         try? await Task.sleep(nanoseconds: delayNs)
                         guard !Task.isCancelled else { break pollLoop }
                         do {
@@ -637,7 +637,7 @@ final class TranscriptionManager: ObservableObject {
                 var attempt = 0
                 var transcribedText: String? = nil
                 pollLoop: while attempt < 30 {
-                    let delayNs = UInt64(min(3.0 * pow(1.5, Double(attempt)), 30.0) * 1_000_000_000)
+                    let delayNs = UInt64(min(5.0 * pow(1.5, Double(attempt)), 30.0) * 1_000_000_000)
                     try? await Task.sleep(nanoseconds: delayNs)
                     guard !Task.isCancelled else { break pollLoop }
                     do {
@@ -807,7 +807,7 @@ final class NoteGenerationManager: ObservableObject {
                 var attempt = 0
                 while attempt < 20 {
                     guard !Task.isCancelled else { return }
-                    let delayNs = UInt64(min(3.0 * pow(1.5, Double(attempt)), 30.0) * 1_000_000_000)
+                    let delayNs = UInt64(min(5.0 * pow(1.5, Double(attempt)), 30.0) * 1_000_000_000)
                     do { try await Task.sleep(nanoseconds: delayNs) } catch { return }
                     guard !Task.isCancelled else { return }
 
@@ -891,7 +891,7 @@ final class NoteGenerationManager: ObservableObject {
                         PendingNoteTaskStore.shared.remove(taskId: entry.taskId)
                         break pollLoop
                     }
-                    let delayNs = UInt64(min(3.0 * pow(1.5, Double(attempt)), 30.0) * 1_000_000_000)
+                    let delayNs = UInt64(min(5.0 * pow(1.5, Double(attempt)), 30.0) * 1_000_000_000)
                     do { try await Task.sleep(nanoseconds: delayNs) } catch {
                         PendingNoteTaskStore.shared.remove(taskId: entry.taskId)
                         break pollLoop
@@ -1024,7 +1024,7 @@ final class NoteGenerationManager: ObservableObject {
                     PendingNoteTaskStore.shared.remove(taskId: taskId)
                     return (false, "task was cancelled")
                 }
-                let delayNs = UInt64(min(3.0 * pow(1.5, Double(attempt)), 30.0) * 1_000_000_000)
+                let delayNs = UInt64(min(5.0 * pow(1.5, Double(attempt)), 30.0) * 1_000_000_000)
                 do { try await Task.sleep(nanoseconds: delayNs) } catch {
                     PendingNoteTaskStore.shared.remove(taskId: taskId)
                     return (false, "task was cancelled")
@@ -1224,7 +1224,7 @@ final class ImageProcessingManager: ObservableObject {
             var attempt = 0
             while attempt < 20 {
                 guard !Task.isCancelled else { return }
-                let delayNs = UInt64(min(3.0 * pow(1.5, Double(attempt)), 30.0) * 1_000_000_000)
+                let delayNs = UInt64(min(5.0 * pow(1.5, Double(attempt)), 30.0) * 1_000_000_000)
                 do { try await Task.sleep(nanoseconds: delayNs) } catch { return }
                 guard !Task.isCancelled else { return }
 
