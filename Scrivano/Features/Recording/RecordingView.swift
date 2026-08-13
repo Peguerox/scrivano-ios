@@ -126,6 +126,11 @@ struct RecordingView: View {
             VStack(spacing: 0) {
 
                 // Top bar
+                ZStack {
+                    Text("Recording")
+                        .font(.inter(16, weight: .heavy))
+                        .foregroundColor(.textPrimary)
+                        .frame(maxWidth: .infinity)
                 HStack {
                     Button {
                         if recorder.isRecording || recorder.isPaused {
@@ -143,10 +148,6 @@ struct RecordingView: View {
                             .overlay(Circle().stroke(Color.white.opacity(0.1), lineWidth: 1))
                             .clipShape(Circle())
                     }
-                    Spacer()
-                    Text("Recording")
-                        .font(.inter(16, weight: .heavy))
-                        .foregroundColor(.textPrimary)
                     Spacer()
                     HStack(spacing: 8) {
                         Button { automationPaused.toggle() } label: {
@@ -172,6 +173,7 @@ struct RecordingView: View {
                             .clipShape(Circle())
                     }
                 }
+                } // ZStack
                 .padding(.horizontal, 18)
                 .padding(.top, 14)
                 .padding(.bottom, 2)
