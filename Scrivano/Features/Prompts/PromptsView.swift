@@ -694,8 +694,11 @@ struct PromptsView: View {
                 // Poll and save
                 let api = APIClient.shared
                 var attempt = 0
-                while attempt < 60 {
-                    try? await Task.sleep(nanoseconds: 5_000_000_000)
+                while attempt < 20 {
+                    guard !Task.isCancelled else { return }
+                    let delayNs = UInt64(min(3.0 * pow(1.5, Double(attempt)), 30.0) * 1_000_000_000)
+                    do { try await Task.sleep(nanoseconds: delayNs) } catch { return }
+                    guard !Task.isCancelled else { return }
                     let result = try await api.pollNoteResult(taskId: taskId)
                     switch result.status {
                     case "completed":
@@ -839,12 +842,16 @@ struct PromptsView: View {
                 promptId: promptId, promptName: promptName, submittedAt: Date()
             ))
             var attempt = 0
-            while attempt < 60 {
+            while attempt < 20 {
                 guard !Task.isCancelled else {
                     PendingNoteTaskStore.shared.remove(taskId: taskId)
                     return (false, "task was cancelled")
                 }
-                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                let delayNs = UInt64(min(3.0 * pow(1.5, Double(attempt)), 30.0) * 1_000_000_000)
+                do { try await Task.sleep(nanoseconds: delayNs) } catch {
+                    PendingNoteTaskStore.shared.remove(taskId: taskId)
+                    return (false, "task was cancelled")
+                }
                 guard !Task.isCancelled else {
                     PendingNoteTaskStore.shared.remove(taskId: taskId)
                     return (false, "task was cancelled")
@@ -879,6 +886,9 @@ struct PromptsView: View {
                     default:
                         break
                     }
+                } catch APIClientError.unauthorized {
+                    PendingNoteTaskStore.shared.remove(taskId: taskId)
+                    return (false, "session expired")
                 } catch {
                     guard !Task.isCancelled else {
                         PendingNoteTaskStore.shared.remove(taskId: taskId)

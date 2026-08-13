@@ -67,7 +67,10 @@ final class KeychainService {
         let query: [String: Any] = [
             kSecClass as String:            kSecClassGenericPassword,
             kSecAttrAccount as String:      key,
-            kSecValueData as String:        data
+            kSecValueData as String:        data,
+            // AfterFirstUnlock allows reads from background tasks and BGProcessingTask
+            // when the device has been unlocked at least once since boot.
+            kSecAttrAccessible as String:   kSecAttrAccessibleAfterFirstUnlock
         ]
         SecItemDelete(query as CFDictionary)
         SecItemAdd(query as CFDictionary, nil)

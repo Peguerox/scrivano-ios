@@ -221,9 +221,9 @@ struct RecordingView: View {
                     .frame(maxHeight: .infinity)
 
                     // Waveform — 2/3 width, centered
-                    EQBandView(isActive: isActivelyRecording)
-                        .frame(height: 72)
-                        .padding(.horizontal, UIScreen.main.bounds.width / 6)
+                    SineWaveView(isActive: isActivelyRecording)
+                        .frame(height: 80)
+                        .padding(.horizontal, UIScreen.main.bounds.width / 8)
 
                     // Timer
                     Text(recorder.formattedTime)
@@ -923,34 +923,94 @@ struct WaveformView: View {
 }
 */
 
-// MARK: - Option C (active): EQ Band VU Meter
-// 14 static bands with independent multipliers — pro VU meter look.
-// Uses single audioLevel: Float published at 4 Hz.
-struct EQBandView: View {
+// MARK: - Sine Wave Visualizer (UIKit-backed, zero SwiftUI overhead per frame)
+struct SineWaveView: UIViewRepresentable {
     var isActive: Bool
-    @ObservedObject private var eqLevel = EQLevelModel.shared
 
-    private let bandCount = 14
-    private let spacing: CGFloat = 4.0
-    private let bandMultipliers: [Float] = [0.55, 0.70, 0.85, 1.0, 0.95, 0.88, 0.80,
-                                             0.75, 0.82, 0.90, 0.78, 0.65, 0.50, 0.40]
+    func makeUIView(context: Context) -> SineWaveUIView {
+        let v = SineWaveUIView()
+        v.isActive = isActive
+        v.startAnimation()
+        return v
+    }
 
-    var body: some View {
-        Canvas { ctx, size in
-            let level = eqLevel.level
-            let barWidth = (size.width - spacing * CGFloat(bandCount - 1)) / CGFloat(bandCount)
-            for i in 0..<bandCount {
-                let bandLevel = CGFloat(min(level * bandMultipliers[i], 1.0))
-                let h = max(4, bandLevel * size.height)
-                let x = CGFloat(i) * (barWidth + spacing)
-                let rect = CGRect(x: x, y: size.height - h, width: barWidth, height: h)
-                let path = Path(roundedRect: rect, cornerRadius: barWidth / 2)
-                let color: Color = isActive
-                    ? Color(red: 1.0, green: Double(0.85 * (1 - bandLevel)), blue: 0).opacity(0.75 + Double(bandLevel) * 0.25)
-                    : Color(hex: "#38d9f5").opacity(0.15 + Double(bandLevel) * 0.20)
-                ctx.fill(path, with: .color(color))
-            }
+    func updateUIView(_ uiView: SineWaveUIView, context: Context) {
+        uiView.isActive = isActive
+    }
+
+    static func dismantleUIView(_ uiView: SineWaveUIView, coordinator: ()) {
+        uiView.stopAnimation()
+    }
+}
+
+final class SineWaveUIView: UIView {
+    var isActive: Bool = false
+    private var displayLink: CADisplayLink?
+    private var startTime: CFTimeInterval = 0
+    private var smoothedLevel: Double = 0.08
+    private let wave1 = CAShapeLayer()
+    private let wave2 = CAShapeLayer()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .clear
+        wave1.fillColor = UIColor.clear.cgColor
+        wave2.fillColor = UIColor.clear.cgColor
+        layer.addSublayer(wave1)
+        layer.addSublayer(wave2)
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    func startAnimation() {
+        startTime = CACurrentMediaTime()
+        let dl = CADisplayLink(target: self, selector: #selector(tick))
+        dl.preferredFrameRateRange = CAFrameRateRange(minimum: 15, maximum: 30, preferred: 30)
+        dl.add(to: .main, forMode: .common)
+        displayLink = dl
+    }
+
+    func stopAnimation() {
+        displayLink?.invalidate()
+        displayLink = nil
+    }
+
+    @objc private func tick() {
+        let t           = CACurrentMediaTime() - startTime
+        let target      = Double(EQLevelModel.shared.level)
+        let alpha       = target > smoothedLevel ? 0.70 : 0.06  // rise fast, decay slow
+        smoothedLevel  += (target - smoothedLevel) * alpha
+        let level       = smoothedLevel
+        let w           = Double(bounds.width)
+        let h     = Double(bounds.height)
+        guard w > 0 else { return }
+
+        let midY  = h / 2
+        let adjusted = max(0, level - 0.04)   // low noise floor — picks up quiet sounds
+        let amp      = h * 0.95 * adjusted    // aggressive scaling — small sounds = big waves
+        let speed = isActive ? 1.8 : 0.5
+
+        wave1.path        = makePath(t: t, speed: speed, freqScale: 1.0, ampScale: 1.0,  phaseOffset: 0,        w: w, midY: midY, amp: amp)
+        wave1.strokeColor = UIColor(red: 0.22, green: 0.85, blue: 0.96, alpha: isActive ? 0.95 : 0.30).cgColor
+        wave1.lineWidth   = 2.5
+
+        wave2.path        = makePath(t: t, speed: speed, freqScale: 1.4, ampScale: 0.65, phaseOffset: .pi * 0.6, w: w, midY: midY, amp: amp)
+        wave2.strokeColor = UIColor(red: 0.10, green: 0.50, blue: 0.81, alpha: isActive ? 0.55 : 0.18).cgColor
+        wave2.lineWidth   = 1.8
+    }
+
+    private func makePath(t: Double, speed: Double, freqScale: Double, ampScale: Double,
+                          phaseOffset: Double, w: Double, midY: Double, amp: Double) -> CGPath {
+        let phase = t * speed * freqScale + phaseOffset
+        let path  = CGMutablePath()
+        var first = true
+        var xi    = 0.0
+        while xi <= w {
+            let y  = midY + amp * ampScale * sin((xi / w) * .pi * 3.5 * freqScale - phase)
+            let pt = CGPoint(x: xi, y: y)
+            if first { path.move(to: pt); first = false } else { path.addLine(to: pt) }
+            xi += 5.0
         }
+        return path
     }
 }
 
@@ -1364,8 +1424,8 @@ final class AudioRecorderManager: NSObject, ObservableObject, AVAudioRecorderDel
     private func startTimer() {
         fileSizeTick = 0
         smoothedLevel = 0.08
-        // 4 Hz — half the old rate, same visual quality, meaningfully less CPU/battery
-        timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in
+        // 12.5 Hz — fast enough for smooth amplitude tracking, still cheap (no network)
+        timer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.elapsedSeconds = Int(self.recorder?.currentTime ?? 0)
@@ -1390,9 +1450,9 @@ final class AudioRecorderManager: NSObject, ObservableObject, AVAudioRecorderDel
                     self.audioLevel = smoothed
                     EQLevelModel.shared.level = smoothed
                 }
-                // File size — only every ~1s (every 4 ticks at 0.25s)
+                // File size — only every ~1s (every 12 ticks at 0.08s)
                 self.fileSizeTick += 1
-                if self.fileSizeTick >= 4 {
+                if self.fileSizeTick >= 12 {
                     self.fileSizeTick = 0
                     let url = self.outputURL
                     Task.detached {

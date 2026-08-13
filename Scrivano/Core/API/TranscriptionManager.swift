@@ -733,6 +733,8 @@ final class NoteGenerationManager: ObservableObject {
     @Published var failedItemName: String? = nil
     @Published var failedReason: String? = nil
 
+    private var resumingTaskIds: Set<String> = []
+
     /// Call once for every item that is being added to TaskQueueManager before the tasks start.
     func markQueued(itemId: String, transcriptIds: [String]) {
         queuedItemIds.insert(itemId)
@@ -803,9 +805,10 @@ final class NoteGenerationManager: ObservableObject {
 
             pollTask = Task {
                 var attempt = 0
-                while attempt < 60 {
+                while attempt < 20 {
                     guard !Task.isCancelled else { return }
-                    do { try await Task.sleep(nanoseconds: 5_000_000_000) } catch { return }
+                    let delayNs = UInt64(min(3.0 * pow(1.5, Double(attempt)), 30.0) * 1_000_000_000)
+                    do { try await Task.sleep(nanoseconds: delayNs) } catch { return }
                     guard !Task.isCancelled else { return }
 
                     do {
@@ -832,9 +835,11 @@ final class NoteGenerationManager: ObservableObject {
                             return
                         default: break
                         }
+                    } catch APIClientError.unauthorized {
+                        state = .failed("Session expired.")
+                        return
                     } catch {
                         guard !Task.isCancelled else { return }
-                        // Network blip — keep polling
                     }
                     attempt += 1
                 }
@@ -874,16 +879,24 @@ final class NoteGenerationManager: ObservableObject {
     func resumePendingNotes() {
         let pending = PendingNoteTaskStore.shared.all()
         guard !pending.isEmpty else { return }
-        appLog("Resuming \(pending.count) pending note task(s) from store")
-        for entry in pending {
+        let newEntries = pending.filter { !resumingTaskIds.contains($0.taskId) }
+        guard !newEntries.isEmpty else { return }
+        appLog("Resuming \(newEntries.count) pending note task(s) from store")
+        for entry in newEntries {
+            resumingTaskIds.insert(entry.taskId)
             TaskQueueManager.shared.enqueue {
+                defer { await MainActor.run { self.resumingTaskIds.remove(entry.taskId) } }
                 var attempt = 0
-                pollLoop: while attempt < 60 {
+                pollLoop: while attempt < 20 {
                     guard !Task.isCancelled else {
                         PendingNoteTaskStore.shared.remove(taskId: entry.taskId)
                         break pollLoop
                     }
-                    try? await Task.sleep(nanoseconds: 5_000_000_000)
+                    let delayNs = UInt64(min(3.0 * pow(1.5, Double(attempt)), 30.0) * 1_000_000_000)
+                    do { try await Task.sleep(nanoseconds: delayNs) } catch {
+                        PendingNoteTaskStore.shared.remove(taskId: entry.taskId)
+                        break pollLoop
+                    }
                     guard !Task.isCancelled else {
                         PendingNoteTaskStore.shared.remove(taskId: entry.taskId)
                         break pollLoop
@@ -912,6 +925,10 @@ final class NoteGenerationManager: ObservableObject {
                             break pollLoop
                         default: break
                         }
+                    } catch APIClientError.unauthorized {
+                        // Auth failed — don't keep hammering a logged-out session
+                        PendingNoteTaskStore.shared.remove(taskId: entry.taskId)
+                        break pollLoop
                     } catch {
                         guard !Task.isCancelled else {
                             PendingNoteTaskStore.shared.remove(taskId: entry.taskId)
@@ -1002,12 +1019,16 @@ final class NoteGenerationManager: ObservableObject {
                 promptId: promptId, promptName: promptName, submittedAt: Date()
             ))
             var attempt = 0
-            while attempt < 60 {
+            while attempt < 20 {
                 guard !Task.isCancelled else {
                     PendingNoteTaskStore.shared.remove(taskId: taskId)
                     return (false, "task was cancelled")
                 }
-                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                let delayNs = UInt64(min(3.0 * pow(1.5, Double(attempt)), 30.0) * 1_000_000_000)
+                do { try await Task.sleep(nanoseconds: delayNs) } catch {
+                    PendingNoteTaskStore.shared.remove(taskId: taskId)
+                    return (false, "task was cancelled")
+                }
                 guard !Task.isCancelled else {
                     PendingNoteTaskStore.shared.remove(taskId: taskId)
                     return (false, "task was cancelled")
@@ -1037,6 +1058,9 @@ final class NoteGenerationManager: ObservableObject {
                         return (false, "server reported failure for prompt '\(promptName)'")
                     default: break
                     }
+                } catch APIClientError.unauthorized {
+                    PendingNoteTaskStore.shared.remove(taskId: taskId)
+                    return (false, "session expired")
                 } catch {
                     guard !Task.isCancelled else {
                         PendingNoteTaskStore.shared.remove(taskId: taskId)
@@ -1198,12 +1222,11 @@ final class ImageProcessingManager: ObservableObject {
 
             // ── 5. Poll for result ────────────────────────────────────────────
             var attempt = 0
-            while attempt < 60 {
+            while attempt < 20 {
                 guard !Task.isCancelled else { return }
-                do { try await Task.sleep(nanoseconds: 5_000_000_000) } catch { return }
+                let delayNs = UInt64(min(3.0 * pow(1.5, Double(attempt)), 30.0) * 1_000_000_000)
+                do { try await Task.sleep(nanoseconds: delayNs) } catch { return }
                 guard !Task.isCancelled else { return }
-                processingStatus = "Processing image… \(attempt * 5)s"
-                TranscriptionManager.shared.transcribingStatus = processingStatus
 
                 do {
                     let result = try await api.pollImageResult(taskId: taskId)
@@ -1246,6 +1269,8 @@ final class ImageProcessingManager: ObservableObject {
                         fail(imageId: imageId, error: result.error ?? "Image processing failed."); return
                     default: break
                     }
+                } catch APIClientError.unauthorized {
+                    fail(imageId: imageId, error: "Session expired."); return
                 } catch {
                     appLog("[IMG] Poll error attempt \(attempt + 1): \(error)", level: .warning)
                     guard !Task.isCancelled else { return }
