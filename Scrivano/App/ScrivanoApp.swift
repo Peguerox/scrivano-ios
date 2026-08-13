@@ -92,10 +92,11 @@ struct ScrivanoApp: App {
             }
         }
         .onChange(of: taskQueue.isProcessing) { processing in
-            // Keep screen on only while recording — polling doesn't need the display
-            // and letting the screen lock allows the CPU to enter deep idle between polls.
+            // Keep screen on while processing or recording — if the screen locks during
+            // a transcription/note poll, the app gets ~30s background time then suspends,
+            // which is not enough for a multi-minute poll chain.
             let stillRecording = AudioRecorderManager.shared.isRecording || AudioRecorderManager.shared.isPaused
-            UIApplication.shared.isIdleTimerDisabled = stillRecording
+            UIApplication.shared.isIdleTimerDisabled = processing || stillRecording
             // When processing finishes while in background, release the task token.
             if !processing && !AudioRecorderManager.shared.isRecording {
                 lifecycle.endBackgroundTask()
