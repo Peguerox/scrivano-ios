@@ -125,6 +125,7 @@ struct AutomationView: View {
     @AppStorage("auto_upload")                  private var autoUpload = false
     @AppStorage("auto_note_prompts_encoded")    private var autoNotePromptsEncoded: String = ""
     @AppStorage("showAutomationIcon")           private var showAutomationIcon = false
+    @AppStorage("automation_paused")            private var automationPaused = false
 
     @State private var expandedStage: Int? = nil
     @State private var showPromptPicker = false
@@ -154,12 +155,30 @@ struct AutomationView: View {
 
                         // Pipeline preview
                         VStack(spacing: 12) {
-                            Text(langMgr.t("automation.diagramLabel"))
-                                .font(.inter(10, weight: .heavy))
-                                .tracking(0.7)
-                                .foregroundColor(.textTertiary)
-                                .textCase(.uppercase)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                            HStack {
+                                Text(langMgr.t("automation.diagramLabel"))
+                                    .font(.inter(10, weight: .heavy))
+                                    .tracking(0.7)
+                                    .foregroundColor(.textTertiary)
+                                    .textCase(.uppercase)
+                                Spacer()
+                                Button { automationPaused.toggle() } label: {
+                                    HStack(spacing: 5) {
+                                        Circle()
+                                            .fill(automationPaused ? Color.white.opacity(0.25) : Color.brandCyan)
+                                            .frame(width: 6, height: 6)
+                                        Text(automationPaused ? "PAUSED" : "ACTIVE")
+                                            .font(.inter(9, weight: .heavy))
+                                            .tracking(0.5)
+                                            .foregroundColor(automationPaused ? .textQuaternary : .brandCyan)
+                                    }
+                                    .padding(.horizontal, 9)
+                                    .padding(.vertical, 5)
+                                    .background(automationPaused ? Color.white.opacity(0.05) : Color.brandCyan.opacity(0.12))
+                                    .overlay(Capsule().stroke(automationPaused ? Color.white.opacity(0.08) : Color.brandCyan.opacity(0.25), lineWidth: 1))
+                                    .clipShape(Capsule())
+                                }
+                            }
 
                             HStack(spacing: 0) {
                                 ForEach([

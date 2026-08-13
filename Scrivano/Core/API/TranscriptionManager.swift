@@ -97,7 +97,8 @@ final class TranscriptionManager: ObservableObject {
 
     // MARK: - Auto-trigger (fires when a recording is saved, if automation is enabled)
     func autoTriggerIfEnabled(entry: LocalRecordingEntry, item: Item) {
-        guard UserDefaults.standard.bool(forKey: "auto_transcription") else { return }
+        guard UserDefaults.standard.bool(forKey: "auto_transcription"),
+              !UserDefaults.standard.bool(forKey: "automation_paused") else { return }
 
         TaskQueueManager.shared.enqueue { [weak self] in
             guard let self, !Task.isCancelled else { return }
@@ -402,7 +403,8 @@ final class TranscriptionManager: ObservableObject {
             // Post-loop auto-note check: fires after ALL recordings in this job are tracked.
             // Moved here from inside the loop to avoid the `break` anti-pattern and to correctly
             // handle the case where the last recording fails (no transcript saved → check was skipped).
-            if !Task.isCancelled && UserDefaults.standard.bool(forKey: "auto_note") {
+            if !Task.isCancelled && UserDefaults.standard.bool(forKey: "auto_note")
+                && !UserDefaults.standard.bool(forKey: "automation_paused") {
                 let allRecs = LocalRecordingStore.shared.recordings(for: item.id)
                 let allDone = !allRecs.isEmpty && allRecs.allSatisfy { rec in
                     !queuedRecordingIds.contains(rec.id) &&
@@ -601,7 +603,8 @@ final class TranscriptionManager: ObservableObject {
 
         // Post-loop auto-note check: same logic as runTranscribeJob — moved outside the loop
         // to avoid `break` skipping transcribedRecordingIds.insert and to handle failed-last-recording.
-        if !Task.isCancelled && UserDefaults.standard.bool(forKey: "auto_note") {
+        if !Task.isCancelled && UserDefaults.standard.bool(forKey: "auto_note")
+            && !UserDefaults.standard.bool(forKey: "automation_paused") {
             let allRecs = LocalRecordingStore.shared.recordings(for: item.id)
             let allDone = !allRecs.isEmpty && allRecs.allSatisfy { rec in
                 !queuedRecordingIds.contains(rec.id) &&

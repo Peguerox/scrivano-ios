@@ -160,7 +160,7 @@ struct DashboardView: View {
                 .fullScreenCover(isPresented: $showProcessItemsPrompts, onDismiss: {
                     showProcessItemsMode = false
                     processItemsSelected.removeAll()
-                    if autoUpload {
+                    if autoUpload && !UserDefaults.standard.bool(forKey: "automation_paused") {
                         if taskQueue.isProcessing || taskQueue.pendingCount > 0 {
                             pendingAutoSubmit = true
                         } else {
@@ -218,7 +218,7 @@ struct DashboardView: View {
             .onChange(of: recorder.lastSavedItemId) { _ in vm.refreshLocalCounts() }
             .onChange(of: notesMgr.completedItemIds) { _ in
                 vm.refreshFromLocalStores()
-                if autoUpload {
+                if autoUpload && !UserDefaults.standard.bool(forKey: "automation_paused") {
                     if taskQueue.isProcessing || taskQueue.pendingCount > 0 {
                         pendingAutoSubmit = true
                     } else {

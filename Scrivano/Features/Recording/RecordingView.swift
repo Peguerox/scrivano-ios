@@ -17,9 +17,10 @@ struct RecordingView: View {
 
     @Environment(\.dismiss) var dismiss
     @ObservedObject private var recorder = AudioRecorderManager.shared
-    @AppStorage("splittingInterval") private var splitInterval: Int = 300
-    @AppStorage("recorderFormat")    private var formatSetting: Int = 1
-    @AppStorage("pocket_mode")       private var pocketMode: Bool = false
+    @AppStorage("splittingInterval")  private var splitInterval: Int = 300
+    @AppStorage("recorderFormat")     private var formatSetting: Int = 1
+    @AppStorage("pocket_mode")        private var pocketMode: Bool = false
+    @AppStorage("automation_paused")  private var automationPaused: Bool = false
 
     @State private var displayName: String
     @State private var showRenameSheet  = false
@@ -147,11 +148,29 @@ struct RecordingView: View {
                         .font(.inter(16, weight: .heavy))
                         .foregroundColor(.textPrimary)
                     Spacer()
-                    AirPlayButton()
-                        .frame(width: 36, height: 36)
-                        .background(Color.white.opacity(0.07))
-                        .overlay(Circle().stroke(Color.white.opacity(0.1), lineWidth: 1))
-                        .clipShape(Circle())
+                    HStack(spacing: 8) {
+                        Button { automationPaused.toggle() } label: {
+                            HStack(spacing: 4) {
+                                Circle()
+                                    .fill(automationPaused ? Color.white.opacity(0.25) : Color.brandCyan)
+                                    .frame(width: 5, height: 5)
+                                Text(automationPaused ? "AUTO OFF" : "AUTO")
+                                    .font(.inter(9, weight: .heavy))
+                                    .tracking(0.3)
+                                    .foregroundColor(automationPaused ? .textQuaternary : .brandCyan)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
+                            .background(automationPaused ? Color.white.opacity(0.05) : Color.brandCyan.opacity(0.12))
+                            .overlay(Capsule().stroke(automationPaused ? Color.white.opacity(0.08) : Color.brandCyan.opacity(0.25), lineWidth: 1))
+                            .clipShape(Capsule())
+                        }
+                        AirPlayButton()
+                            .frame(width: 36, height: 36)
+                            .background(Color.white.opacity(0.07))
+                            .overlay(Circle().stroke(Color.white.opacity(0.1), lineWidth: 1))
+                            .clipShape(Circle())
+                    }
                 }
                 .padding(.horizontal, 18)
                 .padding(.top, 14)

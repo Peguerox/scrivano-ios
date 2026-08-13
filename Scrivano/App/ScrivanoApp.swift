@@ -45,6 +45,7 @@ struct ScrivanoApp: App {
             "recorderBitDepth":    0,     // 16 bit
             "splittingInterval":   300,   // 5 min
             "auto_transcription":  true,
+            "automation_paused":   false,
             "auto_conversion":     true,
             "compression_speed":   0,     // Normal
             "compression_mono":    false,
