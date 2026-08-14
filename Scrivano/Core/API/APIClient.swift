@@ -64,6 +64,9 @@ final class APIClient {
             if let rebuild = rebuildOn401 {
                 appLog("  401 — auto-refreshing token", level: .warning)
                 do { try await refreshToken() } catch {
+                    // Network errors mean refresh may succeed when connectivity returns —
+                    // propagate as-is so poll loops treat it as a transient blip, not a logout.
+                    if let apiErr = error as? APIClientError, case .networkError = apiErr { throw apiErr }
                     // Surface the server's actual error message from the 401 body if present
                     if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                        let message = json["message"] as? String {
@@ -218,6 +221,15 @@ final class APIClient {
                     try await SocialAuthManager.shared.silentGoogleReauth()
                     appLog("  refreshToken: silent Google reauth succeeded", level: .success)
                     return
+                } catch let urlErr as URLError
+                        where urlErr.code == .networkConnectionLost
+                           || urlErr.code == .notConnectedToInternet
+                           || urlErr.code == .timedOut
+                           || urlErr.code == .cannotConnectToHost {
+                    // Network was unavailable — don't force logout. The session may recover
+                    // when connectivity returns; the next API call will retry the full refresh.
+                    appLog("  refreshToken: silent Google reauth failed (network unavailable) — not logging out", level: .warning)
+                    throw APIClientError.networkError(urlErr)
                 } catch {
                     appLog("  refreshToken: silent Google reauth failed — \(error.localizedDescription)", level: .error)
                 }
