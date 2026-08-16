@@ -891,12 +891,15 @@ struct MediaListView: View {
                                 }
                                 Button {
                                     withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showPreparation = false }
-                                    // Queue mode: start the pre-built queue. Single mode: transcribe directly.
                                     if !mediaQueue.isEmpty {
-                                        processQueueNext()
-                                    } else {
-                                        startTranscription()
+                                        // Pass all queued files to a single job so the for-loop in
+                                        // runTranscribeJob chains them — no onChange advancement needed.
+                                        preparationResults = queuePreparationResults
+                                        queuedIds.removeAll()
+                                        mediaQueue.removeAll()
+                                        activeQueueItem = nil
                                     }
+                                    startTranscription()
                                 } label: {
                                     Text(langMgr.t("dashboard.record.continue"))
                                         .font(.inter(14, weight: .bold))
