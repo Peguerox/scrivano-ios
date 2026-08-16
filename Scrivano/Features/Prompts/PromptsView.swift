@@ -696,7 +696,9 @@ struct PromptsView: View {
                 var attempt = 0
                 while attempt < 20 {
                     guard !Task.isCancelled else { return }
-                    let delayNs = UInt64(min(5.0 * pow(1.5, Double(attempt)), 30.0) * 1_000_000_000)
+                    let isRec = AudioRecorderManager.shared.isRecording || AudioRecorderManager.shared.isPaused
+                    let delaySecs = isRec ? 60.0 : min(5.0 * pow(1.5, Double(attempt)), 30.0)
+                    let delayNs = UInt64(delaySecs * 1_000_000_000)
                     do { try await Task.sleep(nanoseconds: delayNs) } catch { return }
                     guard !Task.isCancelled else { return }
                     let result = try await api.pollNoteResult(taskId: taskId)
@@ -847,7 +849,9 @@ struct PromptsView: View {
                     PendingNoteTaskStore.shared.remove(taskId: taskId)
                     return (false, "task was cancelled")
                 }
-                let delayNs = UInt64(min(5.0 * pow(1.5, Double(attempt)), 30.0) * 1_000_000_000)
+                let isRec = AudioRecorderManager.shared.isRecording || AudioRecorderManager.shared.isPaused
+                let delaySecs = isRec ? 60.0 : min(5.0 * pow(1.5, Double(attempt)), 30.0)
+                let delayNs = UInt64(delaySecs * 1_000_000_000)
                 do { try await Task.sleep(nanoseconds: delayNs) } catch {
                     PendingNoteTaskStore.shared.remove(taskId: taskId)
                     return (false, "task was cancelled")
