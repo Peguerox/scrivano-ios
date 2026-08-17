@@ -605,6 +605,7 @@ struct RecordingView: View {
             }
         }
         .animation(.easeInOut(duration: 0.25), value: pocketMode)
+        .onChange(of: pocketMode) { _ in recorder.adaptTimerToPocketMode() }
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showDeleteCard)
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: showRedoCard)
         .toolbar(.hidden, for: .navigationBar)
@@ -1443,10 +1444,14 @@ final class AudioRecorderManager: NSObject, ObservableObject, AVAudioRecorderDel
     var recordedFileURL: URL? { outputURL }
 
     private func startTimer() {
+        timer?.invalidate()
         fileSizeTick = 0
         smoothedLevel = 0.08
-        // 12.5 Hz — fast enough for smooth amplitude tracking, still cheap (no network)
-        timer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
+        let isPocket = UserDefaults.standard.bool(forKey: "pocket_mode")
+        // Pocket mode: 1 Hz — only elapsed time + auto-split needed; CPU sleeps 990 ms/s between fires
+        // Normal mode: 12.5 Hz — smooth amplitude tracking for waveform animation
+        let interval: TimeInterval = isPocket ? 1.0 : 0.08
+        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.elapsedSeconds = Int(self.recorder?.currentTime ?? 0)
@@ -1460,7 +1465,7 @@ final class AudioRecorderManager: NSObject, ObservableObject, AVAudioRecorderDel
                     self.performAutoSplit()
                     return
                 }
-                // Skip meter updates in pocket mode — waveform not displayed, saves CPU
+                // Skip meter updates and file size in pocket mode — not displayed, saves CPU
                 if !UserDefaults.standard.bool(forKey: "pocket_mode") {
                     self.recorder?.updateMeters()
                     let level = self.recorder?.averagePower(forChannel: 0) ?? -60
@@ -1470,22 +1475,28 @@ final class AudioRecorderManager: NSObject, ObservableObject, AVAudioRecorderDel
                     self.smoothedLevel = smoothed
                     self.audioLevel = smoothed
                     EQLevelModel.shared.level = smoothed
-                }
-                // File size — only every ~1s (every 12 ticks at 0.08s)
-                self.fileSizeTick += 1
-                if self.fileSizeTick >= 12 {
-                    self.fileSizeTick = 0
-                    let url = self.outputURL
-                    Task.detached {
-                        guard let url else { return }
-                        if let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
-                           let size = attrs[.size] as? Int64 {
-                            await MainActor.run { [weak self] in self?.fileSize = size }
+                    // File size — only every ~1s (every 12 ticks at 0.08s)
+                    self.fileSizeTick += 1
+                    if self.fileSizeTick >= 12 {
+                        self.fileSizeTick = 0
+                        let url = self.outputURL
+                        Task.detached {
+                            guard let url else { return }
+                            if let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+                               let size = attrs[.size] as? Int64 {
+                                await MainActor.run { [weak self] in self?.fileSize = size }
+                            }
                         }
                     }
                 }
             }
         }
+    }
+
+    /// Restart the timer at the right frequency when pocket mode toggles during an active recording.
+    func adaptTimerToPocketMode() {
+        guard isRecording && !isPaused else { return }
+        startTimer()
     }
 }
 
