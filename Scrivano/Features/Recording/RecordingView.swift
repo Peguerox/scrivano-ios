@@ -869,18 +869,22 @@ struct RenameRecordingSheet: View {
 // MARK: - Pulsing dot (pocket mode timer indicator)
 private struct PulsingDot: View {
     @State private var on = false
+    @State private var pulseTask: Task<Void, Never>? = nil
     var body: some View {
         Circle()
             .fill(Color.white.opacity(on ? 0.75 : 0.20))
             .frame(width: 6, height: 6)
+            .animation(.easeInOut(duration: 0.4), value: on)
             .onAppear {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                    withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
-                        on = true
+                pulseTask = Task {
+                    while !Task.isCancelled {
+                        try? await Task.sleep(nanoseconds: 1_200_000_000)
+                        guard !Task.isCancelled else { return }
+                        await MainActor.run { on.toggle() }
                     }
                 }
             }
-            .onDisappear { on = false }
+            .onDisappear { pulseTask?.cancel(); on = false }
     }
 }
 
