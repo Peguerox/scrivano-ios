@@ -287,8 +287,17 @@ final class TranscriptionManager: ObservableObject {
 
                         appLog("  ← success=\(triggerRes.success) taskId=\(triggerRes.taskId ?? "nil")")
                         guard let taskId = triggerRes.taskId else {
-                            appLog("  ✗ No taskId: \(triggerRes.message ?? "")", level: .error)
-                            transcribingError = triggerRes.message ?? "Failed to start transcription."
+                            let msg = triggerRes.message ?? "Failed to start transcription."
+                            appLog("  ✗ No taskId: \(msg)", level: .error)
+                            let isAuthFailure = msg.lowercased().contains("invalid") || msg.lowercased().contains("expired") || msg.lowercased().contains("token")
+                            if isAuthFailure {
+                                failedRecordingIds.insert(result.recordingId)
+                                transcribingRecordingId = nil; transcribingStatus = ""; transcribingItemName = nil
+                                transcribingError = "Session expired. Please log out and log back in."
+                                if !AudioRecorderManager.shared.isRecording { AuthManager.shared.logout() }
+                                return
+                            }
+                            transcribingError = msg
                             try? await Task.sleep(nanoseconds: 2_000_000_000)
                             transcribingError = nil; continue
                         }
@@ -516,7 +525,17 @@ final class TranscriptionManager: ObservableObject {
                     guard !Task.isCancelled, let triggerRes = uploadResult else { continue }
 
                     guard let taskId = triggerRes.taskId else {
-                        transcribingError = triggerRes.message ?? "Failed to start transcription."
+                        let msg = triggerRes.message ?? "Failed to start transcription."
+                        appLog("  ✗ No taskId: \(msg)", level: .error)
+                        let isAuthFailure = msg.lowercased().contains("invalid") || msg.lowercased().contains("expired") || msg.lowercased().contains("token")
+                        if isAuthFailure {
+                            failedRecordingIds.insert(result.recordingId)
+                            transcribingRecordingId = nil; transcribingStatus = ""; transcribingItemName = nil
+                            transcribingError = "Session expired. Please log out and log back in."
+                            if !AudioRecorderManager.shared.isRecording { AuthManager.shared.logout() }
+                            return
+                        }
+                        transcribingError = msg
                         try? await Task.sleep(nanoseconds: 2_000_000_000)
                         transcribingError = nil; continue
                     }
