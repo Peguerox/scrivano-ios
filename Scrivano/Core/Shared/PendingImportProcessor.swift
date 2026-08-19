@@ -9,16 +9,24 @@ final class PendingImportProcessor {
 
     func process() {
         guard !isProcessing else { return }
-        guard let container = AppGroup.containerURL else { return }
-        let pendingDir  = container.appendingPathComponent("pending_imports")
-        let manifestURL = pendingDir.appendingPathComponent("manifest.json")
-        guard let data = try? Data(contentsOf: manifestURL),
-              let entries = try? JSONDecoder().decode([PendingImport].self, from: data),
-              !entries.isEmpty else { return }
-
         isProcessing = true
         Task {
             defer { isProcessing = false }
+            // Resolve the App Group container and read the manifest on a background thread.
+            // FileManager.containerURL(forSecurityApplicationGroupIdentifier:) can block for
+            // up to ~2 seconds on first call after the app returns from background — running it
+            // on the main actor would freeze the scroll list.
+            let parseResult = await Task.detached(priority: .background) { () -> (URL, [PendingImport])? in
+                guard let container = AppGroup.containerURL else { return nil }
+                let manifestURL = container.appendingPathComponent("pending_imports/manifest.json")
+                guard let data = try? Data(contentsOf: manifestURL),
+                      let entries = try? JSONDecoder().decode([PendingImport].self, from: data),
+                      !entries.isEmpty else { return nil }
+                return (container, entries)
+            }.value
+            guard let (container, entries) = parseResult else { return }
+
+            let manifestURL = container.appendingPathComponent("pending_imports/manifest.json")
             var remaining = entries
             for entry in entries {
                 let fileURL = container.appendingPathComponent(entry.fileRelativePath)

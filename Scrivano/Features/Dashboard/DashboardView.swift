@@ -2108,13 +2108,17 @@ final class DashboardViewModel: ObservableObject {
 
     /// Reloads all local counts from the store (called on load and after any change).
     func refreshLocalCounts() {
+        var newAudio: [String: Int] = [:]
+        var newText: [String: Int] = [:]
+        var newNotes: [String: Int] = [:]
         for item in items {
-            let audio = LocalRecordingStore.shared.count(for: item.id)
-            let images = LocalImageStore.shared.count(for: item.id)
-            localAudioCounts[item.id] = audio + images
-            localTextCounts[item.id] = LocalTranscriptStore.shared.count(for: item.id)
-            localNoteCounts[item.id] = LocalNoteStore.shared.count(for: item.id)
+            newAudio[item.id] = LocalRecordingStore.shared.count(for: item.id) + LocalImageStore.shared.count(for: item.id)
+            newText[item.id]  = LocalTranscriptStore.shared.count(for: item.id)
+            newNotes[item.id] = LocalNoteStore.shared.count(for: item.id)
         }
+        localAudioCounts = newAudio
+        localTextCounts  = newText
+        localNoteCounts  = newNotes
     }
 
     func createCollection() {}
@@ -2132,17 +2136,23 @@ final class DashboardViewModel: ObservableObject {
 
 private struct QueuePulsingDot: View {
     @State private var pulse = false
+    @State private var pulseTask: Task<Void, Never>? = nil
     var body: some View {
         Circle()
             .fill(Color.brandCyan)
             .frame(width: 6, height: 6)
             .opacity(pulse ? 1.0 : 0.3)
+            .animation(.easeInOut(duration: 0.6), value: pulse)
             .onAppear {
-                withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) {
-                    pulse = true
+                pulseTask = Task {
+                    while !Task.isCancelled {
+                        try? await Task.sleep(nanoseconds: 2_500_000_000)
+                        guard !Task.isCancelled else { return }
+                        await MainActor.run { pulse.toggle() }
+                    }
                 }
             }
-            .onDisappear { pulse = false }
+            .onDisappear { pulseTask?.cancel(); pulse = false }
     }
 }
 
