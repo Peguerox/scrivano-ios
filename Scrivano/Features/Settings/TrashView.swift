@@ -6,6 +6,7 @@ struct TrashView: View {
     @State private var entries: [TrashEntry] = []
     @State private var showEmptyConfirm = false
     @State private var restoredId: String? = nil
+    @State private var searchText = ""
 
     // Resolution flow
     @State private var resolution: Resolution? = nil
@@ -26,10 +27,19 @@ struct TrashView: View {
         )
     }
 
+    private var filteredEntries: [TrashEntry] {
+        let q = searchText.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !q.isEmpty else { return entries }
+        return entries.filter {
+            $0.name.lowercased().contains(q) ||
+            ($0.parentName?.lowercased().contains(q) ?? false)
+        }
+    }
+
     private var grouped: [(TrashKind, [TrashEntry])] {
         let order: [TrashKind] = [.collection, .item, .transcript, .note, .recording]
         return order.compactMap { kind in
-            let group = entries.filter { $0.kind == kind }.sorted { $0.deletedAt > $1.deletedAt }
+            let group = filteredEntries.filter { $0.kind == kind }.sorted { $0.deletedAt > $1.deletedAt }
             return group.isEmpty ? nil : (kind, group)
         }
     }
@@ -47,8 +57,46 @@ struct TrashView: View {
                     onTrailing: entries.isEmpty ? nil : { showEmptyConfirm = true }
                 )
 
+                if !entries.isEmpty {
+                    HStack(spacing: 10) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.textQuaternary)
+                        TextField("Search trash…", text: $searchText)
+                            .font(.inter(14))
+                            .foregroundColor(.textPrimary)
+                            .tint(.brandCyan)
+                        if !searchText.isEmpty {
+                            Button { searchText = "" } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 13))
+                                    .foregroundColor(.textQuaternary)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(Color.white.opacity(0.05))
+                    .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.white.opacity(0.08), lineWidth: 1))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(.horizontal, 14)
+                    .padding(.top, 10)
+                    .padding(.bottom, 4)
+                }
+
                 if entries.isEmpty {
                     emptyState
+                } else if filteredEntries.isEmpty {
+                    VStack(spacing: 12) {
+                        Spacer()
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 30, weight: .light))
+                            .foregroundColor(.textQuaternary)
+                        Text("No results for \"\(searchText)\"")
+                            .font(.inter(15, weight: .semibold))
+                            .foregroundColor(.textSecondary)
+                        Spacer()
+                    }
                 } else {
                     ScrollView(showsIndicators: false) {
                         VStack(spacing: 0) {
@@ -133,10 +181,12 @@ struct TrashView: View {
                     // Option 1: restore collection too (if it's in trash)
                     if let trashedCol = trashedCollection {
                         Button {
-                            TrashStore.shared.restore(trashedCol)   // restore collection first
+                            TrashStore.shared.restore(trashedCol)
                             let col = try? JSONDecoder().decode(ScrivanoCollection.self, from: trashedCol.payload)
                             TrashStore.shared.restoreItem(entry, toCollectionId: col?.id, collectionName: col?.name)
                             if let item = decode(LocalStoredItem.self, from: entry.payload) { restoreDependents(of: item) }
+                            // Cascade: restore all other items in the collection that are also in trash
+                            if let col { restoreCollectionDependents(collectionId: col.id) }
                             finishRestore(entry)
                         } label: {
                             HStack(spacing: 8) {
@@ -365,7 +415,7 @@ struct TrashView: View {
                 .tracking(0.7)
                 .textCase(.uppercase)
             Spacer()
-            Text("\(entries.filter { $0.kind == kind }.count)")
+            Text("\(filteredEntries.filter { $0.kind == kind }.count)")
                 .font(.inter(10, weight: .heavy))
                 .foregroundColor(.textQuaternary)
         }
@@ -557,9 +607,26 @@ struct TrashView: View {
         if entry.kind == .item, let item = decode(LocalStoredItem.self, from: entry.payload) {
             restoreDependents(of: item)
         }
+        if entry.kind == .collection, let col = decode(ScrivanoCollection.self, from: entry.payload) {
+            restoreCollectionDependents(collectionId: col.id)
+        }
         restoredId = entry.id
         reload()
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { restoredId = nil }
+    }
+
+    /// Restores all trashed items belonging to `collectionId`, and for each item restores its dependents.
+    private func restoreCollectionDependents(collectionId: String) {
+        let itemEntries = TrashStore.shared.entries.filter { dep in
+            dep.kind == .item &&
+            (decode(LocalStoredItem.self, from: dep.payload)?.collectionId == collectionId) == true
+        }
+        for itemEntry in itemEntries {
+            TrashStore.shared.restore(itemEntry)
+            if let item = decode(LocalStoredItem.self, from: itemEntry.payload) {
+                restoreDependents(of: item)
+            }
+        }
     }
 
     private func finishRestore(_ entry: TrashEntry) {

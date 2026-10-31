@@ -965,13 +965,60 @@ final class TrashStore {
     // MARK: - Permanent delete
 
     func permanentlyDelete(_ id: String) {
-        if let entry = entries.first(where: { $0.id == id }),
-           entry.kind == .recording,
-           let rec = try? JSONDecoder().decode(LocalRecordingEntry.self, from: entry.payload) {
-            LocalRecordingStore.shared.deleteFile(at: rec.fileURL)
+        guard let entry = entries.first(where: { $0.id == id }) else { return }
+
+        switch entry.kind {
+        case .recording:
+            if let rec = try? JSONDecoder().decode(LocalRecordingEntry.self, from: entry.payload) {
+                LocalRecordingStore.shared.deleteFile(at: rec.fileURL)
+            }
+        case .item:
+            if let item = try? JSONDecoder().decode(LocalStoredItem.self, from: entry.payload) {
+                purgeItemDependents(itemId: item.id)
+            }
+        case .collection:
+            if let col = try? JSONDecoder().decode(ScrivanoCollection.self, from: entry.payload) {
+                let itemEntries = entries.filter {
+                    $0.kind == .item &&
+                    (try? JSONDecoder().decode(LocalStoredItem.self, from: $0.payload))?.collectionId == col.id
+                }
+                for ie in itemEntries {
+                    if let item = try? JSONDecoder().decode(LocalStoredItem.self, from: ie.payload) {
+                        purgeItemDependents(itemId: item.id)
+                    }
+                }
+                let itemIds = Set(itemEntries.map { $0.id })
+                entries.removeAll { itemIds.contains($0.id) }
+            }
+        default: break
         }
+
         entries.removeAll { $0.id == id }
         persist()
+    }
+
+    private func purgeItemDependents(itemId: String) {
+        var toDelete: Set<String> = []
+        for dep in entries {
+            switch dep.kind {
+            case .transcript:
+                if (try? JSONDecoder().decode(LocalTranscriptEntry.self, from: dep.payload))?.itemId == itemId {
+                    toDelete.insert(dep.id)
+                }
+            case .note:
+                if (try? JSONDecoder().decode(LocalNoteEntry.self, from: dep.payload))?.itemId == itemId {
+                    toDelete.insert(dep.id)
+                }
+            case .recording:
+                if let rec = try? JSONDecoder().decode(LocalRecordingEntry.self, from: dep.payload),
+                   rec.itemId == itemId {
+                    LocalRecordingStore.shared.deleteFile(at: rec.fileURL)
+                    toDelete.insert(dep.id)
+                }
+            default: break
+            }
+        }
+        entries.removeAll { toDelete.contains($0.id) }
     }
 
     func empty() {
