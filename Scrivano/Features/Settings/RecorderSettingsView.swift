@@ -7,7 +7,7 @@ struct RecorderSettingsView: View {
     @State private var showPocketExplanation = false
     @AppStorage("recorderQuality")  private var quality: Int = 1    // 0=Low 1=Med 2=High 3=Max
     @AppStorage("recorderFormat")   private var format: Int = 1     // 0=M4A 1=WAV
-    @AppStorage("splittingInterval")  private var splitInterval: Int = 300
+    @AppStorage("splittingInterval")  private var splitInterval: Int = 600
     @AppStorage("auto_conversion")    private var autoConversion: Bool = true
     @AppStorage("compression_speed")  private var compressionSpeed: Int = 0   // 0=off 1=1.5x 2=2x
     @AppStorage("compression_mono")   private var compressionMono: Bool = false

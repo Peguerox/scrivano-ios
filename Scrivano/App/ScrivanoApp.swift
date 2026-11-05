@@ -43,7 +43,7 @@ struct ScrivanoApp: App {
             "recorderQuality":     1,     // Medium
             "recorderFormat":      1,     // WAV
             "recorderBitDepth":    0,     // 16 bit
-            "splittingInterval":   300,   // 5 min
+            "splittingInterval":   600,   // 10 min
             "auto_transcription":  true,
             "automation_paused":   false,
             "auto_conversion":     true,
