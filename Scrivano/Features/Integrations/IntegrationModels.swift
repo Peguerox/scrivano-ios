@@ -15,6 +15,9 @@ struct IntegrationConfig: Codable, Identifiable, Hashable {
     let requiresBaseUrl: Bool
     let baseUrlLabel: String?
     let baseUrlDefault: String?
+    /// Non-null when the user already has a saved base URL on the backend. When set,
+    /// the Base URL field is hidden and base_url is omitted from install (backend reuses it).
+    let savedBaseUrl: String?
     let pullTargets: [IntegrationOption]   // entities → radio buttons
     let pullContent: [IntegrationOption]   // content_types → checkboxes
     let pushTargets: [IntegrationOption]
@@ -166,6 +169,7 @@ struct ServerIntegrationListItem: Codable {
             requiresBaseUrl: false,
             baseUrlLabel: nil,
             baseUrlDefault: nil,
+            savedBaseUrl: nil,
             pullTargets: [],
             pullContent: [],
             pushTargets: [],
@@ -235,6 +239,7 @@ struct ServerIntegrationDetail: Codable {
             requiresBaseUrl: auth?.requiresBaseUrl ?? false,
             baseUrlLabel: auth?.baseUrlLabel,
             baseUrlDefault: auth?.baseUrlDefault,
+            savedBaseUrl: auth?.baseUrl,
             pullTargets: entities.map { IntegrationOption(id: $0.id, label: $0.label, subtitle: $0.description ?? "", requiresId: $0.requiresId ?? false, idLabel: $0.idLabel, idType: $0.idType) },
             pullContent: pullContent,
             pushTargets: [],
@@ -258,12 +263,17 @@ struct ServerAuth: Codable {
     let requiresBaseUrl: Bool?
     let baseUrlLabel: String?
     let baseUrlDefault: String?
+    /// Non-null when the user already has a saved base URL (e.g. eClinicalWorks clinic
+    /// picked on the web after paying). When set, the app hides the Base URL field and
+    /// omits base_url from the install request so the backend reuses the saved value.
+    let baseUrl: String?
 
     enum CodingKeys: String, CodingKey {
         case type
         case requiresBaseUrl  = "requires_base_url"
         case baseUrlLabel     = "base_url_label"
         case baseUrlDefault   = "base_url_default"
+        case baseUrl          = "base_url"
     }
 }
 

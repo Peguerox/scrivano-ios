@@ -474,6 +474,14 @@ struct AuthTabView: View {
 
     private var authType: AuthType { integration.config.authType }
 
+    /// True when the Base URL field should be shown: the integration requires one AND the
+    /// user doesn't already have a saved value on the backend. When a value is saved (e.g. an
+    /// eClinicalWorks clinic picked on the web), the field is hidden and base_url is omitted
+    /// from install so the backend reuses the saved value.
+    private var shouldShowBaseUrlField: Bool {
+        integration.config.requiresBaseUrl && (integration.config.savedBaseUrl?.isEmpty ?? true)
+    }
+
     private var timeFmt: DateFormatter {
         let f = DateFormatter(); f.dateStyle = .none; f.timeStyle = .short; return f
     }
@@ -586,7 +594,7 @@ struct AuthTabView: View {
             }
             .padding(.vertical, 20)
 
-            if integration.config.requiresBaseUrl {
+            if shouldShowBaseUrlField {
                 baseUrlField
             }
             actionButton(langMgr.t("integrations.auth.connectBrowser"), style: .primary, loading: isConnecting) { triggerConnect() }
@@ -633,7 +641,7 @@ struct AuthTabView: View {
 
     @ViewBuilder
     private func credentialsForm(reconnect: Bool) -> some View {
-        if integration.config.requiresBaseUrl {
+        if shouldShowBaseUrlField {
             baseUrlField
         }
 
@@ -695,7 +703,7 @@ struct AuthTabView: View {
             do {
                 let url = try await store.install(
                     integrationId: integration.id,
-                    baseUrl: integration.config.requiresBaseUrl ? baseUrl : nil,
+                    baseUrl: shouldShowBaseUrlField ? baseUrl : nil,
                     username: authType == .basic ? credUsername : nil,
                     password: authType == .basic ? credPassword : nil,
                     apiKey: authType == .apiKey ? credApiKey : nil
