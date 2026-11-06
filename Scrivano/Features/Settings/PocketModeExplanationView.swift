@@ -2,6 +2,7 @@ import SwiftUI
 
 struct PocketModeExplanationView: View {
     @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var langMgr: LanguageManager
 
     var body: some View {
         ZStack {
@@ -22,7 +23,7 @@ struct PocketModeExplanationView: View {
                         .foregroundColor(Color.white.opacity(0.30))
 
                     // Title
-                    Text("Pocket Mode Active")
+                    Text(langMgr.t("dashboard.pocketMode"))
                         .font(.inter(16, weight: .heavy))
                         .foregroundColor(Color.white.opacity(0.70))
 
@@ -30,18 +31,18 @@ struct PocketModeExplanationView: View {
                     VStack(alignment: .leading, spacing: 14) {
                         explanationRow(
                             icon: "hand.tap",
-                            title: "First tap arms the action",
-                            detail: "A strong vibration confirms the button is armed. Nothing happens yet."
+                            title: langMgr.t("recorder.firstTap"),
+                            detail: langMgr.t("recorder.pocket.firstDetail")
                         )
                         explanationRow(
                             icon: "hand.tap.fill",
-                            title: "Second tap confirms",
-                            detail: "Tap again within 6 seconds to pause or stop the recording."
+                            title: langMgr.t("recorder.secondTap"),
+                            detail: langMgr.t("recorder.pocket.secondDetail")
                         )
                         explanationRow(
                             icon: "timer",
-                            title: "Inaction cancels",
-                            detail: "If you don't tap again, the action is cancelled with a soft vibration and recording continues."
+                            title: langMgr.t("recorder.inaction"),
+                            detail: langMgr.t("recorder.pocket.inactionDetail")
                         )
                     }
                     .padding(.horizontal, 24)
@@ -51,7 +52,7 @@ struct PocketModeExplanationView: View {
                     Button {
                         dismiss()
                     } label: {
-                        Text("Got it")
+                        Text(langMgr.t("recorder.gotIt"))
                             .font(.inter(14, weight: .heavy))
                             .foregroundColor(Color.white.opacity(0.60))
                             .frame(maxWidth: .infinity)

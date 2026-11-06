@@ -1790,7 +1790,7 @@ struct DashboardView: View {
                     .foregroundColor(Color(hex: "#ef4444"))
                     .font(.system(size: 11))
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("Note failed: \(failedName)")
+                    Text(String(format: langMgr.t("dashboard.noteFailed"), failedName))
                         .font(.inter(11, weight: .bold))
                         .foregroundColor(Color(hex: "#ef4444"))
                     if let reason = notesMgr.failedReason {

@@ -3,6 +3,7 @@ import UIKit
 
 struct CreditsView: View {
     @EnvironmentObject var auth: AuthManager
+    @EnvironmentObject var langMgr: LanguageManager
     @Environment(\.dismiss) var dismiss
     @StateObject private var rc = RevenueCatManager.shared
 
@@ -17,7 +18,7 @@ struct CreditsView: View {
             Color.phoneBg.ignoresSafeArea()
             VStack(spacing: 0) {
                 SubScreenBar(
-                    title: "Plans",
+                    title: langMgr.t("credits.title"),
                     accentColor: .brandCyan,
                     onBack: { dismiss() },
                     trailingSystemIcon: "house.fill",
@@ -41,7 +42,7 @@ struct CreditsView: View {
                 Color.black.opacity(0.55).ignoresSafeArea()
                 VStack(spacing: 14) {
                     ProgressView().progressViewStyle(.circular).tint(.brandCyan).scaleEffect(1.3)
-                    Text("Processing…")
+                    Text(langMgr.t("common.processing"))
                         .font(.inter(13, weight: .semibold))
                         .foregroundColor(.textSecondary)
                 }
@@ -53,11 +54,11 @@ struct CreditsView: View {
         }
         .navigationBarHidden(true)
         .task { await rc.fetchPrices() }
-        .alert("Purchase Error", isPresented: .init(
+        .alert(langMgr.t("credits.purchaseError"), isPresented: .init(
             get: { rc.errorMessage != nil },
             set: { if !$0 { rc.errorMessage = nil } }
         )) {
-            Button("OK", role: .cancel) { rc.errorMessage = nil }
+            Button(langMgr.t("common.ok"), role: .cancel) { rc.errorMessage = nil }
         } message: {
             Text(rc.errorMessage ?? "")
         }
@@ -74,7 +75,7 @@ struct CreditsView: View {
                 .zIndex(1)
 
             VStack(alignment: .leading, spacing: 10) {
-                Text("Current Balance")
+                Text(langMgr.t("plan.currentBalance"))
                     .font(.inter(10, weight: .heavy))
                     .foregroundColor(.textQuaternary)
                     .tracking(1)
@@ -82,9 +83,9 @@ struct CreditsView: View {
 
                 HStack(spacing: 7) {
                     balItem(value: String(format: "%.2f", auth.currentUser?.credit ?? 0),
-                            label: "Paid credits", isPaid: true)
+                            label: langMgr.t("plan.paidCredits"), isPaid: true)
                     balItem(value: String(format: "%.0f", auth.currentUser?.freeCredit ?? 0),
-                            label: "Free credits", isPaid: false)
+                            label: langMgr.t("plan.freeCredits"), isPaid: false)
                 }
             }
             .padding(16)
@@ -123,12 +124,12 @@ struct CreditsView: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
-                    Text("Free Plan")
+                    Text(langMgr.t("plan.free"))
                         .font(.inter(13, weight: .bold))
                         .foregroundColor(isFreePlan ? .textPrimary : Color.white.opacity(0.6))
                     if isFreePlan { activeBadge }
                 }
-                Text("Monthly credits refreshed daily")
+                Text(langMgr.t("plan.refreshed"))
                     .font(.inter(11))
                     .foregroundColor(.textQuaternary)
             }
@@ -145,7 +146,7 @@ struct CreditsView: View {
                         .shadow(color: .black.opacity(0.3), radius: 2)
                         .padding(.trailing, 3)
                 }
-                Text("Always On")
+                Text(langMgr.t("automation.always"))
                     .font(.inter(10, weight: .bold))
                     .foregroundColor(.textQuaternary)
             }
@@ -162,7 +163,7 @@ struct CreditsView: View {
 
     private var paygoGroup: some View {
         VStack(spacing: 0) {
-            Text("Pay as you go")
+            Text(langMgr.t("credits.payAsYouGo"))
                 .font(.inter(10, weight: .heavy))
                 .foregroundColor(.textQuaternary)
                 .tracking(0.7)
@@ -171,11 +172,11 @@ struct CreditsView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 10)
                 .padding(.bottom, 2)
-            tierRow(productId: RCProduct.credits50,  credits: "50",  name: "Starter Pack",  price: rc.productPrices[RCProduct.credits50]  ?? "$4.99",  isBest: false, glowLevel: 0)
+            tierRow(productId: RCProduct.credits50,  credits: "50",  name: langMgr.t("credits.starterPack"),  price: rc.productPrices[RCProduct.credits50]  ?? "$4.99",  isBest: false, glowLevel: 0)
             Divider().background(Color.white.opacity(0.05)).padding(.leading, 76)
-            tierRow(productId: RCProduct.credits125, credits: "125", name: "Standard Pack", price: rc.productPrices[RCProduct.credits125] ?? "$9.99",  isBest: false, glowLevel: 1)
+            tierRow(productId: RCProduct.credits125, credits: "125", name: langMgr.t("credits.standardPack"), price: rc.productPrices[RCProduct.credits125] ?? "$9.99",  isBest: false, glowLevel: 1)
             Divider().background(Color.white.opacity(0.05)).padding(.leading, 76)
-            tierRow(productId: RCProduct.credits300, credits: "300", name: "Plus Pack",     price: rc.productPrices[RCProduct.credits300] ?? "$19.99", isBest: true,  glowLevel: 2)
+            tierRow(productId: RCProduct.credits300, credits: "300", name: langMgr.t("credits.plusPack"),     price: rc.productPrices[RCProduct.credits300] ?? "$19.99", isBest: true,  glowLevel: 2)
         }
         .background(Color.white.opacity(0.045))
         .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.white.opacity(0.09), lineWidth: 1))
@@ -185,7 +186,7 @@ struct CreditsView: View {
 
     // MARK: - Active Plan Badge
     private var activeBadge: some View {
-        Text("CURRENT PLAN")
+        Text(langMgr.t("plan.currentPlan"))
             .font(.inter(8, weight: .heavy))
             .foregroundColor(.brandCyan)
             .padding(.horizontal, 6).padding(.vertical, 2)
@@ -205,7 +206,7 @@ struct CreditsView: View {
                 Text(credits)
                     .font(.inter(15, weight: .heavy))
                     .foregroundColor(isBest ? .white : .brandCyan)
-                Text("credits")
+                Text(langMgr.t("plan.credits"))
                     .font(.system(size: 8, weight: .bold))
                     .foregroundColor(isBest ? Color.white.opacity(0.8) : Color.brandCyan.opacity(0.7))
                     .textCase(.uppercase)
@@ -228,7 +229,7 @@ struct CreditsView: View {
                         .font(.inter(13, weight: .bold))
                         .foregroundColor(.textPrimary)
                     if isBest {
-                        Text("BEST VALUE")
+                        Text(langMgr.t("plan.bestValue"))
                             .font(.inter(8, weight: .heavy))
                             .foregroundColor(.brandCyan)
                             .padding(.horizontal, 6).padding(.vertical, 2)
@@ -236,7 +237,7 @@ struct CreditsView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 5))
                     }
                 }
-                Text("One-time purchase")
+                Text(langMgr.t("plan.onePurchase"))
                     .font(.inter(11))
                     .foregroundColor(.textQuaternary)
             }
@@ -275,7 +276,7 @@ struct CreditsView: View {
                 .zIndex(1)
 
             VStack(alignment: .leading, spacing: 0) {
-                Text("Unlimited Access")
+                Text(langMgr.t("credits.unlimitedHeader"))
                     .font(.inter(10, weight: .heavy))
                     .foregroundColor(.textQuaternary)
                     .tracking(0.7)
@@ -283,7 +284,7 @@ struct CreditsView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.bottom, 10)
                 HStack(spacing: 8) {
-                    Text("Most Popular")
+                    Text(langMgr.t("plan.mostPopular"))
                         .font(.inter(9, weight: .heavy))
                         .tracking(0.8)
                         .foregroundColor(Color(hex: "#060e1e"))
@@ -296,13 +297,13 @@ struct CreditsView: View {
 
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("∞ Unlimited Access")
+                        Text(langMgr.t("plan.unlimited"))
                             .font(.inter(14, weight: .heavy))
                             .foregroundColor(.brandCyan)
                         Text(rc.productPrices[RCProduct.unlimited] ?? "$20.00")
                             .font(.inter(22, weight: .heavy))
                             .foregroundColor(.textPrimary)
-                        Text("per month · cancel anytime")
+                        Text(langMgr.t("plan.perMonthCancel"))
                             .font(.inter(11))
                             .foregroundColor(.textTertiary)
                     }
@@ -318,7 +319,7 @@ struct CreditsView: View {
                     Button {
                         Task { await rc.purchase(productId: RCProduct.unlimited) }
                     } label: {
-                        Text(isUnlimited ? "Active Plan ✓" : "Subscribe Now →")
+                        Text(isUnlimited ? langMgr.t("credits.activePlan") : langMgr.t("credits.subscribeNow"))
                             .font(.inter(13, weight: .heavy))
                             .foregroundColor(isUnlimited ? .brandCyan : Color(hex: "#060e1e"))
                             .frame(maxWidth: .infinity)
@@ -341,7 +342,7 @@ struct CreditsView: View {
                                 UIApplication.shared.open(url)
                             }
                         } label: {
-                            Text("Manage →")
+                            Text(langMgr.t("common.manage"))
                                 .font(.inter(13, weight: .heavy))
                                 .foregroundColor(Color.brandCyan)
                                 .padding(.vertical, 12)
@@ -386,7 +387,7 @@ struct CreditsView: View {
                 .zIndex(1)
 
             VStack(spacing: 10) {
-                Text("Bring Your Own API")
+                Text(langMgr.t("credits.bringApiHeader"))
                     .font(.inter(10, weight: .heavy))
                     .foregroundColor(.textQuaternary)
                     .tracking(0.7)
@@ -405,11 +406,11 @@ struct CreditsView: View {
 
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
-                            Text("Bring your own API")
+                            Text(langMgr.t("settings.apiKey.bringOwn"))
                                 .font(.inter(13, weight: .heavy))
                                 .foregroundColor(Color(hex: "#a78bfa"))
                             if isBringAPI {
-                                Text("CURRENT PLAN")
+                                Text(langMgr.t("plan.currentPlan"))
                                     .font(.inter(8, weight: .heavy))
                                     .foregroundColor(Color(hex: "#a78bfa"))
                                     .padding(.horizontal, 6).padding(.vertical, 2)
@@ -419,7 +420,7 @@ struct CreditsView: View {
                                     .clipShape(RoundedRectangle(cornerRadius: 5))
                             }
                         }
-                        Text("Use your OpenAI key · unlimited integrations")
+                        Text(langMgr.t("settings.apiKey.useOwn"))
                             .font(.inter(11))
                             .foregroundColor(.textQuaternary)
                     }
@@ -431,7 +432,7 @@ struct CreditsView: View {
                         Text(rc.productPrices[RCProduct.bringapi] ?? "$10.00")
                             .font(.inter(20, weight: .heavy))
                             .foregroundColor(.textPrimary)
-                        Text("per month")
+                        Text(langMgr.t("plan.perMonth"))
                             .font(.inter(11))
                             .foregroundColor(.textQuaternary)
                     }
@@ -440,7 +441,7 @@ struct CreditsView: View {
                         Button {
                             Task { await rc.purchase(productId: RCProduct.bringapi) }
                         } label: {
-                            Text(isBringAPI ? "Active Plan ✓" : "Connect API →")
+                            Text(isBringAPI ? langMgr.t("credits.activePlan") : langMgr.t("credits.connectApi"))
                                 .font(.inter(12, weight: .heavy))
                                 .foregroundColor(Color(hex: "#a78bfa"))
                                 .padding(.horizontal, 18).padding(.vertical, 9)
@@ -457,7 +458,7 @@ struct CreditsView: View {
                                     UIApplication.shared.open(url)
                                 }
                             } label: {
-                                Text("Manage →")
+                                Text(langMgr.t("common.manage"))
                                     .font(.inter(12, weight: .heavy))
                                     .foregroundColor(Color(hex: "#a78bfa"))
                                     .padding(.horizontal, 18).padding(.vertical, 9)
@@ -497,7 +498,7 @@ struct CreditsView: View {
         Button {
             Task { await rc.restorePurchases() }
         } label: {
-            Text("Restore Purchases")
+            Text(langMgr.t("plan.restorePurchases"))
                 .font(.inter(12, weight: .semibold))
                 .foregroundColor(.textQuaternary)
         }

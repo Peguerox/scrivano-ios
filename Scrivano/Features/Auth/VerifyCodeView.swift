@@ -5,6 +5,7 @@ struct VerifyCodeView: View {
     var onVerified: (() -> Void)? = nil
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var auth: AuthManager
+    @EnvironmentObject var langMgr: LanguageManager
 
     @State private var digits: [String] = Array(repeating: "", count: 6)
     @FocusState private var inputFocused: Bool   // single focus state for the hidden field
@@ -109,7 +110,7 @@ struct VerifyCodeView: View {
                                 )
                                 .padding(.top, 8)
 
-                            Text("RECORD · TRANSCRIBE · GENERATE")
+                            Text(langMgr.t("dashboard.tagline"))
                                 .font(.inter(9, weight: .bold))
                                 .tracking(2.5)
                                 .foregroundColor(Color.brandCyan.opacity(0.45))
@@ -130,13 +131,13 @@ struct VerifyCodeView: View {
                         }
 
                         VStack(alignment: .leading, spacing: 16) {
-                            Text("Verify Your Email")
+                            Text(langMgr.t("auth.verifyEmail"))
                                 .font(.inter(23, weight: .heavy))
                                 .foregroundColor(.textPrimary)
                                 .padding(.top, 28)
 
                             VStack(alignment: .leading, spacing: 3) {
-                                Text("We sent a 6-digit code to")
+                                Text(langMgr.t("auth.verifyCode"))
                                     .font(.inter(13))
                                     .foregroundColor(.textSecondary)
                                 Text(email)
@@ -146,7 +147,7 @@ struct VerifyCodeView: View {
 
                             // Countdown
                             HStack(spacing: 4) {
-                                Text("Expires in")
+                                Text(langMgr.t("plan.expires"))
                                     .font(.inter(12))
                                     .foregroundColor(.textQuaternary)
                                 Text(formattedTime)
@@ -194,20 +195,20 @@ struct VerifyCodeView: View {
                             } label: {
                                 HStack(spacing: 8) {
                                     if isVerifying { ProgressView().tint(.white).scaleEffect(0.8) }
-                                    Text(isVerifying ? "Verifying…" : "Verify →")
+                                    Text(isVerifying ? langMgr.t("auth.verifying") : langMgr.t("auth.verifyShort"))
                                 }
                             }
                             .primaryButtonStyle()
                             .disabled(!isComplete || isVerifying)
 
                             HStack(spacing: 4) {
-                                Text("Didn't receive it?")
+                                Text(langMgr.t("auth.didntReceive"))
                                     .font(.inter(12))
                                     .foregroundColor(.textQuaternary)
                                 Button {
                                     Task { await resend() }
                                 } label: {
-                                    Text(isResending ? "Sending…" : "Resend Code")
+                                    Text(isResending ? langMgr.t("auth.sending") : langMgr.t("auth.resendCode"))
                                         .font(.inter(12, weight: .semibold))
                                         .foregroundColor(.brandCyan)
                                 }
@@ -260,11 +261,11 @@ struct VerifyCodeView: View {
                                 )
                         }
 
-                        Text("Account Created!")
+                        Text(langMgr.t("auth.accountCreated"))
                             .font(.inter(22, weight: .heavy))
                             .foregroundColor(.textPrimary)
 
-                        Text("Your account has been verified.\nPlease sign in to get started.")
+                        Text(langMgr.t("auth.verified"))
                             .font(.inter(13))
                             .foregroundColor(.textSecondary)
                             .multilineTextAlignment(.center)
@@ -276,7 +277,7 @@ struct VerifyCodeView: View {
                                 onVerified?()
                             }
                         } label: {
-                            Text("Sign In →")
+                            Text(langMgr.t("auth.signInBtn"))
                         }
                         .primaryButtonStyle()
                         .padding(.horizontal, 40)
@@ -338,7 +339,7 @@ struct VerifyCodeView: View {
             let (data, _) = try await URLSession.shared.data(for: req)
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
                 if json["success"] as? Bool == true { verified = true }
-                else { error = json["message"] as? String ?? "Invalid or expired code." }
+                else { error = json["message"] as? String ?? langMgr.t("auth.invalidCode") }
             }
         } catch { self.error = error.localizedDescription }
     }

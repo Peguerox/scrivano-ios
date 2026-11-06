@@ -390,7 +390,7 @@ struct PromptsView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "photo")
                             .font(.system(size: 11, weight: .medium))
-                        Text("Only prompts available for image processing are shown")
+                        Text(langMgr.t("prompts.onlyImage"))
                             .font(.inter(11))
                     }
                     .foregroundColor(Color(hex: "#34d399"))
@@ -558,7 +558,7 @@ struct PromptsView: View {
 
                             // Count badge
                             if cnt > 0 {
-                                Text("\(cnt) selected")
+                                Text(String(format: langMgr.t("prompts.countSelected"), cnt))
                                     .font(.inter(11, weight: .heavy))
                                     .foregroundColor(.brandCyan)
                                     .padding(.horizontal, 9).padding(.vertical, 3)
@@ -1115,7 +1115,7 @@ struct PromptCard: View {
             // ── Expanded example ──
             if showExample, let example = prompt.example {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Example")
+                    Text(LanguageManager.shared.t("common.example"))
                         .font(.inter(10, weight: .heavy))
                         .tracking(0.6)
                         .foregroundColor(.textQuaternary)

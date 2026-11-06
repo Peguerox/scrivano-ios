@@ -92,7 +92,7 @@ struct TrashView: View {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 30, weight: .light))
                             .foregroundColor(.textQuaternary)
-                        Text("No results for \"\(searchText)\"")
+                        Text(String(format: langMgr.t("trash.noResultsFor"), searchText))
                             .font(.inter(15, weight: .semibold))
                             .foregroundColor(.textSecondary)
                         Spacer()
@@ -172,7 +172,7 @@ struct TrashView: View {
                     .font(.inter(16, weight: .heavy))
                     .foregroundColor(.textPrimary)
 
-                Text("\"\(item.name)\" belonged to the \"\(collectionName)\" collection, which no longer exists.")
+                Text(String(format: langMgr.t("trash.collectionGone"), item.name, collectionName))
                     .font(.inter(13))
                     .foregroundColor(.textSecondary)
                     .multilineTextAlignment(.center)
@@ -264,7 +264,7 @@ struct TrashView: View {
                     .font(.inter(16, weight: .heavy))
                     .foregroundColor(.textPrimary)
 
-                Text("This \(entry.kind == .transcript ? "text" : "note") belonged to \"\(parentItemName)\", which no longer exists.")
+                Text(String(format: langMgr.t("trash.parentItemGone"), entry.kind == .transcript ? langMgr.t("common.text.lower") : langMgr.t("common.note.lower"), parentItemName))
                     .font(.inter(13))
                     .foregroundColor(.textSecondary)
                     .multilineTextAlignment(.center)
@@ -297,7 +297,7 @@ struct TrashView: View {
                         .buttonStyle(.plain)
                     } else {
                         // No parent item in trash — can't restore usefully
-                        Text("The item \"\(parentItemName)\" was permanently deleted and cannot be recovered. You need to restore or recreate the item first.")
+                        Text(String(format: langMgr.t("trash.parentDeletedMsg"), parentItemName))
                             .font(.inter(12))
                             .foregroundColor(.textQuaternary)
                             .multilineTextAlignment(.center)

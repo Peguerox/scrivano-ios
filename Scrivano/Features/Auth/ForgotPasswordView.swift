@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ForgotPasswordView: View {
     @EnvironmentObject var auth: AuthManager
+    @EnvironmentObject var langMgr: LanguageManager
     @Environment(\.dismiss) var dismiss
     @State private var email = ""
     @State private var code = ""
@@ -95,7 +96,7 @@ struct ForgotPasswordView: View {
                                         )
                                 }
 
-                                Text(codeSent ? "CHECK YOUR INBOX" : "RESET PASSWORD")
+                                Text(codeSent ? langMgr.t("auth.checkInboxHero") : langMgr.t("auth.resetHeroTitle"))
                                     .font(.system(size: 20, weight: .heavy))
                                     .tracking(4)
                                     .foregroundStyle(
@@ -103,7 +104,7 @@ struct ForgotPasswordView: View {
                                     )
                                     .padding(.top, 8)
 
-                                Text(codeSent ? "CODE SENT · ENTER BELOW" : "WE'LL SEND A CODE TO YOUR EMAIL")
+                                Text(codeSent ? langMgr.t("auth.codeSentHeroSub") : langMgr.t("auth.resetHeroSub"))
                                     .font(.inter(9, weight: .bold))
                                     .tracking(2)
                                     .foregroundColor(Color.brandCyan.opacity(0.45))
@@ -124,30 +125,30 @@ struct ForgotPasswordView: View {
                             }
 
                             VStack(alignment: .leading, spacing: 13) {
-                                Text(codeSent ? "Check Your Inbox" : "Forgot Password?")
+                                Text(codeSent ? langMgr.t("auth.checkInbox") : langMgr.t("auth.forgotPasswordTitle"))
                                     .font(.inter(23, weight: .heavy))
                                     .foregroundColor(.textPrimary)
                                     .padding(.top, 28)
 
                                 Text(codeSent
-                                    ? "Enter the verification code we sent to \(email)."
-                                    : "Enter your email address and we'll send you a verification code.")
+                                    ? String(format: langMgr.t("auth.enterCodeSent"), email)
+                                    : langMgr.t("auth.enterEmailForCode"))
                                     .font(.inter(13))
                                     .foregroundColor(.textSecondary)
                                     .lineSpacing(3)
                                     .padding(.bottom, 4)
 
                                 if codeSent {
-                                    ScrivanoTextField(label: "Enter Code Here", text: $code, placeholder: "000000")
+                                    ScrivanoTextField(label: langMgr.t("auth.enterCodeHere"), text: $code, placeholder: "000000")
                                     if let err = auth.errorMessage {
                                         Text(err)
                                             .font(.inter(12))
                                             .foregroundColor(.danger)
                                             .padding(.top, -6)
                                     }
-                                    ScrivanoTextField(label: "New Password", text: $newPassword, placeholder: "New password", isSecure: true)
+                                    ScrivanoTextField(label: langMgr.t("auth.newPasswordField"), text: $newPassword, placeholder: langMgr.t("auth.newPasswordPlaceholder"), isSecure: true)
                                 } else {
-                                    ScrivanoTextField(label: "Email", text: $email, placeholder: "you@example.com", keyboardType: .emailAddress)
+                                    ScrivanoTextField(label: langMgr.t("auth.email"), text: $email, placeholder: "you@example.com", keyboardType: .emailAddress)
                                     if let err = auth.errorMessage {
                                         Text(err)
                                             .font(.inter(12))
@@ -172,8 +173,8 @@ struct ForgotPasswordView: View {
                                     HStack(spacing: 8) {
                                         if loading { ProgressView().tint(.white).scaleEffect(0.8) }
                                         Text(loading
-                                            ? (codeSent ? "Verifying…" : "Sending…")
-                                            : (codeSent ? "Reset Password" : "Send Code"))
+                                            ? (codeSent ? langMgr.t("auth.verifying") : langMgr.t("auth.sending"))
+                                            : (codeSent ? langMgr.t("auth.resetPassword") : langMgr.t("auth.sendCode")))
                                     }
                                 }
                                 .primaryButtonStyle()
@@ -181,7 +182,7 @@ struct ForgotPasswordView: View {
                                 .padding(.top, 4)
 
                                 if codeSent {
-                                    Button("Resend Code") {
+                                    Button(langMgr.t("auth.resendCode")) {
                                         Task {
                                             loading = true
                                             _ = await auth.resendResetCode(email: email)
@@ -242,11 +243,11 @@ struct ForgotPasswordView: View {
                                 )
                         }
 
-                        Text("Password Changed!")
+                        Text(langMgr.t("auth.passwordChanged"))
                             .font(.inter(22, weight: .heavy))
                             .foregroundColor(.textPrimary)
 
-                        Text("Your password has been updated.\nPlease sign in with your new password.")
+                        Text(langMgr.t("auth.newPassword"))
                             .font(.inter(13))
                             .foregroundColor(.textSecondary)
                             .multilineTextAlignment(.center)
@@ -255,7 +256,7 @@ struct ForgotPasswordView: View {
                         Button {
                             dismiss()
                         } label: {
-                            Text("Back to Sign In →")
+                            Text(langMgr.t("auth.backToSignIn"))
                         }
                         .primaryButtonStyle()
                         .padding(.horizontal, 40)

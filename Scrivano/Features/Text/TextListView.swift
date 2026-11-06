@@ -778,7 +778,7 @@ struct LocalTextRow: View {
                         .foregroundColor(.textPrimary)
                         .lineLimit(1)
                     if transcript.isMerge {
-                        Text("AUTO")
+                        Text(langMgr.t("automation.auto"))
                             .font(.inter(8, weight: .heavy))
                             .tracking(0.5)
                             .foregroundColor(.brandCyan.opacity(0.8))

@@ -16,6 +16,7 @@ struct RecordingView: View {
     var onRecordingSaved: (() -> Void)? = nil
 
     @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var langMgr: LanguageManager
     @ObservedObject private var recorder = AudioRecorderManager.shared
     @AppStorage("splittingInterval")  private var splitInterval: Int = 600
     @AppStorage("recorderFormat")     private var formatSetting: Int = 1
@@ -127,7 +128,7 @@ struct RecordingView: View {
 
                 // Top bar
                 ZStack {
-                    Text("Recording")
+                    Text(langMgr.t("recorder.recording"))
                         .font(.inter(16, weight: .heavy))
                         .foregroundColor(.textPrimary)
                         .frame(maxWidth: .infinity)
@@ -155,7 +156,7 @@ struct RecordingView: View {
                                 Circle()
                                     .fill(automationPaused ? Color.white.opacity(0.25) : Color.brandCyan)
                                     .frame(width: 5, height: 5)
-                                Text(automationPaused ? "AUTO OFF" : "AUTO")
+                                Text(automationPaused ? langMgr.t("recorder.autoOff") : langMgr.t("automation.auto"))
                                     .font(.inter(9, weight: .heavy))
                                     .tracking(0.3)
                                     .foregroundColor(automationPaused ? .textQuaternary : .brandCyan)
@@ -184,7 +185,7 @@ struct RecordingView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(.system(size: 10, weight: .semibold))
-                        Text("No API key set — auto-transcription will not work")
+                        Text(langMgr.t("recorder.noApiKey"))
                             .font(.inter(10, weight: .semibold))
                     }
                     .foregroundColor(Color(hex: "#f59e0b"))
@@ -198,7 +199,7 @@ struct RecordingView: View {
                     HStack(spacing: 5) {
                         Image(systemName: "scissors")
                             .font(.system(size: 10, weight: .semibold))
-                        Text("Split every \(splitIntervalLabel)")
+                        Text(String(format: langMgr.t("recorder.splitEvery"), splitIntervalLabel))
                             .font(.inter(10, weight: .medium))
                     }
                     .foregroundColor(Color.white.opacity(0.38))
@@ -344,18 +345,18 @@ struct RecordingView: View {
                         .font(.system(size: 52))
                         .foregroundColor(.danger)
 
-                    Text("Discard Recording?")
+                    Text(langMgr.t("recording.discard"))
                         .font(.inter(18, weight: .heavy))
                         .foregroundColor(.textPrimary)
 
-                    Text("This recording will be permanently deleted and cannot be recovered.")
+                    Text(langMgr.t("recording.discardMsg"))
                         .font(.inter(13))
                         .foregroundColor(.textTertiary)
                         .multilineTextAlignment(.center)
 
                     HStack(spacing: 12) {
                         Button { showDeleteCard = false } label: {
-                            Text("Keep")
+                            Text(langMgr.t("common.keep"))
                                 .font(.inter(14, weight: .semibold))
                                 .foregroundColor(.textSecondary)
                                 .frame(maxWidth: .infinity)
@@ -368,7 +369,7 @@ struct RecordingView: View {
                             recorder.stopAndDiscard()
                             dismiss()
                         } label: {
-                            Text("Discard")
+                            Text(langMgr.t("common.discard"))
                                 .font(.inter(14, weight: .bold))
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
@@ -397,18 +398,18 @@ struct RecordingView: View {
                         .font(.system(size: 52))
                         .foregroundColor(.brandCyan)
 
-                    Text("Restart Recording?")
+                    Text(langMgr.t("recording.restart"))
                         .font(.inter(18, weight: .heavy))
                         .foregroundColor(.textPrimary)
 
-                    Text("The current recording will be discarded and a new one will start.")
+                    Text(langMgr.t("recording.restartMsg"))
                         .font(.inter(13))
                         .foregroundColor(.textTertiary)
                         .multilineTextAlignment(.center)
 
                     HStack(spacing: 12) {
                         Button { showRedoCard = false } label: {
-                            Text("Cancel")
+                            Text(langMgr.t("common.cancel"))
                                 .font(.inter(14, weight: .semibold))
                                 .foregroundColor(.textSecondary)
                                 .frame(maxWidth: .infinity)
@@ -420,7 +421,7 @@ struct RecordingView: View {
                             showRedoCard = false
                             recorder.restart()
                         } label: {
-                            Text("Restart")
+                            Text(langMgr.t("dashboard.restart"))
                                 .font(.inter(14, weight: .bold))
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
@@ -552,7 +553,7 @@ struct RecordingView: View {
                 VStack {
                     Spacer()
                     VStack(spacing: 16) {
-                        Text("Rename Item")
+                        Text(langMgr.t("dashboard.renameItem"))
                             .font(.inter(16, weight: .heavy))
                             .foregroundColor(.textPrimary)
                         TextField(displayName, text: $renameText)
@@ -572,7 +573,7 @@ struct RecordingView: View {
                             }
                         HStack(spacing: 10) {
                             Button { showRenameSheet = false } label: {
-                                Text("Cancel")
+                                Text(langMgr.t("common.cancel"))
                                     .font(.inter(14, weight: .bold)).foregroundColor(.textTertiary)
                                     .frame(maxWidth: .infinity).padding(.vertical, 13)
                                     .background(Color.white.opacity(0.05))
@@ -584,7 +585,7 @@ struct RecordingView: View {
                                 guard !t.isEmpty else { return }
                                 displayName = t; onRename?(t); showRenameSheet = false
                             } label: {
-                                Text("Rename")
+                                Text(langMgr.t("common.rename"))
                                     .font(.inter(14, weight: .bold)).foregroundColor(.white)
                                     .frame(maxWidth: .infinity).padding(.vertical, 13)
                                     .background(LinearGradient(colors: [Color.brandBlue, Color.brandCyan], startPoint: .leading, endPoint: .trailing))
@@ -676,8 +677,14 @@ struct RecorderSettingsSheet: View {
     @AppStorage(kGain)    private var gain: Double = 0.5
 
     @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var langMgr: LanguageManager
 
-    private let qualityLabels = ["Low", "Medium", "High", "Max"]
+    private var qualityLabels: [String] {
+        [langMgr.t("recorder.quality.labelLow"),
+         langMgr.t("recorder.quality.labelMedium"),
+         langMgr.t("recorder.quality.labelHigh"),
+         langMgr.t("recorder.quality.labelMax")]
+    }
     private let formatLabels  = ["M4A", "WAV"]
     private let gainSettable  = AVAudioSession.sharedInstance().isInputGainSettable
 
@@ -688,7 +695,7 @@ struct RecorderSettingsSheet: View {
             VStack(spacing: 0) {
                 // Header
                 HStack {
-                    Text("Recorder Settings")
+                    Text(langMgr.t("settings.recorderSettings.title"))
                         .font(.inter(16, weight: .heavy))
                         .foregroundColor(.textPrimary)
                     Spacer()
@@ -709,7 +716,7 @@ struct RecorderSettingsSheet: View {
                     VStack(spacing: 0) {
 
                         // Audio Quality
-                        SectionLabel(text: "Audio Quality")
+                        SectionLabel(text: langMgr.t("recorder.section.quality"))
                         Picker("Quality", selection: $quality) {
                             ForEach(0..<qualityLabels.count, id: \.self) { i in
                                 Text(qualityLabels[i]).tag(i)
@@ -723,7 +730,7 @@ struct RecorderSettingsSheet: View {
                         Divider().background(Color.borderDefault).padding(.horizontal, 18)
 
                         // Audio Format
-                        SectionLabel(text: "Audio Format")
+                        SectionLabel(text: langMgr.t("recorder.section.format"))
                         Picker("Format", selection: $format) {
                             ForEach(0..<formatLabels.count, id: \.self) { i in
                                 Text(formatLabels[i]).tag(i)
@@ -737,7 +744,7 @@ struct RecorderSettingsSheet: View {
                         Divider().background(Color.borderDefault).padding(.horizontal, 18)
 
                         // Input Gain
-                        SectionLabel(text: "Input Gain")
+                        SectionLabel(text: langMgr.t("recorder.sectionInputGain"))
                         VStack(spacing: 8) {
                             HStack {
                                 Image(systemName: "mic")
@@ -755,13 +762,13 @@ struct RecorderSettingsSheet: View {
                             .padding(.horizontal, 18)
 
                             if !gainSettable {
-                                Text("Input gain is not adjustable on this device")
+                                Text(langMgr.t("recorder.inputGain"))
                                     .font(.inter(11))
                                     .foregroundColor(.textTertiary)
                                     .multilineTextAlignment(.center)
                                     .padding(.horizontal, 18)
                             } else {
-                                Text(String(format: "Gain: %.0f%%", gain * 100))
+                                Text(String(format: langMgr.t("recorder.gainLabel"), gain * 100))
                                     .font(.inter(11))
                                     .foregroundColor(.textSecondary)
                             }
@@ -789,6 +796,7 @@ struct RenameRecordingSheet: View {
     var title: String = "Rename Item"
     var onRename: ((String) -> Void)?
     @Environment(\.dismiss) var dismiss
+    @EnvironmentObject var langMgr: LanguageManager
     @State private var name = ""
     @FocusState private var focused: Bool
 
@@ -825,7 +833,7 @@ struct RenameRecordingSheet: View {
                         Button {
                             dismiss()
                         } label: {
-                            Text("Cancel")
+                            Text(langMgr.t("common.cancel"))
                                 .font(.inter(14, weight: .bold))
                                 .foregroundColor(.textTertiary)
                                 .frame(maxWidth: .infinity).padding(.vertical, 13)
@@ -839,7 +847,7 @@ struct RenameRecordingSheet: View {
                             onRename?(trimmed)
                             dismiss()
                         } label: {
-                            Text("Rename")
+                            Text(langMgr.t("common.rename"))
                                 .font(.inter(14, weight: .bold))
                                 .foregroundColor(.white)
                                 .frame(maxWidth: .infinity).padding(.vertical, 13)

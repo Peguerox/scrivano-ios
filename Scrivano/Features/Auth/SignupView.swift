@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SignupView: View {
     @EnvironmentObject var auth: AuthManager
+    @EnvironmentObject var langMgr: LanguageManager
     @Environment(\.dismiss) var dismiss
     @State private var firstName = ""
     @State private var lastName = ""
@@ -102,7 +103,7 @@ struct SignupView: View {
                                     )
                                     .padding(.top, 8)
 
-                                Text("RECORD · TRANSCRIBE · GENERATE")
+                                Text(langMgr.t("dashboard.tagline"))
                                     .font(.inter(9, weight: .bold))
                                     .tracking(2.5)
                                     .foregroundColor(Color.brandCyan.opacity(0.45))
@@ -123,29 +124,29 @@ struct SignupView: View {
                             }
 
                             VStack(alignment: .leading, spacing: 13) {
-                                Text("Create Account")
+                                Text(langMgr.t("auth.createAccount"))
                                     .font(.inter(23, weight: .heavy))
                                     .foregroundColor(.textPrimary)
                                     .padding(.top, 28)
 
-                                Text("Join thousands of professionals")
+                                Text(langMgr.t("auth.joinThousands"))
                                     .font(.inter(13))
                                     .foregroundColor(.textSecondary)
                                     .padding(.bottom, 4)
 
                                 HStack(spacing: 10) {
-                                    ScrivanoTextField(label: "First Name", text: $firstName, placeholder: "John")
-                                    ScrivanoTextField(label: "Last Name", text: $lastName, placeholder: "Cabrera")
+                                    ScrivanoTextField(label: langMgr.t("auth.firstName"), text: $firstName, placeholder: "John")
+                                    ScrivanoTextField(label: langMgr.t("auth.lastName"), text: $lastName, placeholder: "Cabrera")
                                 }
 
-                                ScrivanoTextField(label: "Email", text: $email, placeholder: "you@example.com", keyboardType: .emailAddress)
+                                ScrivanoTextField(label: langMgr.t("auth.email"), text: $email, placeholder: "you@example.com", keyboardType: .emailAddress)
 
-                                ScrivanoTextField(label: "Password", text: $password, placeholder: "Min 6 characters", isSecure: true)
+                                ScrivanoTextField(label: langMgr.t("auth.password"), text: $password, placeholder: langMgr.t("auth.minChars"), isSecure: true)
 
-                                ScrivanoTextField(label: "Confirm Password", text: $confirmPassword, placeholder: "Retype password", isSecure: true)
+                                ScrivanoTextField(label: langMgr.t("auth.confirmPassword"), text: $confirmPassword, placeholder: langMgr.t("auth.retypePassword"), isSecure: true)
 
                                 if !confirmPassword.isEmpty && password != confirmPassword {
-                                    Text("Passwords don't match")
+                                    Text(langMgr.t("auth.passwordsDontMatch"))
                                         .font(.inter(11))
                                         .foregroundColor(.danger)
                                         .padding(.top, -6)
@@ -171,7 +172,7 @@ struct SignupView: View {
                                 } label: {
                                     HStack(spacing: 8) {
                                         if auth.isLoading { ProgressView().tint(.white).scaleEffect(0.8) }
-                                        Text(auth.isLoading ? "Creating…" : "Create Account →")
+                                        Text(auth.isLoading ? langMgr.t("auth.creating") : langMgr.t("auth.createAccountBtn"))
                                     }
                                 }
                                 .primaryButtonStyle()
@@ -182,7 +183,7 @@ struct SignupView: View {
                                     HStack(spacing: 6) {
                                         Image(systemName: "exclamationmark.circle.fill")
                                             .font(.system(size: 13))
-                                        Text("You must agree to our Legal Agreements to continue.")
+                                        Text(langMgr.t("auth.mustAgree"))
                                             .font(.inter(12))
                                     }
                                     .foregroundColor(.danger)
@@ -208,10 +209,10 @@ struct SignupView: View {
                                     .padding(.top, 1)
 
                                     HStack(spacing: 0) {
-                                        Text("I agree to the ")
+                                        Text(langMgr.t("auth.agree"))
                                             .font(.inter(12))
                                             .foregroundColor(Color.white.opacity(0.38))
-                                        Button("Legal Agreements") {
+                                        Button(langMgr.t("auth.legalAgreements")) {
                                             if let url = URL(string: "https://app.scrivano.net/#legal") {
                                                 UIApplication.shared.open(url)
                                             }
@@ -225,10 +226,10 @@ struct SignupView: View {
 
                                 HStack {
                                     Spacer()
-                                    Text("Already have an account? ")
+                                    Text(langMgr.t("auth.haveAccount"))
                                         .font(.inter(12))
                                         .foregroundColor(.textQuaternary)
-                                    Button("Sign In") { dismiss() }
+                                    Button(langMgr.t("auth.signInShort")) { dismiss() }
                                         .font(.inter(12, weight: .semibold))
                                         .foregroundColor(.brandCyan)
                                 }

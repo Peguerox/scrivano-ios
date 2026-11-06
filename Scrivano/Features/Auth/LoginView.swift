@@ -4,6 +4,7 @@ import AuthenticationServices
 
 struct LoginView: View {
     @EnvironmentObject var auth: AuthManager
+    @EnvironmentObject var langMgr: LanguageManager
     @State private var email = ""
     @State private var password = ""
     @State private var showSignup = false
@@ -96,7 +97,7 @@ struct LoginView: View {
                                 )
                                 .padding(.top, 8)
 
-                            Text("RECORD · TRANSCRIBE · GENERATE")
+                            Text(langMgr.t("dashboard.tagline"))
                                 .font(.inter(10, weight: .bold))
                                 .tracking(2.5)
                                 .foregroundColor(Color.brandCyan.opacity(0.45))
@@ -118,21 +119,21 @@ struct LoginView: View {
                         }
 
                         VStack(alignment: .leading, spacing: 13) {
-                            Text("Welcome back")
+                            Text(langMgr.t("auth.welcomeBack"))
                                 .font(.inter(23, weight: .heavy))
                                 .foregroundColor(.textPrimary)
                                 .padding(.top, 28)
 
-                            Text("Sign in to your account")
+                            Text(langMgr.t("auth.signIn"))
                                 .font(.inter(13))
                                 .foregroundColor(.textSecondary)
                                 .padding(.bottom, 11)
 
-                            ScrivanoTextField(label: "Email", text: $email, placeholder: "you@example.com", keyboardType: .emailAddress)
+                            ScrivanoTextField(label: langMgr.t("auth.email"), text: $email, placeholder: "you@example.com", keyboardType: .emailAddress)
 
                             VStack(alignment: .trailing, spacing: 0) {
-                                ScrivanoTextField(label: "Password", text: $password, placeholder: "••••••••", isSecure: true)
-                                Button("Forgot password?") { showForgot = true }
+                                ScrivanoTextField(label: langMgr.t("auth.password"), text: $password, placeholder: "••••••••", isSecure: true)
+                                Button(langMgr.t("auth.forgotPasswordLink")) { showForgot = true }
                                     .font(.inter(12, weight: .medium))
                                     .foregroundColor(.brandCyan)
                                     .padding(.top, 8)
@@ -152,7 +153,7 @@ struct LoginView: View {
                                     if auth.isLoading {
                                         ProgressView().tint(.white).scaleEffect(0.8)
                                     }
-                                    Text(auth.isLoading ? "Signing in…" : "Sign In →")
+                                    Text(auth.isLoading ? langMgr.t("auth.signingIn") : langMgr.t("auth.signInBtn"))
                                 }
                             }
                             .primaryButtonStyle()
@@ -166,18 +167,18 @@ struct LoginView: View {
                                         Image(systemName: "envelope.badge.fill")
                                             .font(.system(size: 14))
                                             .foregroundColor(.brandCyan)
-                                        Text("Email not verified yet")
+                                        Text(langMgr.t("auth.emailNotVerified"))
                                             .font(.inter(13, weight: .bold))
                                             .foregroundColor(.textPrimary)
                                     }
-                                    Text("Your account exists but the email hasn't been confirmed. Check your inbox for the verification code.")
+                                    Text(langMgr.t("auth.existingAccount"))
                                         .font(.inter(12))
                                         .foregroundColor(.textSecondary)
                                         .lineSpacing(3)
                                     Button {
                                         showVerify = true
                                     } label: {
-                                        Text("Verify Email →")
+                                        Text(langMgr.t("auth.verifyEmailBtn"))
                                             .font(.inter(13, weight: .bold))
                                             .foregroundColor(.brandCyan)
                                     }
@@ -209,10 +210,10 @@ struct LoginView: View {
                                 .padding(.top, 1)
 
                                 HStack(spacing: 0) {
-                                    Text("I agree to the ")
+                                    Text(langMgr.t("auth.agree"))
                                         .font(.inter(12))
                                         .foregroundColor(Color.white.opacity(0.38))
-                                    Button("Legal Agreements") {
+                                    Button(langMgr.t("auth.legalAgreements")) {
                                         if let url = URL(string: "https://app.scrivano.net/#legal") {
                                             UIApplication.shared.open(url)
                                         }
@@ -227,7 +228,7 @@ struct LoginView: View {
                             // Divider
                             HStack(spacing: 10) {
                                 Rectangle().fill(Color.white.opacity(0.08)).frame(height: 1)
-                                Text("or continue with").font(.inter(10, weight: .bold)).foregroundColor(Color.white.opacity(0.25)).tracking(0.5).fixedSize()
+                                Text(langMgr.t("auth.orContinue")).font(.inter(10, weight: .bold)).foregroundColor(Color.white.opacity(0.25)).tracking(0.5).fixedSize()
                                 Rectangle().fill(Color.white.opacity(0.08)).frame(height: 1)
                             }
                             .padding(.vertical, 4)
@@ -257,7 +258,7 @@ struct LoginView: View {
                                 } label: {
                                     HStack(spacing: 7) {
                                         GoogleGIcon(size: 17)
-                                        Text("Google").font(.inter(13, weight: .semibold))
+                                        Text(langMgr.t("auth.google")).font(.inter(13, weight: .semibold))
                                     }
                                     .foregroundColor(Color.white.opacity(0.7))
                                     .frame(maxWidth: .infinity)
@@ -279,7 +280,7 @@ struct LoginView: View {
                                                 // User cancelled — no message needed
                                             } else if code == 1000 {
                                                 socialErrorIsInfo = true
-                                                socialError = "Apple ID verified! Tap Sign in with Apple once more to continue."
+                                                socialError = langMgr.t("auth.appleVerified")
                                             } else {
                                                 socialErrorIsInfo = false
                                                 socialError = error.localizedDescription
@@ -289,7 +290,7 @@ struct LoginView: View {
                                 } label: {
                                     HStack(spacing: 7) {
                                         Image(systemName: "apple.logo").font(.system(size: 15))
-                                        Text("Apple").font(.inter(13, weight: .semibold))
+                                        Text(langMgr.t("auth.apple")).font(.inter(13, weight: .semibold))
                                     }
                                     .foregroundColor(Color.white.opacity(0.7))
                                     .frame(maxWidth: .infinity)
@@ -302,10 +303,10 @@ struct LoginView: View {
 
                             HStack {
                                 Spacer()
-                                Text("Don't have an account? ")
+                                Text(langMgr.t("auth.noAccount"))
                                     .font(.inter(12))
                                     .foregroundColor(.textQuaternary)
-                                Button("Sign up free") { showSignup = true }
+                                Button(langMgr.t("auth.signUpFree")) { showSignup = true }
                                     .font(.inter(12, weight: .semibold))
                                     .foregroundColor(.brandCyan)
                             }

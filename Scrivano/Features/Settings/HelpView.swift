@@ -105,7 +105,7 @@ struct HelpView: View {
                 let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
                 let build   = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
                 HStack(spacing: 6) {
-                    Text("Scrivano \(version) · Build \(build)")
+                    Text(String(format: langMgr.t("help.versionBuild"), version, build))
                         .font(.inter(11, weight: .medium))
                         .foregroundColor(.textPrimary)
                 }

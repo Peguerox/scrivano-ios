@@ -2691,7 +2691,7 @@ struct DatePickerSheet: View {
             Color.phoneBg.ignoresSafeArea()
             VStack(spacing: 0) {
                 HStack {
-                    Text("Select Date")
+                    Text(LanguageManager.shared.t("media.selectDate"))
                         .font(.inter(16, weight: .heavy))
                         .foregroundColor(.textPrimary)
                     Spacer()
@@ -2720,7 +2720,7 @@ struct DatePickerSheet: View {
                 Button {
                     isPresented = false
                 } label: {
-                    Text("Done")
+                    Text(LanguageManager.shared.t("common.done"))
                         .font(.inter(15, weight: .bold))
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)

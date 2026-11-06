@@ -997,8 +997,8 @@ struct MediaListView: View {
                 processQueueNext()
             }
         }
-        .alert("Conversion Failed", isPresented: .init(get: { convertError != nil }, set: { if !$0 { convertError = nil } })) {
-            Button("OK", role: .cancel) {}
+        .alert(langMgr.t("media.conversionFailed"), isPresented: .init(get: { convertError != nil }, set: { if !$0 { convertError = nil } })) {
+            Button(langMgr.t("common.ok"), role: .cancel) {}
         } message: { Text(convertError ?? "") }
         .sheet(isPresented: $showBulkMove) {
             BulkMoveAudioSheet(ids: Array(selected), currentItemId: item.id) {
@@ -1862,8 +1862,8 @@ struct LocalAudioPlayerView: View {
             }
         }
         .onDisappear { player.stop() }
-        .alert("Error", isPresented: .init(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
-            Button("OK", role: .cancel) {}
+        .alert(langMgr.t("common.error"), isPresented: .init(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+            Button(langMgr.t("common.ok"), role: .cancel) {}
         } message: { Text(errorMessage ?? "") }
     }
 
@@ -2121,7 +2121,7 @@ struct MoveToSheet: View {
                                         .lineLimit(1)
                                     Spacer()
                                     if audioCount > 0 {
-                                        Text("\(audioCount) audio\(audioCount == 1 ? "" : "s")")
+                                        Text(String(format: langMgr.t("media.audioCount"), audioCount))
                                             .font(.inter(10, weight: .semibold))
                                             .foregroundColor(.stageMedia.opacity(0.8))
                                             .padding(.horizontal, 7).padding(.vertical, 3)
@@ -2497,9 +2497,9 @@ struct ImageFileRow: View {
                     VStack(spacing: 12) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .font(.system(size: 36)).foregroundColor(.red.opacity(0.8))
-                        Text("Image file not found.")
+                        Text(LanguageManager.shared.t("media.imageNotFound"))
                             .font(.inter(15, weight: .semibold)).foregroundColor(.textPrimary)
-                        Button("Close") { showPromptImage = false }
+                        Button(LanguageManager.shared.t("media.close")) { showPromptImage = false }
                             .font(.inter(14, weight: .semibold)).foregroundColor(.brandCyan)
                     }
                 }

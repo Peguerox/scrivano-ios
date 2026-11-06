@@ -428,7 +428,7 @@ struct SwipeToDelete<Content: View>: View {
                         VStack(spacing: 5) {
                             Image(systemName: "trash")
                                 .font(.system(size: 18, weight: .bold))
-                            Text("Delete")
+                            Text(LanguageManager.shared.t("common.delete"))
                                 .font(.inter(11, weight: .heavy))
                         }
                         .foregroundColor(.white)
@@ -462,23 +462,23 @@ struct DeleteConfirmCover: View {
                     .foregroundColor(.danger)
                     .shadow(color: Color.danger.opacity(0.5), radius: 10)
                 if let name = itemName {
-                    Text("Delete \u{201C}\(name)\u{201D}?")
+                    Text(String(format: LanguageManager.shared.t("dashboard.deleteCollection"), name))
                         .font(.inter(16, weight: .heavy))
                         .foregroundColor(.textPrimary)
                         .multilineTextAlignment(.center)
                 } else {
-                    Text("Delete this item?")
+                    Text(LanguageManager.shared.t("dashboard.deleteItem"))
                         .font(.inter(16, weight: .heavy))
                         .foregroundColor(.textPrimary)
                         .multilineTextAlignment(.center)
                 }
-                Text("This action cannot be undone.")
+                Text(LanguageManager.shared.t("common.this_cannot_undo"))
                     .font(.inter(13))
                     .foregroundColor(.textSecondary)
                     .multilineTextAlignment(.center)
                 HStack(spacing: 10) {
                     Button { cancel() } label: {
-                        Text("Cancel")
+                        Text(LanguageManager.shared.t("common.cancel"))
                             .font(.inter(14, weight: .bold)).foregroundColor(.textTertiary)
                             .frame(maxWidth: .infinity).padding(.vertical, 13)
                             .background(Color.white.opacity(0.05))
@@ -489,7 +489,7 @@ struct DeleteConfirmCover: View {
                         dismiss()
                         onDelete()
                     } label: {
-                        Text("Delete")
+                        Text(LanguageManager.shared.t("common.delete"))
                             .font(.inter(14, weight: .heavy)).foregroundColor(.white)
                             .frame(maxWidth: .infinity).padding(.vertical, 13)
                             .background(Color.danger.opacity(0.80))
@@ -536,7 +536,7 @@ struct CollectionTopPanel: View {
     // All rows: default first (always), then real collections sorted by preference
     private var allRows: [(id: String, name: String, isDefault: Bool)] {
         let defaults: [(id: String, name: String, isDefault: Bool)] = showMyCollection
-            ? [(id: defaultKey, name: "My Collection", isDefault: true)]
+            ? [(id: defaultKey, name: LanguageManager.shared.t("dashboard.myCollection"), isDefault: true)]
             : []
         let sorted = sortOrder == "name"
             ? vm.collections.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -549,7 +549,7 @@ struct CollectionTopPanel: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Text("Collections")
+                Text(LanguageManager.shared.t("dashboard.collections"))
                     .font(.inter(17, weight: .heavy))
                     .foregroundColor(.textPrimary)
                 Spacer()
@@ -560,7 +560,7 @@ struct CollectionTopPanel: View {
                     HStack(spacing: 4) {
                         Image(systemName: sortOrder == "name" ? "textformat.abc" : "calendar")
                             .font(.system(size: 11, weight: .semibold))
-                        Text(sortOrder == "name" ? "A–Z" : "Date")
+                        Text(sortOrder == "name" ? LanguageManager.shared.t("dashboard.sortAZ") : LanguageManager.shared.t("dashboard.sortDate"))
                             .font(.inter(11, weight: .semibold))
                     }
                     .foregroundColor(.textSecondary)
@@ -588,7 +588,7 @@ struct CollectionTopPanel: View {
                     } label: {
                         HStack(spacing: 4) {
                             Image(systemName: "trash")
-                            Text("Delete")
+                            Text(LanguageManager.shared.t("common.delete"))
                         }
                         .font(.inter(12, weight: .bold))
                         .foregroundColor(.danger)
@@ -605,7 +605,7 @@ struct CollectionTopPanel: View {
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "plus")
-                        Text("New")
+                        Text(LanguageManager.shared.t("common.new"))
                     }
                     .font(.inter(12, weight: .bold))
                     .foregroundColor(.brandCyan)
@@ -630,8 +630,8 @@ struct CollectionTopPanel: View {
                                 : vm.activeCollection?.id == row.id
                             let allStored = LocalItemStore.shared.all()
                             let meta = row.isDefault
-                                ? "\(allStored.filter { $0.collectionId == nil || ($0.collectionId?.isEmpty ?? true) }.count) items"
-                                : "\(allStored.filter { $0.collectionId == row.id }.count) items"
+                                ? String(format: LanguageManager.shared.t("dashboard.itemsCountMeta"), allStored.filter { $0.collectionId == nil || ($0.collectionId?.isEmpty ?? true) }.count)
+                                : String(format: LanguageManager.shared.t("dashboard.itemsCountMeta"), allStored.filter { $0.collectionId == row.id }.count)
                             collRow(key: row.id, name: row.name, meta: meta, isActive: isActive, isDefault: row.isDefault)
                                 .id(row.id)
                         }
@@ -671,11 +671,11 @@ struct CollectionTopPanel: View {
                             .foregroundColor(.danger)
                             .shadow(color: Color.danger.opacity(0.5), radius: 10)
                         let count = selected.count
-                        Text("Delete \(count) collection\(count == 1 ? "" : "s")?")
+                        Text(String(format: LanguageManager.shared.t("dashboard.deleteCollectionsCount"), count))
                             .font(.inter(16, weight: .heavy))
                             .foregroundColor(.textPrimary)
                             .multilineTextAlignment(.center)
-                        Text("Items inside will not be deleted.")
+                        Text(LanguageManager.shared.t("dashboard.deleteItemHint"))
                             .font(.inter(13))
                             .foregroundColor(.textSecondary)
                             .multilineTextAlignment(.center)
@@ -683,7 +683,7 @@ struct CollectionTopPanel: View {
                             Button {
                                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showDeleteConfirm = false }
                             } label: {
-                                Text("Cancel")
+                                Text(LanguageManager.shared.t("common.cancel"))
                                     .font(.inter(14, weight: .bold)).foregroundColor(.textTertiary)
                                     .frame(maxWidth: .infinity).padding(.vertical, 13)
                                     .background(Color.white.opacity(0.05))
@@ -694,7 +694,7 @@ struct CollectionTopPanel: View {
                                 withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { showDeleteConfirm = false }
                                 performDelete()
                             } label: {
-                                Text("Delete")
+                                Text(LanguageManager.shared.t("common.delete"))
                                     .font(.inter(14, weight: .heavy)).foregroundColor(.white)
                                     .frame(maxWidth: .infinity).padding(.vertical, 13)
                                     .background(Color.danger.opacity(0.80))
@@ -765,7 +765,7 @@ struct CollectionTopPanel: View {
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(name).font(.inter(14, weight: .bold)).foregroundColor(.textPrimary)
-                    Text(meta + (isActive ? " · Active" : "")).font(.inter(11)).foregroundColor(.textTertiary)
+                    Text(meta + (isActive ? LanguageManager.shared.t("dashboard.activeSuffix") : "")).font(.inter(11)).foregroundColor(.textTertiary)
                 }
                 Spacer()
                 if isActive {
@@ -938,7 +938,7 @@ struct IntegrationMetaSheet: View {
                 // Header
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("Integration Source")
+                        Text(LanguageManager.shared.t("item.integrationSource"))
                             .font(.inter(16, weight: .heavy))
                             .foregroundColor(.textPrimary)
                         Text(meta.integrationName)
@@ -961,16 +961,16 @@ struct IntegrationMetaSheet: View {
                 ScrollView(showsIndicators: false) {
                     VStack(spacing: 12) {
                         // Sync info card
-                        infoCard(label: "Sync Info") {
+                        infoCard(label: LanguageManager.shared.t("item.syncInfo")) {
                             infoRow(label: meta.identifierLabel, value: meta.sourceIdentifier, mono: true, isLast: false)
-                            infoRow(label: "Last synced", value: dateFmt.string(from: meta.lastSynced), mono: false, isLast: true)
+                            infoRow(label: LanguageManager.shared.t("item.lastSynced"), value: dateFmt.string(from: meta.lastSynced), mono: false, isLast: true)
                         }
 
                         // Raw fields card — exclude keys already shown in Sync Info
                         let hiddenKeys: Set<String> = ["patient_name"]
                         let ehrKeys = meta.rawFields.keys.filter { !hiddenKeys.contains($0.lowercased()) }.sorted()
                         if !ehrKeys.isEmpty {
-                            infoCard(label: "EHR Fields") {
+                            infoCard(label: LanguageManager.shared.t("item.ehrFields")) {
                                 ForEach(ehrKeys, id: \.self) { key in
                                     infoRow(label: key.replacingOccurrences(of: "_", with: " "),
                                             value: meta.rawFields[key] ?? "", mono: false,
