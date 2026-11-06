@@ -13,7 +13,12 @@ struct RecorderSettingsView: View {
     @AppStorage("compression_mono")   private var compressionMono: Bool = false
     @AppStorage("compression_silence") private var compressionSilence: Bool = false
 
-    private let qualityLabels = ["Low", "Medium", "High", "Max"]
+    private var qualityLabels: [String] {[
+        langMgr.t("recorder.quality.labelLow"),
+        langMgr.t("recorder.quality.labelMedium"),
+        langMgr.t("recorder.quality.labelHigh"),
+        langMgr.t("recorder.quality.labelMax")
+    ]}
     private var qualityDescriptions: [String] {[
         langMgr.t("recorder.quality.low"),
         langMgr.t("recorder.quality.medium"),
@@ -104,17 +109,17 @@ struct RecorderSettingsView: View {
                         }
 
                         // ── Compression Options ────────────────────────────
-                        SectionLabel(text: "Compression Options")
+                        SectionLabel(text: langMgr.t("recorder.section.compression"))
                         settingsGroup {
                             VStack(spacing: 0) {
                                 // Speed
                                 VStack(alignment: .leading, spacing: 10) {
-                                    Text("UPLOAD SPEED")
+                                    Text(langMgr.t("recorder.compression.uploadSpeed"))
                                         .font(.inter(10, weight: .heavy))
                                         .foregroundColor(.textTertiary)
                                         .tracking(0.6)
                                     HStack(spacing: 6) {
-                                        ForEach([(0, "Normal"), (1, "1.5×"), (2, "2×")], id: \.0) { val, label in
+                                        ForEach([(0, langMgr.t("recorder.compression.normal")), (1, "1.5×"), (2, "2×")], id: \.0) { val, label in
                                             let isOn = compressionSpeed == val
                                             Button { withAnimation(.easeInOut(duration: 0.15)) { compressionSpeed = val } } label: {
                                                 Text(label)
@@ -132,10 +137,10 @@ struct RecorderSettingsView: View {
                                         }
                                     }
                                     Text(compressionSpeed == 0
-                                        ? "Audio sent at original speed."
+                                        ? langMgr.t("recorder.compression.speed0")
                                         : compressionSpeed == 1
-                                            ? "Speeds up audio 1.5× before upload. Reduces transcription cost ~33%."
-                                            : "Speeds up audio 2× before upload. Significantly reduces cost. Use with caution on low quality audio or heavy accents — may reduce accuracy.")
+                                            ? langMgr.t("recorder.compression.speed1")
+                                            : langMgr.t("recorder.compression.speed2"))
                                         .font(.inter(11))
                                         .foregroundColor(.textTertiary)
                                         .fixedSize(horizontal: false, vertical: true)
@@ -148,9 +153,9 @@ struct RecorderSettingsView: View {
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack {
                                         VStack(alignment: .leading, spacing: 2) {
-                                            Text("Convert to Mono")
+                                            Text(langMgr.t("recorder.compression.mono"))
                                                 .font(.inter(13, weight: .semibold)).foregroundColor(.textPrimary)
-                                            Text("Reduces file size ~50%. Increases transcription speed but may increase cost. May reduce accuracy.")
+                                            Text(langMgr.t("recorder.compression.monoDesc"))
                                                 .font(.inter(11)).foregroundColor(.textTertiary)
                                         }
                                         Spacer()
@@ -165,9 +170,9 @@ struct RecorderSettingsView: View {
                                 VStack(alignment: .leading, spacing: 4) {
                                     HStack {
                                         VStack(alignment: .leading, spacing: 2) {
-                                            Text("Strip Silence")
+                                            Text(langMgr.t("recorder.compression.silence"))
                                                 .font(.inter(13, weight: .semibold)).foregroundColor(.textPrimary)
-                                            Text("Removes silent gaps before upload. Moderately reduces cost. May reduce accuracy.")
+                                            Text(langMgr.t("recorder.compression.silenceDesc"))
                                                 .font(.inter(11)).foregroundColor(.textTertiary)
                                         }
                                         Spacer()
